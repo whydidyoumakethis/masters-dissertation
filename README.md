@@ -13,3 +13,8 @@ To build the project, first install [CMake](https://cmake.org/download/) version
 * MSBuild support for LLVM (clang-cl) toolset
 
 These can be installed using the Visual Studio installer.
+
+#### MacOS/Linux
+`./unix.sh [build type] [compiler]`
+
+Defaults to `Debug` and clang++. Creates Makefiles in `output/[build type]`.
