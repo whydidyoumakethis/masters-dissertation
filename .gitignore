@@ -46,3 +46,8 @@ build/output/
 
 # debug information files
 *.dwo
+
+# generated vs files
+.vs/
+out/*
+
