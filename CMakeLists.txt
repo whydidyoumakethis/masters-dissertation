@@ -9,7 +9,7 @@ include(FetchContent)
 FetchContent_Declare(
 	volk
 	GIT_REPOSITORY	"https://github.com/zeux/volk.git"
-	GIT_TAG 	"master"
+	GIT_TAG 	"d261d2505214c553a9185f310a7dc822cfadc46b"
 )
 
 FetchContent_MakeAvailable(volk)
@@ -18,7 +18,7 @@ FetchContent_MakeAvailable(volk)
 FetchContent_Declare(
 	glfw
 	GIT_REPOSITORY	"https://github.com/glfw/glfw.git"
-	GIT_TAG 	"master"
+	GIT_TAG 	"7c9ea952338b792cb2f70d7c663e498725073797"
 )
 
 FetchContent_MakeAvailable(glfw)
