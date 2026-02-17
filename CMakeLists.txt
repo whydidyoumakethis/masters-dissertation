@@ -14,6 +14,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(volk)
 
+# GLFW
+FetchContent_Declare(
+	glfw
+	GIT_REPOSITORY	"https://github.com/glfw/glfw.git"
+	GIT_TAG 	"master"
+)
+
+FetchContent_MakeAvailable(glfw)
+
 # glm
 FetchContent_Declare(
 	glm
