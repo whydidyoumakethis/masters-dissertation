@@ -14,6 +14,15 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(volk)
 
+# VulkanMemoryAllocator
+FetchContent_Declare(
+	VulkanMemoryAllocator
+	GIT_REPOSITORY	"https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git"
+	GIT_TAG 	"e722e57c891a8fbe3cc73ca56c19dd76be242759"
+)
+
+FetchContent_MakeAvailable(VulkanMemoryAllocator)
+
 # GLFW
 FetchContent_Declare(
 	glfw
