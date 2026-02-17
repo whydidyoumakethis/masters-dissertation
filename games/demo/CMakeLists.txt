@@ -11,5 +11,6 @@ target_link_libraries(demo
     kiki
     glm
     volk
+    VulkanMemoryAllocator
     glfw
 )
