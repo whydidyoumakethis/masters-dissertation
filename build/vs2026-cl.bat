@@ -1,0 +1,1 @@
+cmake -B output -S .. -G "Visual Studio 18 2026"
