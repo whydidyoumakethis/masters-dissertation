@@ -18,3 +18,5 @@ These can be installed using the Visual Studio installer.
 `./unix.sh [build type] [compiler]`
 
 Defaults to `Debug` and clang++. Creates Makefiles in `output/[build type]`.
+
+Example for Linux: `./unix.sh Debug g++`.

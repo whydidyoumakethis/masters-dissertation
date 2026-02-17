@@ -4,6 +4,17 @@ project(KikiEngine)
 
 include(FetchContent)
 
+### Dependencies ###
+# volk
+FetchContent_Declare(
+	volk
+	GIT_REPOSITORY	"https://github.com/zeux/volk.git"
+	GIT_TAG 	"master"
+)
+
+FetchContent_MakeAvailable(volk)
+
+# glm
 FetchContent_Declare(
 	glm
 	GIT_REPOSITORY	"https://github.com/g-truc/glm.git"
