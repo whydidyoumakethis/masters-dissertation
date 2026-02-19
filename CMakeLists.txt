@@ -41,6 +41,12 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glm)
 
+# -------- Create an interface library to propagate dependencies --------
+# This helps your subdirectories automatically get volk, glfw, glm
+add_library(KikiDeps INTERFACE)
+target_link_libraries(KikiDeps INTERFACE volk glfw VulkanMemoryAllocator)
+target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
+
 # Kiki Engine
 add_subdirectory(kiki-engine)
 
