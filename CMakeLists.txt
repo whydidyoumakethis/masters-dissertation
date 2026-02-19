@@ -41,10 +41,23 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(glm)
 
+# entt
+FetchContent_Declare(
+    entt
+    GIT_REPOSITORY "https://github.com/skypjack/entt.git"
+    GIT_TAG "v3.16.0"
+)
+FetchContent_MakeAvailable(entt)
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
-target_link_libraries(KikiDeps INTERFACE volk glfw VulkanMemoryAllocator)
+target_link_libraries(KikiDeps INTERFACE 
+	volk 
+	glfw 
+	VulkanMemoryAllocator
+	EnTT::EnTT
+)
 target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
 
 # Kiki Engine
