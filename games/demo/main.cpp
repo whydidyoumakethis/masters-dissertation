@@ -38,7 +38,13 @@ void update(entt::registry& registry) {
     //}
 }
 
-#include <renderer/render.h>
+int main(int argc, char** argv) {
+    temp::print("demo");
+    glm::vec3 vector(0.1f, 0.2f, 3.f);
+
+    std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
+
+    // VkResult volkInitilialize();
 
     // glfwSetCharCallback();
 
