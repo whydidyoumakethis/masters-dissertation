@@ -5,6 +5,7 @@
 #include <entt/entt.hpp>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <spdlog/spdlog.h>
 struct position {
     float x;
     float y;
@@ -19,7 +20,7 @@ void update(entt::registry& registry) {
 
     // use a callback
     view.each([](const auto& pos, auto& vel) { /* ... */
-        std::cout << pos.x <<"   " << pos.y << std::endl;
+        spdlog::info("Positions are {0} {1}", pos.x, pos.y);
         
         });
 
@@ -41,8 +42,8 @@ void update(entt::registry& registry) {
 int main(int argc, char** argv) {
     temp::print("demo");
     glm::vec3 vector(0.1f, 0.2f, 3.f);
-
-    std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
+    spdlog::info("{0} {1} {2}", vector.r, vector.g , vector.b);
+    //std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
 
     // VkResult volkInitilialize();
 
