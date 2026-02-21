@@ -1,6 +1,11 @@
 # Kiki Engine
 add_library(kiki)
 
+target_link_libraries(kiki
+  PRIVATE
+    KikiDeps
+)
+
 target_sources(kiki
   PRIVATE
     temp.cpp
@@ -10,3 +15,5 @@ target_sources(kiki
     FILES 
       temp.h
 )
+
+add_subdirectory(renderer)

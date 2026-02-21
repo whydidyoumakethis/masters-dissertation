@@ -1,6 +1,8 @@
-cmake_minimum_required(VERSION 3.11)
+cmake_minimum_required(VERSION 3.13)
 
 project(KikiEngine)
+
+set(CMAKE_CXX_STANDARD 23)
 
 include(FetchContent)
 
@@ -47,7 +49,17 @@ FetchContent_Declare(
     GIT_REPOSITORY "https://github.com/skypjack/entt.git"
     GIT_TAG "v3.16.0"
 )
+
 FetchContent_MakeAvailable(entt)
+
+# Reflect
+FetchContent_Declare(
+    reflect
+    GIT_REPOSITORY "https://github.com/qlibs/reflect.git"
+    GIT_TAG "96b9548a6e114368a3ab22a674a0feab7da7cfd8"
+)
+
+FetchContent_MakeAvailable(reflect)
 
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
