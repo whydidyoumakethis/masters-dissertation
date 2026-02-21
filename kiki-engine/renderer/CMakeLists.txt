@@ -6,7 +6,7 @@ target_sources(kiki
     utils/VulkanWindow.cpp
 
   PRIVATE
-    FILE_SET privateHeaders
+    FILE_SET rendererPrivateHeaders
     TYPE HEADERS
     FILES
       utils/Devices.hpp
@@ -14,7 +14,7 @@ target_sources(kiki
       utils/VulkanWindow.hpp
 
   PUBLIC
-    FILE_SET publicHeaders
+    FILE_SET rendererPublicHeaders
     TYPE HEADERS
     FILES 
       Renderer.hpp

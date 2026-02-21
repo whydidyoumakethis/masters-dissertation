@@ -52,15 +52,6 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(entt)
 
-# Reflect
-FetchContent_Declare(
-    reflect
-    GIT_REPOSITORY "https://github.com/qlibs/reflect.git"
-    GIT_TAG "96b9548a6e114368a3ab22a674a0feab7da7cfd8"
-)
-
-FetchContent_MakeAvailable(reflect)
-
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)

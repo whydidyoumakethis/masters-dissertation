@@ -5,7 +5,7 @@
 
 #include <iostream>
 
-namespace log {
+namespace klog {
     void info(std::string s);
     void error(std::string s);
 }

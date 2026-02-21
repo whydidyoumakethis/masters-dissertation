@@ -9,7 +9,31 @@
 
 
 std::vector<char const*> checkRequiredDeviceFeatures(VkPhysicalDevice device) {
-    return std::vector<char const*>();
+    VkPhysicalDeviceVulkan13Features vk13{};
+	vk13.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+		
+	VkPhysicalDeviceVulkan14Features vk14{};
+	vk14.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+	vk14.pNext  = &vk13;
+
+	VkPhysicalDeviceFeatures2 feat{};
+	feat.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+	feat.pNext  = &vk14;
+
+	vkGetPhysicalDeviceFeatures2(device, &feat);
+
+	std::vector<char const*> missingFeat;
+	if(!vk13.synchronization2) {
+		missingFeat.emplace_back("synchronization2");
+	}
+	if(!vk13.dynamicRendering) {
+		missingFeat.emplace_back("dynamicRendering");
+	}
+	if(!vk14.maintenance5) {
+		missingFeat.emplace_back("maintenance5");
+	}
+
+	return missingFeat;
 }
 
 float scoreDevice(VkPhysicalDevice device, VkSurfaceKHR surface) {
@@ -21,7 +45,7 @@ float scoreDevice(VkPhysicalDevice device, VkSurfaceKHR surface) {
 	auto const minor = VK_API_VERSION_MINOR(props.apiVersion);
 
 	if( major < 1 || (major == 1 && minor < 4) ) {
-        log::error(std::format("Info: Discarding device '{}': insufficient vulkan version at {}.{}\n", props.deviceName, major, minor));
+        klog::error(std::format("Info: Discarding device '{}': insufficient vulkan version at {}.{}\n", props.deviceName, major, minor));
 		return -1.f;
 	}
 
@@ -32,7 +56,7 @@ float scoreDevice(VkPhysicalDevice device, VkSurfaceKHR surface) {
 		for(auto const* feat : missing)
 			msg = msg.append(std::format("  - {}\n", feat));
 
-        log::error(msg);
+        klog::error(msg);
 		return -1.f;
 	}
 
@@ -84,4 +108,57 @@ namespace rutils {
 
 		return bestDevice;
     }
+
+	VkDevice createDevice(VkPhysicalDevice aPhysicalDev, std::vector<std::uint32_t> const& aQueues, std::vector<char const*> const& aEnabledExtensions) {
+		if( aQueues.empty() )
+			throw Kiki::FatalError( "create_device(): no queues requested" );
+
+		float queuePriorities[1] = { 1.f };
+
+		std::vector<VkDeviceQueueCreateInfo> queueInfos( aQueues.size() );
+		for( std::size_t i = 0; i < aQueues.size(); ++i )
+		{
+			auto& queueInfo = queueInfos[i];
+			queueInfo.sType  = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+			queueInfo.queueFamilyIndex  = aQueues[i];
+			queueInfo.queueCount        = 1;
+			queueInfo.pQueuePriorities  = queuePriorities;
+		}
+
+		VkPhysicalDeviceFeatures deviceFeatures{};
+		// No extra Vulkan 1.0 features for now.
+
+		VkPhysicalDeviceVulkan13Features vk13{};
+		vk13.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+		vk13.synchronization2  = VK_TRUE;
+		vk13.dynamicRendering  = VK_TRUE;
+
+		VkPhysicalDeviceVulkan14Features vk14{};
+		vk14.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
+		vk14.pNext  = &vk13;
+		vk14.maintenance5  = VK_TRUE; // Required in Vulkan 1.4, but we need to say that we want it.
+
+		VkDeviceCreateInfo deviceInfo{};
+		deviceInfo.sType  = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
+
+		deviceInfo.queueCreateInfoCount     = std::uint32_t(queueInfos.size());
+		deviceInfo.pQueueCreateInfos        = queueInfos.data();
+
+		deviceInfo.enabledExtensionCount    = std::uint32_t(aEnabledExtensions.size());
+		deviceInfo.ppEnabledExtensionNames  = aEnabledExtensions.data();
+
+		deviceInfo.pEnabledFeatures         = &deviceFeatures;
+
+		deviceInfo.pNext                    = &vk14;
+
+		VkDevice device = VK_NULL_HANDLE;
+		if( auto const res = vkCreateDevice( aPhysicalDev, &deviceInfo, nullptr, &device ); VK_SUCCESS != res )
+		{
+			throw Kiki::FatalError( "Unable to create logical device\n"
+				"vkCreateDevice() returned {}", toString(res)
+			);
+		}
+
+		return device;
+	}
 }

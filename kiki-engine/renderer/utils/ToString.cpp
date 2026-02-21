@@ -4,8 +4,6 @@
 #include <sstream>
 #include <type_traits>
 
-//#include <reflect>
-
 namespace rutils {
 	std::string toString(VkResult aResult) {
 		// See:
@@ -92,8 +90,6 @@ namespace rutils {
 	std::string toString(VkPhysicalDeviceType aDevType) {
 		// See
 		// https://www.khronos.org/registry/vulkan/specs/1.2-extensions/man/html/VkPhysicalDeviceType.html
-		//if(auto ret = reflect::enum_name( aDevType ); !ret.empty())
-			//return std::string(ret);
 
 		// Handle other values gracefully.
 		std::ostringstream oss;

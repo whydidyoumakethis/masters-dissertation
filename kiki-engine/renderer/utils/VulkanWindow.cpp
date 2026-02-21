@@ -1,1 +1,393 @@
 #include "VulkanWindow.hpp"
+
+#include <print>
+#include <tuple>
+#include <limits>
+#include <vector>
+#include <utility>
+#include <optional>
+#include <algorithm>
+#include <unordered_set>
+
+#include <iostream>
+
+#include <cassert>
+
+#include "../../logging/FatalError.hpp"
+#include "ToString.hpp"
+#include "Devices.hpp"
+
+
+// Define helpers
+std::unordered_set<std::string> getInstanceLayers();
+std::unordered_set<std::string> getInstanceExtensions();
+
+VkInstance createInstance(std::vector<char const*> const& aEnabledLayers, std::vector<char const*> const& aEnabledExtensions, bool aEnableDebugUtils);
+VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance aInstance);
+
+std::tuple<VkSwapchainKHR,VkFormat,VkExtent2D> createSwapchain(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface, VkDevice aDevice, GLFWwindow* aWindow, std::vector<std::uint32_t> const& aQueueFamilyIndices, VkSwapchainKHR aOldSwapchain);
+void getSwapchainImages(VkDevice aDevice, VkSwapchainKHR aSwapchain, std::vector<VkImage>& aImages);
+void createSwapchainImageViews(VkDevice aDevice, VkFormat aSwapchainFormat, std::vector<VkImage> const& aImages, std::vector<VkImageView>& aViews);
+
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_util_callback( VkDebugUtilsMessageSeverityFlagBitsEXT aSeverity, VkDebugUtilsMessageTypeFlagsEXT aType, VkDebugUtilsMessengerCallbackDataEXT const* aData, void* /*aUserPtr*/ );
+
+
+namespace rutils {
+	// VulkanWindow
+	VulkanWindow::VulkanWindow() = default;
+
+	VulkanWindow::~VulkanWindow() {
+		// Device-related objects
+		for( auto const view : swapViews )
+			vkDestroyImageView( device, view, nullptr );
+
+		if( VK_NULL_HANDLE != swapchain )
+			vkDestroySwapchainKHR( device, swapchain, nullptr );
+
+		// Window and related objects
+		if( VK_NULL_HANDLE != surface )
+			vkDestroySurfaceKHR( instance, surface, nullptr );
+
+		if( window )
+		{
+			glfwDestroyWindow( window );
+
+			// The following assumes that we never create more than one window;
+			// if there are multiple windows, destroying one of them would
+			// unload the whole GLFW library. Nevertheless, this solution is
+			// convenient when only dealing with one window (which we will do
+			// in the exercises), as it ensure that GLFW is unloaded after all
+			// window-related resources are.
+			glfwTerminate();
+		}
+	}
+
+	VulkanWindow::VulkanWindow( VulkanWindow&& aOther ) noexcept
+		: instance( std::exchange( aOther.instance, VK_NULL_HANDLE ) )
+		, physicalDevice( std::exchange( aOther.physicalDevice, VK_NULL_HANDLE ) )
+		, device( std::exchange( aOther.device, VK_NULL_HANDLE ) )
+		, graphicsFamilyIndex( aOther.graphicsFamilyIndex )
+		, graphicsQueue( std::exchange( aOther.graphicsQueue, VK_NULL_HANDLE ) )
+		, debugMessenger( std::exchange( aOther.debugMessenger, VK_NULL_HANDLE ) )
+		, window( std::exchange( aOther.window, VK_NULL_HANDLE ) )
+		, surface( std::exchange( aOther.surface, VK_NULL_HANDLE ) )
+		, presentFamilyIndex( aOther.presentFamilyIndex )
+		, presentQueue( std::exchange( aOther.presentQueue, VK_NULL_HANDLE ) )
+		, swapchain( std::exchange( aOther.swapchain, VK_NULL_HANDLE ) )
+		, swapImages( std::move( aOther.swapImages ) )
+		, swapViews( std::move( aOther.swapViews ) )
+		, swapchainFormat( aOther.swapchainFormat )
+		, swapchainExtent( aOther.swapchainExtent )
+	{}
+
+	VulkanWindow& VulkanWindow::operator=( VulkanWindow&& aOther ) noexcept
+	{
+		/* We can't just copy over the data from aOther, as we need to ensure that
+		 * any potential objects help by `this` are destroyed properly. Swapping
+		 * the data of `this` with aOther will do so: the data of `this` ends up in
+		 * aOther, and is subsequently destroyed properly by aOther's destructor.
+		 *
+		 * Advantages are that the move-operation is quite cheap and can trivially
+		 * be `noexcept`. Disadvantage is that the destruction of the resources
+		 * held by `this` is delayed until aOther's destruction.
+		 *
+		 * This is a somewhat common way of implementing move assignments.
+		 */
+		std::swap( instance, aOther.instance );
+		std::swap( physicalDevice, aOther.physicalDevice );
+		std::swap( device, aOther.device );
+		std::swap( graphicsFamilyIndex, aOther.graphicsFamilyIndex );
+		std::swap( graphicsQueue, aOther.graphicsQueue );
+		std::swap( debugMessenger, aOther.debugMessenger );
+		std::swap( window, aOther.window );
+		std::swap( surface, aOther.surface );
+		std::swap( presentFamilyIndex, aOther.presentFamilyIndex );
+		std::swap( presentQueue, aOther.presentQueue );
+		std::swap( swapchain, aOther.swapchain );
+		std::swap( swapImages, aOther.swapImages );
+		std::swap( swapViews, aOther.swapViews );
+		std::swap( swapchainFormat, aOther.swapchainFormat );
+		std::swap( swapchainExtent, aOther.swapchainExtent );
+		return *this;
+	}
+
+	// make_vulkan_window()
+	VulkanWindow makeVulkanWindow() {
+		VulkanWindow ret;
+
+		// Initialize Volk
+		if( auto const res = volkInitialize(); VK_SUCCESS != res )
+		{
+			throw Kiki::FatalError( "Unable to load Vulkan API\n" 
+				"Volk returned error {}", toString(res)
+			);
+		}
+
+		//TODO: initialize GLFW
+
+		// Check for instance layers and extensions
+		auto const supportedLayers = getInstanceLayers();
+		auto const supportedExtensions = getInstanceExtensions();
+
+		bool enableDebugUtils = false;
+
+		std::vector<char const*> enabledLayers, enabledExensions;
+
+		//TODO: check that the instance extensions required by GLFW are available,
+		//TODO: and if so, request these to be enabled in the instance creation.
+
+        // For Mac compatibility
+		enabledExensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+
+		// Validation layers support.
+#		if !defined(NDEBUG) // debug builds only
+		if( supportedLayers.count( "VK_LAYER_KHRONOS_validation" ) )
+		{
+			enabledLayers.emplace_back( "VK_LAYER_KHRONOS_validation" );
+		}
+
+		if( supportedExtensions.count( "VK_EXT_debug_utils" ) )
+		{
+			enableDebugUtils = true;
+			enabledExensions.emplace_back( "VK_EXT_debug_utils" );
+		}
+#		endif // ~ debug builds
+
+		for( auto const& layer : enabledLayers )
+			std::print( stderr, "Enabling layer: {}\n", layer );
+
+		for( auto const& extension : enabledExensions )
+			std::print( stderr, "Enabling instance extension: {}\n", extension );
+
+		// Create Vulkan instance
+		ret.instance = createInstance( enabledLayers, enabledExensions, enableDebugUtils );
+
+		// Load rest of the Vulkan API
+		volkLoadInstance( ret.instance );
+
+		// Setup debug messenger
+		if( enableDebugUtils )
+			ret.debugMessenger = createDebugMessenger(ret.instance);
+
+		//TODO: create GLFW window
+		//TODO: get VkSurfaceKHR from the window
+
+		// Select appropriate Vulkan device
+		ret.physicalDevice = rutils::selectDevice( ret.instance, ret.surface );
+		if( VK_NULL_HANDLE == ret.physicalDevice )
+			throw Kiki::FatalError( "No suitable physical device found!" );
+
+		{
+			VkPhysicalDeviceProperties props;
+			vkGetPhysicalDeviceProperties( ret.physicalDevice, &props );
+			std::print( stderr, "Selected device: {} ({}.{}.{})\n", props.deviceName, VK_API_VERSION_MAJOR(props.apiVersion), VK_API_VERSION_MINOR(props.apiVersion), VK_API_VERSION_PATCH(props.apiVersion) );
+		}
+
+		// Create a logical device
+		// Enable required extensions. The device selection method ensures that
+		// the VK_KHR_swapchain extension is present, so we can safely just
+		// request it without further checks.
+		std::vector<char const*> enabledDevExensions;
+
+		//TODO: list necessary extensions here
+
+		for( auto const& ext : enabledDevExensions )
+			std::print( stderr, "Enabling device extension: {}\n", ext );
+
+		// We need one or two queues:
+		// - best case: one GRAPHICS queue that can present
+		// - otherwise: one GRAPHICS queue and any queue that can present
+		std::vector<std::uint32_t> queueFamilyIndices;
+
+		//TODO: logic to select necessary queue families to instantiate
+
+		ret.device = rutils::createDevice(ret.physicalDevice, queueFamilyIndices, enabledDevExensions);
+
+		// Retrieve VkQueues
+		vkGetDeviceQueue( ret.device, ret.graphicsFamilyIndex, 0, &ret.graphicsQueue );
+
+		assert( VK_NULL_HANDLE != ret.graphicsQueue );
+
+		if( queueFamilyIndices.size() >= 2 )
+			vkGetDeviceQueue( ret.device, ret.presentFamilyIndex, 0, &ret.presentQueue );
+		else
+		{
+			ret.presentFamilyIndex = ret.graphicsFamilyIndex;
+			ret.presentQueue = ret.graphicsQueue;
+		}
+
+		// Create swap chain
+		//std::tie(ret.swapchain, ret.swapchainFormat, ret.swapchainExtent) = createSwapchain( ret.physicalDevice, ret.surface, ret.device, ret.window, queueFamilyIndices );
+		
+		// Get swap chain images & create associated image views
+		getSwapchainImages( ret.device, ret.swapchain, ret.swapImages );
+		createSwapchainImageViews( ret.device, ret.swapchainFormat, ret.swapImages, ret.swapViews );
+
+		// Done
+		return ret;
+	}
+
+	SwapChanges recreateSwapchain( VulkanWindow& aWindow ) {
+		//TODO: implement me!
+		throw Kiki::FatalError( "Not yet implemented!" );
+	}
+}
+
+std::unordered_set<std::string> getInstanceLayers() {
+    std::uint32_t numLayers = 0;
+	if( auto const res = vkEnumerateInstanceLayerProperties( &numLayers, nullptr ); VK_SUCCESS != res ) {
+		throw Kiki::FatalError( "Unable to enumerate layers\n"
+			"vkEnumerateInstanceLayerProperties() returned {}\n", rutils::toString(res)
+		);
+	}
+
+	std::vector<VkLayerProperties> layers( numLayers );
+	if( auto const res = vkEnumerateInstanceLayerProperties( &numLayers, layers.data() ); VK_SUCCESS != res ) {
+		throw Kiki::FatalError( "Unable to get layer properties\n"
+			"vkEnumerateInstanceLayerProperties() returned {}", rutils::toString(res)
+		);
+	}
+
+	std::unordered_set<std::string> res;
+	for( auto const& layer : layers )
+		res.insert( layer.layerName );
+
+	return res;
+}
+
+std::unordered_set<std::string> getInstanceExtensions() {
+	std::uint32_t numExtensions = 0;
+	if( auto const res = vkEnumerateInstanceExtensionProperties( nullptr, &numExtensions, nullptr ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to enumerate extensions\n"
+			"vkEnumerateInstanceExtensionProperties() returned {}", rutils::toString(res)
+		);
+	}
+
+	std::vector<VkExtensionProperties> extensions( numExtensions );
+	if( auto const res = vkEnumerateInstanceExtensionProperties( nullptr, &numExtensions, extensions.data() ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to get extension properties\n" 
+			"vkEnumerateInstanceExtensionProperties() returned {}", rutils::toString(res)
+		);
+	}
+
+	std::unordered_set<std::string> res;
+	for( auto const& extension : extensions )
+		res.insert( extension.extensionName );
+
+	return res;
+}
+
+VkInstance createInstance(std::vector<char const*> const& aEnabledLayers, std::vector<char const*> const& aEnabledExtensions, bool aEnableDebugUtils) {
+    // Prepare debug messenger info
+    VkDebugUtilsMessengerCreateInfoEXT debugInfo{};
+
+    if( aEnableDebugUtils )
+    {
+        debugInfo.sType  = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+        debugInfo.messageSeverity  = /*VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | */VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+        debugInfo.messageType      = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+        debugInfo.pfnUserCallback  = &debug_util_callback;
+        debugInfo.pUserData        = nullptr;
+    }
+
+    // Prepare application info
+    // The `apiVersion` is the *highest* version of Vulkan than the
+    // application can use. We can therefore safely set it to 1.3, even if
+    // we are not intending to use any 1.3 features (and want to run on
+    // pre-1.3 implementations).
+    VkApplicationInfo appInfo{};
+    appInfo.sType  = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    appInfo.pApplicationName    = "kiki";
+    appInfo.applicationVersion  = 1;
+    appInfo.apiVersion          = VK_MAKE_API_VERSION( 0, 1, 4, 0 ); // Version 1.4
+
+    // Create instance
+    VkInstanceCreateInfo instanceInfo{};
+    instanceInfo.sType  = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+
+    instanceInfo.enabledLayerCount        = std::uint32_t(aEnabledLayers.size());
+    instanceInfo.ppEnabledLayerNames      = aEnabledLayers.data();
+
+    instanceInfo.enabledExtensionCount    = std::uint32_t(aEnabledExtensions.size());
+    instanceInfo.ppEnabledExtensionNames  = aEnabledExtensions.data();
+
+    instanceInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+
+    instanceInfo.pApplicationInfo = &appInfo;
+
+    if( aEnableDebugUtils ) {
+        debugInfo.pNext = instanceInfo.pNext;
+        instanceInfo.pNext = &debugInfo; 
+    }
+
+    VkInstance instance;
+    if( auto const res = vkCreateInstance( &instanceInfo, nullptr, &instance ); VK_SUCCESS != res ) {
+        throw Kiki::FatalError( "Unable to create Vulkan instance\n"
+            "vkCreateInstance() returned {}", rutils::toString(res)
+        );
+    }
+
+    return instance;
+}
+
+VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance aInstance) {
+    // Set up the debug messaging for the rest of the application
+    VkDebugUtilsMessengerCreateInfoEXT debugInfo{};
+    debugInfo.sType            = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    debugInfo.messageSeverity  = /*VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_INFO_BIT_EXT | */ VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    debugInfo.messageType      = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT | VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    debugInfo.pfnUserCallback  = &debug_util_callback;
+    debugInfo.pUserData        = nullptr;
+
+    VkDebugUtilsMessengerEXT messenger = VK_NULL_HANDLE;
+    if( auto const res = vkCreateDebugUtilsMessengerEXT( aInstance, &debugInfo, nullptr, &messenger ); VK_SUCCESS != res ) {
+        throw Kiki::FatalError( "Unable to set up debug messenger\n" 
+            "vkCreateDebugUtilsMessengerEXT() returned {}", rutils::toString(res)
+        );
+    }
+
+    return messenger;
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL debug_util_callback( VkDebugUtilsMessageSeverityFlagBitsEXT aSeverity, VkDebugUtilsMessageTypeFlagsEXT aType, VkDebugUtilsMessengerCallbackDataEXT const* aData, void* /*aUserPtr*/ ) {
+    std::print( stderr, "{} ({}): {} ({})\n{}\n--\n", rutils::toString(aSeverity), rutils::messageTypeFlags(aType), aData->pMessageIdName, aData->messageIdNumber, aData->pMessage );
+
+    return VK_FALSE;
+}
+
+std::tuple<VkSwapchainKHR,VkFormat,VkExtent2D> createSwapchain(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface, VkDevice aDevice, GLFWwindow* aWindow, std::vector<std::uint32_t> const& aQueueFamilyIndices, VkSwapchainKHR aOldSwapchain) {
+    //auto const formats = get_surface_formats( aPhysicalDev, aSurface );
+    //auto const modes = get_present_modes( aPhysicalDev, aSurface );
+
+    //TODO: pick appropriate VkSurfaceFormatKHR format.
+    VkSurfaceFormatKHR format{}; // FIXME!
+
+    //TODO: pick appropriate VkPresentModeKHR
+    VkPresentModeKHR presentMode{}; // FIXME
+
+    //TODO: pick image count
+    std::uint32_t imageCount{}; // FIXME
+
+    //TODO: figure out swap extent
+    VkExtent2D extent{}; // FIXME
+
+    // TODO: create swap chain
+    throw Kiki::FatalError( "Not yet implemented!" );
+}
+
+
+void getSwapchainImages(VkDevice aDevice, VkSwapchainKHR aSwapchain, std::vector<VkImage>& aImages) {
+    assert( 0 == aImages.size() );
+
+    // TODO: get swapchain image handles with vkGetSwapchainImagesKHR
+    throw Kiki::FatalError( "Not yet implemented!" );
+}
+
+void createSwapchainImageViews(VkDevice aDevice, VkFormat aSwapchainFormat, std::vector<VkImage> const& aImages, std::vector<VkImageView>& aViews) {
+    assert( 0 == aViews.size() );
+
+    // TODO: create a VkImageView for each of the VkImages.
+    throw Kiki::FatalError( "Not yet implemented!" );
+
+    assert( aViews.size() == aImages.size() );
+}

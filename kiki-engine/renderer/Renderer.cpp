@@ -1,10 +1,13 @@
 #include "Renderer.hpp"
 
-#include "utils/Devices.hpp"
+#include "utils/VulkanWindow.hpp"
+
+#include <iostream>
 
 namespace Kiki {
     void initialiseRenderer() {
-        // TODO
-        
+        rutils::VulkanWindow window = rutils::makeVulkanWindow();
+
+        std::cout << "hi :D" << std::endl;
     }
 }

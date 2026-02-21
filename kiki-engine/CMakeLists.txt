@@ -17,3 +17,5 @@ target_sources(kiki
 )
 
 add_subdirectory(renderer)
+
+add_subdirectory(logging)
