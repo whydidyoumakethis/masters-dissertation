@@ -5,21 +5,24 @@
 #include <entt/entt.hpp>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+#include <spdlog/spdlog.h>
 struct position {
     float x;
     float y;
 };
-
 struct velocity {
     float dx;
     float dy;
+};
+struct tag {
+    entt::hashed_string string;
 };
 void update(entt::registry& registry) {
     auto view = registry.view<const position, velocity>();
 
     // use a callback
     view.each([](const auto& pos, auto& vel) { /* ... */
-        std::cout << pos.x <<"   " << pos.y << std::endl;
+        spdlog::info("Positions are {0} {1}", pos.x, pos.y);
         
         });
 
@@ -37,12 +40,22 @@ void update(entt::registry& registry) {
     //    // ...
     //}
 }
-
+void add_context(entt::registry& registry) {
+    // one type for one value in default
+    registry.ctx().emplace<int>(42);
+}
+void get_context(entt::registry& registry) {
+    // one type for one value in default
+    int int_value = registry.ctx().get<int>();
+    spdlog::info("score: {0}", int_value);
+}
 int main(int argc, char** argv) {
+    using namespace entt::literals; // to simplify the use of hashed_string 
     temp::print("demo");
     glm::vec3 vector(0.1f, 0.2f, 3.f);
 
-    std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
+    spdlog::info("{0} {1} {2}", vector.r, vector.g , vector.b);
+    // std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
 
     // VkResult volkInitilialize();
 
@@ -58,5 +71,22 @@ int main(int argc, char** argv) {
         if (i % 2 == 0) { registry.emplace<velocity>(entity, i * .1f, i * .1f); }
     }
     update(registry);
+    const auto player = registry.create();
+    registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string
+    registry.emplace<position>(player, 2.f, 4.f);
+    registry.emplace<velocity>(player, 3.f, 4.f);
+    const auto enemy = registry.create();
+    registry.emplace<tag>(enemy, "enemy"_hs);
+    registry.emplace<position>(enemy, 9.f, 9.f);
+    registry.emplace<velocity>(enemy, 9.f, 9.f);
+    auto view = registry.view<const position,velocity,tag>();
+    for (auto [entity, pos, vel, tag] : view.each()) {
+        if (tag.string == "player"_hs) {
+            spdlog::info("player's position is {0} {1}",pos.x,pos.y);
+            spdlog::info("player's velocity is {0} {1}", vel.dx, vel.dy);
+        }
+    }
+    add_context(registry);
+    get_context(registry);
     return 0;
 }
