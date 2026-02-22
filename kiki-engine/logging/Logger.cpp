@@ -6,7 +6,7 @@ namespace klog {
         std::cout << s << std::endl;
     }
 
-    void log(std::string s) {
+    void info(std::string s) {
         std::cout << s << std::endl;
     }
 }

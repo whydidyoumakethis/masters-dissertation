@@ -60,12 +60,25 @@ float scoreDevice(VkPhysicalDevice device, VkSurfaceKHR surface) {
 		return -1.f;
 	}
 
-	//TODO: additional checks
-	//TODO:  - check that the VK_KHR_swapchain extension is supported
-	//TODO:  - check that there is a queue family that can present to the
-	//TODO:    given surface
-	//TODO:  - check that there is a queue family that supports graphics
-	//TODO:    commands
+	// Check that the device supports the VK KHR swapchain extension
+	auto const exts = rutils::getDeviceExtensions( device );
+
+	if( !exts.count( VK_KHR_SWAPCHAIN_EXTENSION_NAME ) ) {
+		std::print( stderr, "Info: Discarding device ’{}’: extension {} missing\n", props.deviceName, VK_KHR_SWAPCHAIN_EXTENSION_NAME );
+		return -1.f;
+	}
+
+	// Ensure there is a queue family that can present to the given surface
+	if( !rutils::findQueueFamily( device, 0, surface ) ) {
+		std::print( stderr, "Info: Discarding device ’{}’: can’t present to surface\n", props.deviceName );
+		return -1.f;
+	}
+
+	// Also ensure there is a queue family that supports graphics commands
+	if( !rutils::findQueueFamily( device, VK_QUEUE_GRAPHICS_BIT ) ) {
+		std::print( stderr, "Info: Discarding device ’{}’: no graphics queue family\n", props.deviceName );
+		return -1.f;
+	}
 
 	// Discrete GPU > Integrated GPU > others
 	float score = 0.f;
@@ -116,8 +129,7 @@ namespace rutils {
 		float queuePriorities[1] = { 1.f };
 
 		std::vector<VkDeviceQueueCreateInfo> queueInfos( aQueues.size() );
-		for( std::size_t i = 0; i < aQueues.size(); ++i )
-		{
+		for( std::size_t i = 0; i < aQueues.size(); ++i ) {
 			auto& queueInfo = queueInfos[i];
 			queueInfo.sType  = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
 			queueInfo.queueFamilyIndex  = aQueues[i];
@@ -152,13 +164,59 @@ namespace rutils {
 		deviceInfo.pNext                    = &vk14;
 
 		VkDevice device = VK_NULL_HANDLE;
-		if( auto const res = vkCreateDevice( aPhysicalDev, &deviceInfo, nullptr, &device ); VK_SUCCESS != res )
-		{
+		if( auto const res = vkCreateDevice( aPhysicalDev, &deviceInfo, nullptr, &device ); VK_SUCCESS != res ) {
 			throw Kiki::FatalError( "Unable to create logical device\n"
 				"vkCreateDevice() returned {}", toString(res)
 			);
 		}
 
 		return device;
+	}
+
+	std::unordered_set<std::string> getDeviceExtensions( VkPhysicalDevice aPhysicalDev ) {
+		std::uint32_t extensionCount = 0;
+		if( auto const res = vkEnumerateDeviceExtensionProperties( aPhysicalDev, nullptr, &extensionCount, nullptr ); VK_SUCCESS != res )
+		{
+			throw Kiki::FatalError( "Unable to get device extension count\n"
+				"vkEnumerateDeviceExtensionProperties() returned {}", toString(res)
+			);
+		}
+
+		std::vector<VkExtensionProperties> extensions( extensionCount );
+		if( auto const res = vkEnumerateDeviceExtensionProperties( aPhysicalDev, nullptr, &extensionCount, extensions.data() ); VK_SUCCESS != res )
+		{
+			throw Kiki::FatalError( "Unable to get device extensions\n"
+				"vkEnumerateDeviceExtensionProperties() returned {}", toString(res)
+			);
+		}
+
+		std::unordered_set<std::string> ret;
+		for( auto const& ext : extensions )
+			ret.emplace( ext.extensionName );
+
+		return ret;
+	}
+
+	std::optional<std::uint32_t> findQueueFamily( VkPhysicalDevice aPhysicalDev, VkQueueFlags aQueueFlags, VkSurfaceKHR aSurface ) {
+		std::uint32_t numQueues = 0;
+		vkGetPhysicalDeviceQueueFamilyProperties( aPhysicalDev, &numQueues, nullptr );
+
+		std::vector<VkQueueFamilyProperties> families( numQueues );
+		vkGetPhysicalDeviceQueueFamilyProperties( aPhysicalDev, &numQueues, families.data());
+
+		for( std::uint32_t i = 0; i < numQueues; ++i ) {
+			auto const& family = families[i];
+
+			if( aQueueFlags == (aQueueFlags & family.queueFlags) ) {
+				if( VK_NULL_HANDLE == aSurface )
+					return i;
+
+				VkBool32 supported = VK_FALSE;
+				auto const res = vkGetPhysicalDeviceSurfaceSupportKHR( aPhysicalDev, i, aSurface, &supported );
+
+				if( VK_SUCCESS == res && supported )
+					return i;
+			}
+		}
 	}
 }

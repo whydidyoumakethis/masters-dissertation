@@ -25,11 +25,14 @@ std::unordered_set<std::string> getInstanceExtensions();
 VkInstance createInstance(std::vector<char const*> const& aEnabledLayers, std::vector<char const*> const& aEnabledExtensions, bool aEnableDebugUtils);
 VkDebugUtilsMessengerEXT createDebugMessenger(VkInstance aInstance);
 
-std::tuple<VkSwapchainKHR,VkFormat,VkExtent2D> createSwapchain(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface, VkDevice aDevice, GLFWwindow* aWindow, std::vector<std::uint32_t> const& aQueueFamilyIndices, VkSwapchainKHR aOldSwapchain);
+std::tuple<VkSwapchainKHR,VkFormat,VkExtent2D> createSwapchain(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface, VkDevice aDevice, GLFWwindow* aWindow, std::vector<std::uint32_t> const& aQueueFamilyIndices, VkSwapchainKHR aOldSwapchain = VK_NULL_HANDLE);
 void getSwapchainImages(VkDevice aDevice, VkSwapchainKHR aSwapchain, std::vector<VkImage>& aImages);
 void createSwapchainImageViews(VkDevice aDevice, VkFormat aSwapchainFormat, std::vector<VkImage> const& aImages, std::vector<VkImageView>& aViews);
 
 VKAPI_ATTR VkBool32 VKAPI_CALL debug_util_callback( VkDebugUtilsMessageSeverityFlagBitsEXT aSeverity, VkDebugUtilsMessageTypeFlagsEXT aType, VkDebugUtilsMessengerCallbackDataEXT const* aData, void* /*aUserPtr*/ );
+
+std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface);
+std::unordered_set<VkPresentModeKHR> getPresentModes(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface);
 
 
 namespace rutils {
@@ -111,19 +114,30 @@ namespace rutils {
 		return *this;
 	}
 
-	// make_vulkan_window()
+	// makeVulkanWindow()
 	VulkanWindow makeVulkanWindow() {
 		VulkanWindow ret;
 
 		// Initialize Volk
-		if( auto const res = volkInitialize(); VK_SUCCESS != res )
-		{
+		if( auto const res = volkInitialize(); VK_SUCCESS != res ) {
 			throw Kiki::FatalError( "Unable to load Vulkan API\n" 
 				"Volk returned error {}", toString(res)
 			);
 		}
 
-		//TODO: initialize GLFW
+		// Initialize GLFW and make sure this GLFW supports Vulkan.
+        // Note: this assumes that we will not create multiple windows that exist concurrently. If multiple windows are
+        // to be used, the glfwInit() and the glfwTerminate() (see destructor) calls should be moved elsewhere.
+        if( GLFW_TRUE != glfwInit() ) {
+            char const* errMsg = nullptr;
+            glfwGetError( &errMsg );
+            
+            throw Kiki::FatalError( "GLFW initialization failed: {}", errMsg );
+        }
+        
+        if( !glfwVulkanSupported() ) {
+            throw Kiki::FatalError( "GLFW: Vulkan not supported." );
+        }
 
 		// Check for instance layers and extensions
 		auto const supportedLayers = getInstanceLayers();
@@ -133,8 +147,19 @@ namespace rutils {
 
 		std::vector<char const*> enabledLayers, enabledExensions;
 
-		//TODO: check that the instance extensions required by GLFW are available,
-		//TODO: and if so, request these to be enabled in the instance creation.
+		// GLFW may require a number of instance extensions
+        // GLFW returns a bunch of pointers-to-strings; however, GLFW manages these internally, so we must not
+        // free them ourselves. GLFW guarantees that the strings remain valid until GLFW terminates.
+        std::uint32_t reqExtCount = 0;
+        char const** requiredExt = glfwGetRequiredInstanceExtensions( &reqExtCount );
+
+        for( std::uint32_t i = 0; i < reqExtCount; ++i ) {
+            if( !supportedExtensions.count( requiredExt[i] ) ) {
+                throw Kiki::FatalError( "GLFW/Vulkan: required instance extension {} not supported", requiredExt[i] );
+            }
+
+            enabledExensions.emplace_back( requiredExt[i] );
+        }
 
         // For Mac compatibility
 		enabledExensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
@@ -169,8 +194,24 @@ namespace rutils {
 		if( enableDebugUtils )
 			ret.debugMessenger = createDebugMessenger(ret.instance);
 
-		//TODO: create GLFW window
-		//TODO: get VkSurfaceKHR from the window
+		// Create GLFW Window and the Vulkan surface
+        glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
+
+        ret.window = glfwCreateWindow( 1280, 720, "kiki", nullptr, nullptr );
+        if( !ret.window ) {
+            char const* errMsg = nullptr;
+            glfwGetError( &errMsg );
+
+            throw Kiki::FatalError( "Unable to create GLFW window\n"
+                "Last error = {}", errMsg
+            );
+        }
+
+        if( auto const res = glfwCreateWindowSurface( ret.instance, ret.window, nullptr, &ret.surface ); VK_SUCCESS != res ) {
+            throw Kiki::FatalError( "Unable to create VkSurfaceKHR\n"
+                "glfwCreateWindowSurface() returned {}", rutils::toString(res)
+            );
+        }
 
 		// Select appropriate Vulkan device
 		ret.physicalDevice = rutils::selectDevice( ret.instance, ret.surface );
@@ -189,7 +230,10 @@ namespace rutils {
 		// request it without further checks.
 		std::vector<char const*> enabledDevExensions;
 
-		//TODO: list necessary extensions here
+		enabledDevExensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
+
+        // For mac support
+        enabledDevExensions.emplace_back("VK_KHR_portability_subset");
 
 		for( auto const& ext : enabledDevExensions )
 			std::print( stderr, "Enabling device extension: {}\n", ext );
@@ -199,7 +243,23 @@ namespace rutils {
 		// - otherwise: one GRAPHICS queue and any queue that can present
 		std::vector<std::uint32_t> queueFamilyIndices;
 
-		//TODO: logic to select necessary queue families to instantiate
+		if( auto const index = rutils::findQueueFamily( ret.physicalDevice, VK_QUEUE_GRAPHICS_BIT, ret.surface ) ) {
+            ret.graphicsFamilyIndex = *index;
+
+            queueFamilyIndices.emplace_back( *index );
+        }
+        else {
+            auto graphics = rutils::findQueueFamily( ret.physicalDevice, VK_QUEUE_GRAPHICS_BIT ); 
+            auto present = rutils::findQueueFamily( ret.physicalDevice, 0, ret.surface );
+
+            assert( graphics && present );
+
+            ret.graphicsFamilyIndex = *graphics;
+            ret.presentFamilyIndex = *present;
+
+            queueFamilyIndices.emplace_back( *graphics );
+            queueFamilyIndices.emplace_back( *present );
+        }
 
 		ret.device = rutils::createDevice(ret.physicalDevice, queueFamilyIndices, enabledDevExensions);
 
@@ -217,7 +277,7 @@ namespace rutils {
 		}
 
 		// Create swap chain
-		//std::tie(ret.swapchain, ret.swapchainFormat, ret.swapchainExtent) = createSwapchain( ret.physicalDevice, ret.surface, ret.device, ret.window, queueFamilyIndices );
+		std::tie(ret.swapchain, ret.swapchainFormat, ret.swapchainExtent) = createSwapchain( ret.physicalDevice, ret.surface, ret.device, ret.window, queueFamilyIndices );
 		
 		// Get swap chain images & create associated image views
 		getSwapchainImages( ret.device, ret.swapchain, ret.swapImages );
@@ -356,38 +416,195 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_util_callback( VkDebugUtilsMessageSeverityF
 }
 
 std::tuple<VkSwapchainKHR,VkFormat,VkExtent2D> createSwapchain(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface, VkDevice aDevice, GLFWwindow* aWindow, std::vector<std::uint32_t> const& aQueueFamilyIndices, VkSwapchainKHR aOldSwapchain) {
-    //auto const formats = get_surface_formats( aPhysicalDev, aSurface );
-    //auto const modes = get_present_modes( aPhysicalDev, aSurface );
+    auto const formats = getSurfaceFormats( aPhysicalDev, aSurface );
+    auto const modes = getPresentModes( aPhysicalDev, aSurface );
 
-    //TODO: pick appropriate VkSurfaceFormatKHR format.
-    VkSurfaceFormatKHR format{}; // FIXME!
+    // Pick the surface format
+    // If there is an 8-bit RGB(A) SRGB format available, pick that. There are two main variations possible here
+    // RGBA and BGRA. If neither is available, pick the first one that the driver gives us.
+    //
+    // See http://vulkan.gpuinfo.org/listsurfaceformats.php for a list of formats and statistics about where they’re
+    // supported.
+    assert (!formats.empty());
 
-    //TODO: pick appropriate VkPresentModeKHR
-    VkPresentModeKHR presentMode{}; // FIXME
+    VkSurfaceFormatKHR format = formats[0];
+    for (auto const fmt : formats) {
+        if (VK_FORMAT_R8G8B8A8_SRGB == fmt.format && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == fmt.colorSpace) {
+            format = fmt;
+            break;
+        }
 
-    //TODO: pick image count
-    std::uint32_t imageCount{}; // FIXME
+        if (VK_FORMAT_B8G8R8A8_SRGB == fmt.format && VK_COLOR_SPACE_SRGB_NONLINEAR_KHR == fmt.colorSpace) {
+            format = fmt;
+            break;
+        }
+    }
 
-    //TODO: figure out swap extent
-    VkExtent2D extent{}; // FIXME
+    // Pick a presentation mode
+    VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
-    // TODO: create swap chain
-    throw Kiki::FatalError( "Not yet implemented!" );
+    // Prefer FIFO RELAXED if it’s available.
+    if (modes.count(VK_PRESENT_MODE_FIFO_RELAXED_KHR))
+        presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+
+    // Pick an image count
+    VkSurfaceCapabilitiesKHR caps;
+    if (auto const res = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(aPhysicalDev, aSurface, &caps); VK_SUCCESS != res) {
+        throw Kiki::FatalError( "Unable to get surface capabilities\n"
+            "vkGetPhysicalDeviceSurfaceCapabilitiesKHR() returned {}", rutils::toString(res)
+        );
+    }
+
+    std::uint32_t imageCount = 2;
+
+    if (imageCount < caps.minImageCount + 1)
+        imageCount = caps.minImageCount + 1;
+
+    if (caps.maxImageCount > 0 && imageCount > caps.maxImageCount)
+        imageCount = caps.maxImageCount;
+
+    // Figure out the swap extent
+    VkExtent2D extent = caps.currentExtent;
+    if (std::numeric_limits<std::uint32_t>::max() == extent.width) {
+        int width, height;
+        glfwGetFramebufferSize( aWindow, &width, &height );
+
+        // Note: we must ensure that the extent is within the range defined by [ minImageExtent, maxImageExtent ].
+        auto const& min = caps.minImageExtent;
+        auto const& max = caps.maxImageExtent;
+
+        extent.width = std::clamp( std::uint32_t(width), min.width, max.width );
+        extent.height = std::clamp( std::uint32_t(height), min.height, max.height );
+    }
+
+    // Finally create the swap chain
+    VkSwapchainCreateInfoKHR chainInfo{};
+    chainInfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    chainInfo.surface = aSurface;
+    chainInfo.minImageCount = imageCount;
+    chainInfo.imageFormat = format.format;
+    chainInfo.imageColorSpace = format.colorSpace;
+    chainInfo.imageExtent = extent;
+    chainInfo.imageArrayLayers = 1;
+    chainInfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+    chainInfo.preTransform = caps.currentTransform;
+    chainInfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    chainInfo.presentMode = presentMode;
+    chainInfo.clipped = VK_TRUE;
+    chainInfo.oldSwapchain = aOldSwapchain;
+
+    if(aQueueFamilyIndices.size() <= 1){
+        chainInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    }
+    else {
+        // Multiple queues may access this resource. There are two options. SHARING MODE CONCURRENT
+        // allows access from multiple queues without transferring ownership. EXCLUSIVE would require explicit
+        // ownership transfers, which we’re avoiding for now. EXCLUSIVE may result in better performance than
+        // CONCURRENT.
+        chainInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        chainInfo.queueFamilyIndexCount = std::uint32_t(aQueueFamilyIndices.size());
+        chainInfo.pQueueFamilyIndices = aQueueFamilyIndices.data();
+    }
+
+    VkSwapchainKHR chain = VK_NULL_HANDLE;
+    if (auto const res = vkCreateSwapchainKHR( aDevice, &chainInfo, nullptr, &chain); VK_SUCCESS != res) {
+        throw Kiki::FatalError( "Unable to create swap chain\n"
+            "vkCreateSwapchainKHR() returned {}", rutils::toString(res)
+        );
+    }
+
+    return { chain, format.format, extent };
 }
 
 
 void getSwapchainImages(VkDevice aDevice, VkSwapchainKHR aSwapchain, std::vector<VkImage>& aImages) {
     assert( 0 == aImages.size() );
 
-    // TODO: get swapchain image handles with vkGetSwapchainImagesKHR
-    throw Kiki::FatalError( "Not yet implemented!" );
+    std::uint32_t numImages = 0;
+	if( auto const res = vkGetSwapchainImagesKHR( aDevice, aSwapchain, &numImages, nullptr ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to enumerate images\n"
+			"vkGetSwapchainImagesKHR() returned {}", rutils::toString(res)
+		);
+	}
+
+	aImages.resize(numImages);
+	if( auto const res = vkGetSwapchainImagesKHR( aDevice, aSwapchain, &numImages, aImages.data() ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to get images\n" 
+			"vkGetSwapchainImagesKHR() returned {}", rutils::toString(res)
+		);
+	}
 }
 
 void createSwapchainImageViews(VkDevice aDevice, VkFormat aSwapchainFormat, std::vector<VkImage> const& aImages, std::vector<VkImageView>& aViews) {
     assert( 0 == aViews.size() );
 
-    // TODO: create a VkImageView for each of the VkImages.
-    throw Kiki::FatalError( "Not yet implemented!" );
+    for (std::size_t i = 0; i < aImages.size(); ++i) {
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = aImages[i];
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = aSwapchainFormat;
+        viewInfo.components = VkComponentMapping{
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY
+        };
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0, 1,
+            0, 1
+            };
+
+        VkImageView view = VK_NULL_HANDLE;
+        if (auto const res = vkCreateImageView( aDevice, &viewInfo, nullptr, &view ); VK_SUCCESS != res) {
+            throw Kiki::FatalError( "Unable to create image view for swap chain image {}\n"
+                "vkCreateImageView() returned {}", i, rutils::toString(res)
+            );
+        }
+
+        aViews.emplace_back(view);
+    }
 
     assert( aViews.size() == aImages.size() );
+}
+
+std::vector<VkSurfaceFormatKHR> getSurfaceFormats(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface) {
+    std::uint32_t numFormats = 0;
+	if( auto const res = vkGetPhysicalDeviceSurfaceFormatsKHR( aPhysicalDev, aSurface, &numFormats, nullptr ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to enumerate surface formats\n"
+			"vkGetPhysicalDeviceSurfaceFormatsKHR() returned {}", rutils::toString(res)
+		);
+	}
+
+	std::vector<VkSurfaceFormatKHR> formats( numFormats );
+	if( auto const res = vkGetPhysicalDeviceSurfaceFormatsKHR( aPhysicalDev, aSurface, &numFormats, formats.data() ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to get surface formats\n" 
+			"vkGetPhysicalDeviceSurfaceFormatsKHR() returned {}", rutils::toString(res)
+		);
+	}
+
+	return formats;
+}
+
+std::unordered_set<VkPresentModeKHR> getPresentModes(VkPhysicalDevice aPhysicalDev, VkSurfaceKHR aSurface) {
+    std::uint32_t numModes = 0;
+	if( auto const res = vkGetPhysicalDeviceSurfacePresentModesKHR( aPhysicalDev, aSurface, &numModes, nullptr ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to enumerate presentation modes\n"
+			"vkGetPhysicalDeviceSurfaceFormatsKHR() returned {}", rutils::toString(res)
+		);
+	}
+
+	std::vector<VkPresentModeKHR> modes( numModes );
+	if( auto const res = vkGetPhysicalDeviceSurfacePresentModesKHR( aPhysicalDev, aSurface, &numModes, modes.data() ); VK_SUCCESS != res ) {	
+		throw Kiki::FatalError( "Unable to get presentation modes\n" 
+			"vkGetPhysicalDeviceSurfacePresentModesKHR() returned {}", rutils::toString(res)
+		);
+	}
+
+    std::unordered_set<VkPresentModeKHR> res;
+	for( auto const& mode : modes )
+		res.insert( mode );
+
+	return res;
 }
