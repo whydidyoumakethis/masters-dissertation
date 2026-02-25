@@ -9,9 +9,10 @@ target_sources(kiki
     FILE_SET HEADERS
     FILES 
       temp.h
-)
+      Event/Event.h
+      kiki.h "ImGui/ImGui.h" "SceneManager/SceneManager.h" "Timer/Timer.h")
 
 target_link_libraries(kiki
-  PRIVATE
+  PUBLIC
     KikiDeps
 )
