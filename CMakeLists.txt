@@ -52,6 +52,37 @@ FetchContent_Declare(
 
 FetchContent_MakeAvailable(entt)
 
+# compile shaders
+set(SHADER_IN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/kiki-engine/renderer/shaders)
+set(SHADER_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders/compiled)
+
+file(GLOB SHADERS CONFIGURE_DEPENDS
+    ${SHADER_IN_DIR}/*.vert
+    ${SHADER_IN_DIR}/*.frag
+    ${SHADER_IN_DIR}/*.geom
+)
+
+set(COMPILED_SHADERS)
+
+find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
+
+foreach(shader IN LISTS SHADERS)
+    get_filename_component(FILENAME ${shader} NAME)
+    set(SPV_FILE ${SHADER_OUT_DIR}/${FILENAME}.spv)
+
+    add_custom_command(
+        OUTPUT ${SPV_FILE}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_OUT_DIR}
+        COMMAND ${GLSLANG_VALIDATOR} -V ${shader} -o ${SPV_FILE}
+        DEPENDS ${shader}
+        COMMENT "Compiling shader: ${FILENAME}"
+    )
+
+    list(APPEND COMPILED_SHADERS ${SPV_FILE})
+endforeach()
+
+add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)

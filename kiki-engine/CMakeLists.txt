@@ -16,6 +16,8 @@ target_sources(kiki
       temp.h
 )
 
+add_dependencies(kiki shaders)
+
 add_subdirectory(renderer)
 
 add_subdirectory(logging)
