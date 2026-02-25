@@ -84,6 +84,16 @@ namespace Kiki {
                 // Technically, with the VK SUBOPTIMAL KHR return code, we could continue rendering with the
                 // current swap chain (unlike VK ERROR OUT OF DATE KHR, which does require us to recreate the
                 // swap chain).
+
+                // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
+                // to finish processing.
+                vkDeviceWaitIdle( window.device );
+
+                // Recreate resources
+                rutils::recreateSwapchain( window );
+
+                pipeline = rutils::createPipeline( window, pipelineLayout.handle );
+
                 recreateSwapchain = true;
 
                 // We won’t render a frame this time around. Consequently, no commands were submitted for execution
@@ -100,6 +110,63 @@ namespace Kiki {
                 );
             }
 
+            // Reset fence
+            // Do this only after AcquireNextImage(), so that we can wait on the same fence again in case the swapchain
+            // had to be re-created.
+            
+            if(auto const res = vkResetFences( window.device, 1, &frameDone[frameIndex].handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError( "Unable to reset frame fence {}\n"
+                    "vkResetFences() returned {}", frameIndex, rutils::toString(res)
+                );
+            }
+
+            // Record and submit commands for this frame
+            assert(std::size_t(imageIndex) < window.swapImages.size());
+
+            rutils::ImageAndView colorTarget;
+            colorTarget.image = window.swapImages[imageIndex];
+            colorTarget.view = window.swapViews[imageIndex];
+
+            assert(std::size_t(frameIndex) < commandBuffers.size());
+
+            rutils::recordCommands(
+                commandBuffers[frameIndex],
+                pipeline.handle,
+                colorTarget,
+                window.swapchainExtent
+            );
+
+            assert(std::size_t(frameIndex) < renderFinished.size());
+
+            rutils::submitCommands(
+                window,
+                commandBuffers[frameIndex],
+                frameDone[frameIndex].handle,
+                imageAvailable[frameIndex].handle,
+                renderFinished[frameIndex].handle
+            );
+
+            // Present the results
+            // https://registry.khronos.org/vulkan/specs/latest/man/html/VkPresentInfoKHR.html
+            VkPresentInfoKHR presentInfo{};
+            presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+            presentInfo.waitSemaphoreCount = 1;
+            presentInfo.pWaitSemaphores = &renderFinished[frameIndex].handle;
+            presentInfo.swapchainCount = 1;
+            presentInfo.pSwapchains = &window.swapchain;
+            presentInfo.pImageIndices = &imageIndex;
+            presentInfo.pResults = nullptr;
+
+            auto const presentRes = vkQueuePresentKHR(window.presentQueue, &presentInfo);
+
+            if (VK_SUBOPTIMAL_KHR == presentRes || VK_ERROR_OUT_OF_DATE_KHR == presentRes) {
+                recreateSwapchain = true;
+            }
+            else if (VK_SUCCESS != presentRes) {
+                throw Kiki::FatalError( "Unable present swapchain image {}\n"
+                    "vkQueuePresentKHR() returned {}", imageIndex, rutils::toString(presentRes)
+                );
+            }
         }
 
         vkDeviceWaitIdle(window.device);

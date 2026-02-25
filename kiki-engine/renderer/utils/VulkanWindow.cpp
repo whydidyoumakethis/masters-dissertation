@@ -298,8 +298,56 @@ namespace rutils {
 	}
 
 	SwapChanges recreateSwapchain( VulkanWindow& aWindow ) {
-		//TODO: implement me!
-		throw Kiki::FatalError( "Not yet implemented!" );
+		// Remember old format & extents
+		// These are two of the properties that may change. Typically only the extent changes (e.g., window resized),
+		// but the format may in theory also change. If the format changes, we need to recreate additional resources.
+		auto const oldFormat = aWindow.swapchainFormat;
+		auto const oldExtent = aWindow.swapchainExtent;
+
+		// Destroy old objects (except for the old swap chain)
+		// We keep the old swap chain object around, such that we can pass it to vkCreateSwapchainKHR() via the
+		// oldSwapchain member of VkSwapchainCreateInfoKHR.
+		VkSwapchainKHR oldSwapchain = aWindow.swapchain;
+
+		for (auto view : aWindow.swapViews)
+		vkDestroyImageView( aWindow.device, view, nullptr );
+
+		aWindow.swapViews.clear();
+		aWindow.swapImages.clear();
+
+		// Create swap chain
+		std::vector<std::uint32_t> queueFamilyIndices;
+		if (aWindow.presentFamilyIndex != aWindow.graphicsFamilyIndex) {
+			queueFamilyIndices.emplace_back( aWindow.graphicsFamilyIndex );
+			queueFamilyIndices.emplace_back( aWindow.presentFamilyIndex );
+		}
+
+		try {
+			std::tie(aWindow.swapchain, aWindow.swapchainFormat, aWindow.swapchainExtent) = createSwapchain(aWindow.physicalDevice, aWindow.surface, aWindow.device, aWindow.window, queueFamilyIndices, oldSwapchain);
+		}
+		catch( ... ) {
+			// Put pack the old swap chain handle into the VulkanWindow; this ensures that the old swap chain is
+			// destroyed when this error branch occurs.
+			aWindow.swapchain = oldSwapchain;
+			throw;
+		}
+
+		// Destroy old swap chain
+		vkDestroySwapchainKHR( aWindow.device, oldSwapchain, nullptr );
+
+		// Get new swap chain images & create associated image views
+		getSwapchainImages( aWindow.device, aWindow.swapchain, aWindow.swapImages );
+		createSwapchainImageViews( aWindow.device, aWindow.swapchainFormat, aWindow.swapImages, aWindow.swapViews );
+
+		// Determine which swap chain properties have changed and return the information indicating this
+		SwapChanges ret{};
+
+		if (oldExtent.width != aWindow.swapchainExtent.width || oldExtent.height != aWindow.swapchainExtent.height)
+			ret.changedSize = true;
+		if (oldFormat != aWindow.swapchainFormat)
+			ret.changedFormat = true;
+
+		return ret;
 	}
 }
 
