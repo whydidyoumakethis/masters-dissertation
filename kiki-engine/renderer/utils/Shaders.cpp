@@ -6,7 +6,7 @@
 #include "../../logging/FatalError.hpp"
 
 namespace rutils {
-    std::vector<std::uint32_t> load_file_u32(char const* aPath) {
+    std::vector<std::uint32_t> loadShader(char const* aPath) {
 		assert( aPath );
 
 		if (std::FILE* fin = std::fopen(aPath, "rb")) {

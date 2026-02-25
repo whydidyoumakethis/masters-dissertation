@@ -6,6 +6,8 @@ target_sources(kiki
     utils/VulkanWindow.cpp
     utils/Pipelines.cpp
     utils/Shaders.cpp
+    utils/Commands.cpp
+    utils/Synchronisation.cpp
 
   PRIVATE
     FILE_SET rendererPrivateHeaders
@@ -17,6 +19,8 @@ target_sources(kiki
       utils/VulkanWrapper.hpp
       utils/Pipelines.hpp
       utils/Shaders.hpp
+      utils/Commands.hpp
+      utils/Synchronisation.hpp
 
   PUBLIC
     FILE_SET rendererPublicHeaders
