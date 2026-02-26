@@ -82,6 +82,13 @@ foreach(shader IN LISTS SHADERS)
 endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
+# spdlog
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY "https://github.com/gabime/spdlog.git"
+    GIT_TAG "v1.17.0"
+)
+FetchContent_MakeAvailable(spdlog)
 
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
@@ -91,6 +98,7 @@ target_link_libraries(KikiDeps INTERFACE
 	glfw 
 	VulkanMemoryAllocator
 	EnTT::EnTT
+	spdlog::spdlog
 )
 target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
 
