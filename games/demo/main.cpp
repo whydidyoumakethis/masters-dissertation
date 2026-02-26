@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include "renderer/RenderManager.hpp"
+#include "input/InputManager.hpp"
 
 #include <spdlog/spdlog.h>
 
