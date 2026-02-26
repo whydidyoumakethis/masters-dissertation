@@ -45,6 +45,15 @@ namespace Kiki {
             glfwPollEvents();
 
             if (recreateSwapchain) {
+                // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
+                // to finish processing.
+                vkDeviceWaitIdle( window.device );
+
+                // Recreate resources
+                rutils::recreateSwapchain( window );
+
+                pipeline = rutils::createPipeline( window, pipelineLayout.handle );
+                
                 recreateSwapchain = false;
             }
 
@@ -84,15 +93,6 @@ namespace Kiki {
                 // Technically, with the VK SUBOPTIMAL KHR return code, we could continue rendering with the
                 // current swap chain (unlike VK ERROR OUT OF DATE KHR, which does require us to recreate the
                 // swap chain).
-
-                // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
-                // to finish processing.
-                vkDeviceWaitIdle( window.device );
-
-                // Recreate resources
-                rutils::recreateSwapchain( window );
-
-                pipeline = rutils::createPipeline( window, pipelineLayout.handle );
 
                 recreateSwapchain = true;
 
