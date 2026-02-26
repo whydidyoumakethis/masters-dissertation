@@ -6,7 +6,7 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include "renderer/Renderer.hpp"
+#include "renderer/RenderManager.hpp"
 #include "input/InputManager.hpp"
 
 #include <spdlog/spdlog.h>
@@ -54,6 +54,18 @@ void get_context(entt::registry& registry) {
     int int_value = registry.ctx().get<int>();
     spdlog::info("score: {0}", int_value);
 }
+
+
+
+
+// TODO: temporary glfw input handling
+void glfwCallback(GLFWwindow* aWindow, int aKey, int /*aScanCode*/, int aAction, int /*aModifierFlags*/) {
+    if (GLFW_KEY_ESCAPE == aKey && GLFW_PRESS == aAction) {
+		glfwSetWindowShouldClose(aWindow, GLFW_TRUE);
+	}
+}
+
+
 int main(int argc, char** argv) {
     using namespace entt::literals; // to simplify the use of hashed_string 
     temp::print("demo");
@@ -77,10 +89,7 @@ int main(int argc, char** argv) {
     }
     update(registry);
 
-    Kiki::initialiseRenderer();
-
-    Kiki::InputManager& inputManager = Kiki::InputManager::get();
-    inputManager.initialise();
+    
 
     const auto player = registry.create();
     registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string
@@ -99,5 +108,23 @@ int main(int argc, char** argv) {
     }
     add_context(registry);
     get_context(registry);
+
+    // Temporary game loop
+    Kiki::RenderManager& renderManager = Kiki::RenderManager::get();
+    Kiki::RenderManager::WindowInfo info;
+
+    renderManager.initialise(info);
+
+    GLFWwindow* window = renderManager.getWindow();
+
+    // create temporary glfw callback
+    glfwSetKeyCallback(window, &glfwCallback);
+
+    while (!glfwWindowShouldClose(window)) {
+        renderManager.nextFrame();
+    }
+
+    renderManager.shutdown();
+
     return 0;
 }
