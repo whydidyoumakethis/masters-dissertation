@@ -21,3 +21,5 @@ add_dependencies(kiki shaders)
 add_subdirectory(renderer)
 
 add_subdirectory(logging)
+
+add_subdirectory(input)

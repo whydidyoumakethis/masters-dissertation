@@ -7,6 +7,7 @@
 #include <GLFW/glfw3.h>
 
 #include "renderer/Renderer.hpp"
+#include "input/InputManager.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -77,6 +78,9 @@ int main(int argc, char** argv) {
     update(registry);
 
     Kiki::initialiseRenderer();
+
+    Kiki::InputManager& inputManager = Kiki::InputManager::get();
+    inputManager.initialise();
 
     const auto player = registry.create();
     registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string

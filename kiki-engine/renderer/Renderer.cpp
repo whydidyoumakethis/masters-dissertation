@@ -177,6 +177,7 @@ namespace Kiki {
 
 // called everytime key is pressed
 void glfwCallback(GLFWwindow* aWindow, int aKey, int /*aScanCode*/, int aAction, int /*aModifierFlags*/) {
+    // TODO: i want to access the InputManager here
     if (GLFW_KEY_ESCAPE == aKey && GLFW_PRESS == aAction) {
 		glfwSetWindowShouldClose(aWindow, GLFW_TRUE);
 	}
