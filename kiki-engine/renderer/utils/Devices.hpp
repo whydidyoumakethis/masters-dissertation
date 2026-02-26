@@ -5,6 +5,9 @@
 
 #include <vector>
 #include <unordered_set>
+#include <string>
+#include <optional>
+#include <cstdint>
 
 namespace rutils {
     VkPhysicalDevice selectDevice(VkInstance instance, VkSurfaceKHR surface);

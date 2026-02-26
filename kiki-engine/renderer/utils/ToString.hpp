@@ -4,6 +4,7 @@
 #include <volk.h>
 
 #include <string>
+#include <cstdint>
 
 namespace rutils {
 	std::string toString(VkResult);

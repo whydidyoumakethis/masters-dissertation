@@ -6,6 +6,8 @@
 
 #include <vector>
 #include <format>
+#include <iostream>
+#include <print>
 
 
 std::vector<char const*> checkRequiredDeviceFeatures(VkPhysicalDevice device) {
@@ -64,19 +66,19 @@ float scoreDevice(VkPhysicalDevice device, VkSurfaceKHR surface) {
 	auto const exts = rutils::getDeviceExtensions( device );
 
 	if( !exts.count( VK_KHR_SWAPCHAIN_EXTENSION_NAME ) ) {
-		std::print( stderr, "Info: Discarding device ’{}’: extension {} missing\n", props.deviceName, VK_KHR_SWAPCHAIN_EXTENSION_NAME );
+		klog::error(std::format("Info: Discarding device ’{}’: extension {} missing\n", props.deviceName, VK_KHR_SWAPCHAIN_EXTENSION_NAME));
 		return -1.f;
 	}
 
 	// Ensure there is a queue family that can present to the given surface
 	if( !rutils::findQueueFamily( device, 0, surface ) ) {
-		std::print( stderr, "Info: Discarding device ’{}’: can’t present to surface\n", props.deviceName );
+		klog::error(std::format("Info: Discarding device ’{}’: can’t present to surface\n", props.deviceName));
 		return -1.f;
 	}
 
 	// Also ensure there is a queue family that supports graphics commands
 	if( !rutils::findQueueFamily( device, VK_QUEUE_GRAPHICS_BIT ) ) {
-		std::print( stderr, "Info: Discarding device ’{}’: no graphics queue family\n", props.deviceName );
+		klog::error(std::format("Info: Discarding device ’{}’: no graphics queue family\n", props.deviceName));
 		return -1.f;
 	}
 
@@ -218,5 +220,7 @@ namespace rutils {
 					return i;
 			}
 		}
+
+		return std::nullopt;
 	}
 }
