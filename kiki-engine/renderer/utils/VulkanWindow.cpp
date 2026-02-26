@@ -172,7 +172,9 @@ namespace rutils {
         }
 
         // For Mac compatibility
+#		ifdef __APPLE__
 		enabledExensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+#		endif
 
 		// Validation layers support.
 #		if !defined(NDEBUG) // debug builds only
@@ -243,7 +245,9 @@ namespace rutils {
 		enabledDevExensions.emplace_back(VK_KHR_SWAPCHAIN_EXTENSION_NAME);
 
         // For mac support
+#		ifdef __APPLE__
         enabledDevExensions.emplace_back("VK_KHR_portability_subset");
+#		endif
 
 		for( auto const& ext : enabledDevExensions )
 			std::print( stderr, "Enabling device extension: {}\n", ext );
@@ -429,7 +433,9 @@ VkInstance createInstance(std::vector<char const*> const& aEnabledLayers, std::v
     instanceInfo.enabledExtensionCount    = std::uint32_t(aEnabledExtensions.size());
     instanceInfo.ppEnabledExtensionNames  = aEnabledExtensions.data();
 
+#	ifdef __APPLE__
     instanceInfo.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
+#	endif
 
     instanceInfo.pApplicationInfo = &appInfo;
 
