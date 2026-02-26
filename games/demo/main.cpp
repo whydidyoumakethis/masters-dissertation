@@ -5,7 +5,11 @@
 #include <entt/entt.hpp>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
+
+#include "renderer/Renderer.hpp"
+
 #include <spdlog/spdlog.h>
+
 struct position {
     float x;
     float y;
@@ -71,6 +75,9 @@ int main(int argc, char** argv) {
         if (i % 2 == 0) { registry.emplace<velocity>(entity, i * .1f, i * .1f); }
     }
     update(registry);
+
+    Kiki::initialiseRenderer();
+
     const auto player = registry.create();
     registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string
     registry.emplace<position>(player, 2.f, 4.f);
