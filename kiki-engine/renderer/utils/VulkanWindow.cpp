@@ -47,9 +47,19 @@ namespace rutils {
 		if (VK_NULL_HANDLE != swapchain)
 			vkDestroySwapchainKHR(device, swapchain, nullptr);
 
+		if( VK_NULL_HANDLE != device )
+			vkDestroyDevice( device, nullptr );
+
 		// Window and related objects
 		if (VK_NULL_HANDLE != surface)
 			vkDestroySurfaceKHR(instance, surface, nullptr);
+
+		// Instance-related objects
+		if( VK_NULL_HANDLE != debugMessenger )
+			vkDestroyDebugUtilsMessengerEXT( instance, debugMessenger, nullptr );
+
+		if( VK_NULL_HANDLE != instance )
+			vkDestroyInstance( instance, nullptr );
 
 		if (window) {
 			glfwDestroyWindow(window);
@@ -62,17 +72,6 @@ namespace rutils {
 			// window-related resources are.
 			glfwTerminate();
 		}
-
-		// Device-related objects
-		if( VK_NULL_HANDLE != device )
-			vkDestroyDevice( device, nullptr );
-
-		// Instance-related objects
-		if( VK_NULL_HANDLE != debugMessenger )
-			vkDestroyDebugUtilsMessengerEXT( instance, debugMessenger, nullptr );
-
-		if( VK_NULL_HANDLE != instance )
-			vkDestroyInstance( instance, nullptr );
 	}
 
 	VulkanWindow::VulkanWindow( VulkanWindow&& aOther ) noexcept
