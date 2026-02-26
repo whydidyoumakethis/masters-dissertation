@@ -24,6 +24,8 @@ These can be installed using the Visual Studio installer.
 
 Defaults to `Debug` and clang++. Creates Makefiles in `output/[build type]`.
 
+On the lab machines, make sure to run `module load vulkansdk` and `module load gcc`.
+
 Example for Linux: `./unix.sh Debug g++`.
 
 
