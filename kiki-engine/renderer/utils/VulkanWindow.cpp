@@ -124,7 +124,7 @@ namespace rutils {
 	}
 
 	// makeVulkanWindow()
-	VulkanWindow makeVulkanWindow() {
+	VulkanWindow makeVulkanWindow(Kiki::WindowInfo info) {
 		VulkanWindow ret;
 
 		// Initialize Volk
@@ -208,7 +208,56 @@ namespace rutils {
 		// Create GLFW Window and the Vulkan surface
         glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
 
-        ret.window = glfwCreateWindow( 1280, 720, "kiki", nullptr, nullptr );
+		// Get details of the monitor
+		int count;
+		GLFWmonitor** monitors = glfwGetMonitors(&count);
+		GLFWmonitor* monitor;
+
+		if (info.monitor < count && info.monitor >= 0) {
+			monitor = monitors[info.monitor];
+		} else {
+			throw Kiki::FatalError("Invalid monitor index given");
+		}
+
+		if (!monitor) {
+            char const* errMsg = nullptr;
+            glfwGetError(&errMsg);
+
+            throw Kiki::FatalError( "Unable to get monitor\n"
+                "Last error = {}", errMsg
+            );
+        }
+
+		const GLFWvidmode* videoMode = glfwGetVideoMode(monitor);
+		if (!videoMode) {
+            char const* errMsg = nullptr;
+            glfwGetError(&errMsg);
+
+            throw Kiki::FatalError( "Unable to get monitor's video mode\n"
+                "Last error = {}", errMsg
+            );
+        }
+
+		// Check if the width/height is 0, and if so set to monitors resolution
+		if (info.width == 0) {
+			info.width = videoMode->width;
+		}
+
+		if (info.height == 0) {
+			info.height = videoMode->height;
+		}
+
+		// Check if decorations are disabled
+		if (!info.decorations) {
+			glfwWindowHint(GLFW_DECORATED, GLFW_FALSE);
+		}
+
+		// Create window (and check if it needs to be fullscreen)
+		if (info.fullscreen) {
+			ret.window = glfwCreateWindow(info.width, info.height, info.title, monitor, nullptr);
+		} else {
+        	ret.window = glfwCreateWindow(info.width, info.height, info.title, nullptr, nullptr);
+		}
         if( !ret.window ) {
             char const* errMsg = nullptr;
             glfwGetError( &errMsg );
@@ -217,6 +266,11 @@ namespace rutils {
                 "Last error = {}", errMsg
             );
         }
+
+		// Check if resizing is disabled
+		if (!info.resizeable) {
+			glfwSetWindowSizeLimits(ret.window, info.width, info.height, info.width, info.height);
+		}
 
         if( auto const res = glfwCreateWindowSurface( ret.instance, ret.window, nullptr, &ret.surface ); VK_SUCCESS != res ) {
             throw Kiki::FatalError( "Unable to create VkSurfaceKHR\n"

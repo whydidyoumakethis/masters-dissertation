@@ -21,7 +21,7 @@ namespace Kiki {
 
     void RenderManager::initialise(WindowInfo info) {
         // Create window
-        window = rutils::makeVulkanWindow();
+        window = rutils::makeVulkanWindow(info);
 
         // Initialise resources
         pipelineLayout = rutils::createPipelineLayout(window);

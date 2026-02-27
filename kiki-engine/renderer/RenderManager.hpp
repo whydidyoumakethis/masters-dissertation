@@ -4,14 +4,12 @@
 #include "utils/VulkanWindow.hpp"
 #include "utils/VulkanWrapper.hpp"
 #include "utils/Synchronisation.hpp"
+#include "WindowInfo.hpp"
+
 
 namespace Kiki {
     class RenderManager {
         public:
-        struct WindowInfo{
-
-        };
-            
         static RenderManager& get();
         void initialise(WindowInfo info);
         void nextFrame();

@@ -6,6 +6,7 @@
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
+#include "renderer/WindowInfo.hpp"
 #include "renderer/RenderManager.hpp"
 #include "input/InputManager.hpp"
 
@@ -111,7 +112,13 @@ int main(int argc, char** argv) {
 
     // Temporary game loop
     Kiki::RenderManager& renderManager = Kiki::RenderManager::get();
-    Kiki::RenderManager::WindowInfo info;
+    Kiki::WindowInfo info;
+    info.fullscreen = false;
+    info.monitor = 1;
+    // info.width = 0;
+    // info.height = 0;
+    // info.decorations = false;
+    info.resizeable = false;
 
     renderManager.initialise(info);
 
