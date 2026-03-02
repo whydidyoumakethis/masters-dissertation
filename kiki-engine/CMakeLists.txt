@@ -9,6 +9,8 @@ target_sources(kiki
     FILE_SET HEADERS
     FILES 
       temp.h
+      Event/Event.h
+      Timer/Timer.h
 )
 
 add_dependencies(kiki shaders)
@@ -16,7 +18,6 @@ add_dependencies(kiki shaders)
 add_subdirectory(renderer)
 
 add_subdirectory(logging)
-
 add_subdirectory(input)
 target_link_libraries(kiki
   PUBLIC

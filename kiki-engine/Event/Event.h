@@ -6,7 +6,7 @@ template<typename... Args>
 class Event {
 public:
 
-    template<auto Fn>
+    //template<auto Fn>
     /*void AddListener() {
         entt::sink{ _sig }.connect<Fn>();
     }*/

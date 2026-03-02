@@ -3,12 +3,9 @@
 
 #include <volk.h>
 #include <entt/entt.hpp>
-#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include "renderer/WindowInfo.hpp"
-#include "renderer/RenderManager.hpp"
-#include "input/InputManager.hpp"
+
 
 #include <spdlog/spdlog.h>
 
