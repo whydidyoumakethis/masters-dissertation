@@ -216,7 +216,10 @@ namespace rutils {
 		if (info.monitor < count && info.monitor >= 0) {
 			monitor = monitors[info.monitor];
 		} else {
-			throw Kiki::FatalError("Invalid monitor index given");
+			monitor = glfwGetPrimaryMonitor();
+			if (monitor == NULL) {
+				throw Kiki::FatalError("Invalid monitor index given");
+			}
 		}
 
 		if (!monitor) {

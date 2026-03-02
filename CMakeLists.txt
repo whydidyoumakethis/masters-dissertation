@@ -101,7 +101,10 @@ target_link_libraries(KikiDeps INTERFACE
 	spdlog::spdlog
 )
 target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
-
+target_compile_definitions(KikiDeps INTERFACE
+    PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
+    PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+)
 # Kiki Engine
 add_subdirectory(kiki-engine)
 

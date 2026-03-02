@@ -114,7 +114,7 @@ int main(int argc, char** argv) {
     Kiki::RenderManager& renderManager = Kiki::RenderManager::get();
     Kiki::WindowInfo info;
     info.fullscreen = false;
-    info.monitor = 1;
+    info.monitor = 0;
     // info.width = 0;
     // info.height = 0;
     // info.decorations = false;
