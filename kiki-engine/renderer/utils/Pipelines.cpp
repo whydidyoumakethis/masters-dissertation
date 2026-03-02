@@ -30,6 +30,7 @@ namespace rutils {
         //
         // This uses a Vulkan 1.4 feature (from VK KHR maintenance5), which allows us to skip the VkShaderModule
         // creation and instead directly pass SPIR-V code to the pipeline creation.
+        std::filesystem::current_path(PROJECT_BINARY_DIR);
         auto const vShader = rutils::loadShader("shaders/compiled/triangle.vert.spv"); // TODO: update file path, temporarily hardocded
         auto const fShader = rutils::loadShader("shaders/compiled/triangle.frag.spv");
 

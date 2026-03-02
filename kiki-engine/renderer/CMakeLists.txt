@@ -1,6 +1,6 @@
 target_sources(kiki
   PRIVATE
-    Renderer.cpp
+    RenderManager.cpp
     utils/Devices.cpp
     utils/ToString.cpp
     utils/VulkanWindow.cpp
@@ -26,5 +26,6 @@ target_sources(kiki
     FILE_SET rendererPublicHeaders
     TYPE HEADERS
     FILES 
-      Renderer.hpp
+      RenderManager.hpp
+      WindowInfo.hpp
 )
