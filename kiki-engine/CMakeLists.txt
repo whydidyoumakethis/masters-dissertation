@@ -9,9 +9,15 @@ target_sources(kiki
     FILE_SET HEADERS
     FILES 
       temp.h
-      Event/Event.h
-      kiki.h "ImGui/ImGui.h" "SceneManager/SceneManager.h" "Timer/Timer.h")
+)
 
+add_dependencies(kiki shaders)
+
+add_subdirectory(renderer)
+
+add_subdirectory(logging)
+
+add_subdirectory(input)
 target_link_libraries(kiki
   PUBLIC
     KikiDeps

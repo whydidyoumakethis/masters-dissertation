@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.13)
 
 project(KikiEngine)
 
+set(CMAKE_CXX_STANDARD 23)
+
 include(FetchContent)
 
 ### Dependencies ###
@@ -47,8 +49,39 @@ FetchContent_Declare(
     GIT_REPOSITORY "https://github.com/skypjack/entt.git"
     GIT_TAG "v3.16.0"
 )
+
 FetchContent_MakeAvailable(entt)
 
+# compile shaders
+set(SHADER_IN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/kiki-engine/renderer/shaders)
+set(SHADER_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders/compiled)
+
+file(GLOB SHADERS CONFIGURE_DEPENDS
+    ${SHADER_IN_DIR}/*.vert
+    ${SHADER_IN_DIR}/*.frag
+    ${SHADER_IN_DIR}/*.geom
+)
+
+set(COMPILED_SHADERS)
+
+find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
+
+foreach(shader IN LISTS SHADERS)
+    get_filename_component(FILENAME ${shader} NAME)
+    set(SPV_FILE ${SHADER_OUT_DIR}/${FILENAME}.spv)
+
+    add_custom_command(
+        OUTPUT ${SPV_FILE}
+        COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_OUT_DIR}
+        COMMAND ${GLSLANG_VALIDATOR} -V ${shader} -o ${SPV_FILE}
+        DEPENDS ${shader}
+        COMMENT "Compiling shader: ${FILENAME}"
+    )
+
+    list(APPEND COMPILED_SHADERS ${SPV_FILE})
+endforeach()
+
+add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
 # spdlog
 FetchContent_Declare(
     spdlog
@@ -68,7 +101,10 @@ target_link_libraries(KikiDeps INTERFACE
 	spdlog::spdlog
 )
 target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
-
+target_compile_definitions(KikiDeps INTERFACE
+    PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
+    PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+)
 # Kiki Engine
 add_subdirectory(kiki-engine)
 
