@@ -5,6 +5,8 @@
 #include <entt/entt.hpp>
 #include <GLFW/glfw3.h>
 
+#include <GltfLoader/GltfLoader.hpp>
+
 
 
 #include <spdlog/spdlog.h>
@@ -87,7 +89,7 @@ int main(int argc, char** argv) {
     }
     update(registry);
 
-    
+	 bool test = Kiki::GltfLoader::loadMesh("../../../../../Test.glb"); // how does one Not go through this junk
 
     const auto player = registry.create();
     registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string

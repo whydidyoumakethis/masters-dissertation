@@ -4,14 +4,15 @@ add_library(kiki)
 target_sources(kiki
   PRIVATE
     temp.cpp
-    
+    GltfLoader/GltfLoader.cpp
   PUBLIC
     FILE_SET HEADERS
     FILES 
       temp.h
       Event/Event.h
       Timer/Timer.h
-)
+      
+      GltfLoader/GltfLoader.hpp)
 
 add_dependencies(kiki shaders)
 
