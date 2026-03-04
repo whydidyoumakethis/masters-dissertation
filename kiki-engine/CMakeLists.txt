@@ -11,6 +11,8 @@ target_sources(kiki
       temp.h
       Event/Event.h
       Timer/Timer.h
+      ECS/World.h
+ "ECS/GameObject.h" "ECS/System.h" "Engine.h"
       
       GltfLoader/GltfLoader.hpp)
 
