@@ -90,6 +90,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(spdlog)
 
+# fastGLTF
+FetchContent_Declare(
+    fastgltf
+    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
+    GIT_TAG "v0.9.0"
+)
+FetchContent_MakeAvailable(fastgltf)
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
@@ -99,6 +107,7 @@ target_link_libraries(KikiDeps INTERFACE
 	VulkanMemoryAllocator
 	EnTT::EnTT
 	spdlog::spdlog
+    fastgltf::fastgltf
 )
 target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
 target_compile_definitions(KikiDeps INTERFACE

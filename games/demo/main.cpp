@@ -5,6 +5,8 @@
 #include <entt/entt.hpp>
 #include <GLFW/glfw3.h>
 
+#include <GltfLoader/GltfLoader.hpp>
+
 
 
 #include <spdlog/spdlog.h>
