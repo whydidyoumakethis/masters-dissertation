@@ -1,14 +1,13 @@
-#include <temp.h>
+#include <kiki.h>
 #include <glm/vec3.hpp>
 
 #include <volk.h>
 #include <entt/entt.hpp>
-#define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
 
-#include "renderer/WindowInfo.hpp"
-#include "renderer/RenderManager.hpp"
-#include "input/InputManager.hpp"
+#include <GltfLoader/GltfLoader.hpp>
+
+
 
 #include <spdlog/spdlog.h>
 
@@ -68,70 +67,74 @@ void glfwCallback(GLFWwindow* aWindow, int aKey, int /*aScanCode*/, int aAction,
 
 
 int main(int argc, char** argv) {
-    using namespace entt::literals; // to simplify the use of hashed_string 
-    temp::print("demo");
-    glm::vec3 vector(0.1f, 0.2f, 3.f);
+    //using namespace entt::literals; // to simplify the use of hashed_string 
+    //temp::print("demo");
+    //glm::vec3 vector(0.1f, 0.2f, 3.f);
 
-    spdlog::info("{0} {1} {2}", vector.r, vector.g , vector.b);
-    // std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
+    //spdlog::info("{0} {1} {2}", vector.r, vector.g , vector.b);
+    //// std::cout << vector.r << " " << vector.g << " " << vector.b << std::endl;
 
-    // VkResult volkInitilialize();
+    //// VkResult volkInitilialize();
 
-    // glfwSetCharCallback();
+    //// glfwSetCharCallback();
 
-    if (!glfwInit())
-        return -1;
-    entt::registry registry;
+    //if (!glfwInit())
+    //    return -1;
+    //entt::registry registry;
 
-    for (auto i = 0u; i < 10u; ++i) {
-        const auto entity = registry.create();
-        registry.emplace<position>(entity, i * 1.f, i * 1.f);
-        if (i % 2 == 0) { registry.emplace<velocity>(entity, i * .1f, i * .1f); }
-    }
-    update(registry);
+    //for (auto i = 0u; i < 10u; ++i) {
+    //    const auto entity = registry.create();
+    //    registry.emplace<position>(entity, i * 1.f, i * 1.f);
+    //    if (i % 2 == 0) { registry.emplace<velocity>(entity, i * .1f, i * .1f); }
+    //}
+    //update(registry);
 
-    
+    //
 
-    const auto player = registry.create();
-    registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string
-    registry.emplace<position>(player, 2.f, 4.f);
-    registry.emplace<velocity>(player, 3.f, 4.f);
-    const auto enemy = registry.create();
-    registry.emplace<tag>(enemy, "enemy"_hs);
-    registry.emplace<position>(enemy, 9.f, 9.f);
-    registry.emplace<velocity>(enemy, 9.f, 9.f);
-    auto view = registry.view<const position,velocity,tag>();
-    for (auto [entity, pos, vel, tag] : view.each()) {
-        if (tag.string == "player"_hs) {
-            spdlog::info("player's position is {0} {1}",pos.x,pos.y);
-            spdlog::info("player's velocity is {0} {1}", vel.dx, vel.dy);
-        }
-    }
-    add_context(registry);
-    get_context(registry);
+    //const auto player = registry.create();
+    //registry.emplace<tag>(player, "player"_hs); // Simplified version of hashed_string
+    //registry.emplace<position>(player, 2.f, 4.f);
+    //registry.emplace<velocity>(player, 3.f, 4.f);
+    //const auto enemy = registry.create();
+    //registry.emplace<tag>(enemy, "enemy"_hs);
+    //registry.emplace<position>(enemy, 9.f, 9.f);
+    //registry.emplace<velocity>(enemy, 9.f, 9.f);
+    //auto view = registry.view<const position,velocity,tag>();
+    //for (auto [entity, pos, vel, tag] : view.each()) {
+    //    if (tag.string == "player"_hs) {
+    //        spdlog::info("player's position is {0} {1}",pos.x,pos.y);
+    //        spdlog::info("player's velocity is {0} {1}", vel.dx, vel.dy);
+    //    }
+    //}
+    //add_context(registry);
+    //get_context(registry);
 
-    // Temporary game loop
-    Kiki::RenderManager& renderManager = Kiki::RenderManager::get();
-    Kiki::WindowInfo info;
-    info.fullscreen = false;
-    info.monitor = 0;
-    // info.width = 0;
-    // info.height = 0;
-    // info.decorations = false;
-    info.resizeable = false;
+    //// Temporary game loop
+    //Kiki::RenderManager& renderManager = Kiki::RenderManager::get();
+    //Kiki::WindowInfo info;
+    //info.fullscreen = false;
+    //info.monitor = 0;
+    //// info.width = 0;
+    //// info.height = 0;
+    //// info.decorations = false;
+    //info.resizeable = false;
 
-    renderManager.initialise(info);
+    //renderManager.initialise(info);
 
-    GLFWwindow* window = renderManager.getWindow();
+    //GLFWwindow* window = renderManager.getWindow();
 
-    // create temporary glfw callback
-    glfwSetKeyCallback(window, &glfwCallback);
+    //// create temporary glfw callback
+    //glfwSetKeyCallback(window, &glfwCallback);
 
-    while (!glfwWindowShouldClose(window)) {
-        renderManager.nextFrame();
-    }
+    //while (!glfwWindowShouldClose(window)) {
+    //    renderManager.nextFrame();
+    //}
 
-    renderManager.shutdown();
+    //renderManager.shutdown();
 
-    return 0;
+    //return 0;
+	Kiki::Engine engine;
+	engine.Init();
+    engine.Run();
+
 }

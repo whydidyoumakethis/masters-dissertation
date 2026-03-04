@@ -9,5 +9,4 @@ target_sources(demo
 target_link_libraries(demo
   PRIVATE
     kiki
-    KikiDeps
 )
