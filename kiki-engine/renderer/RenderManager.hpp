@@ -9,18 +9,14 @@
 
 namespace Kiki {
     class RenderManager {
-        public:
-        static RenderManager& get();
-        void initialise(WindowInfo info);
-        void nextFrame();
-        void shutdown();
-        GLFWwindow* getWindow();
-
         private:
         RenderManager() = default;
         ~RenderManager() = default;
+        RenderManager(const RenderManager&) = delete;
+        RenderManager& operator=(const RenderManager&) = delete;
 
         bool recreateSwapchain = false;
+        bool initialised = false;
 
         rutils::VulkanWindow window;
 
@@ -32,6 +28,16 @@ namespace Kiki {
         std::vector<VkCommandBuffer> commandBuffers;
         std::vector<rutils::Fence> frameDone;
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
+
+        public:
+        static RenderManager& get();
+        void initialise(WindowInfo info);
+        
+        void nextFrame();
+        void shutdown();
+        GLFWwindow* getWindow();
+
+        bool isInitialised() { return initialised; };
     };
 }
 

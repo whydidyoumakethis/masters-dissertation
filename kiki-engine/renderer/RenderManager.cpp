@@ -20,19 +20,23 @@ namespace Kiki {
     }
 
     void RenderManager::initialise(WindowInfo info) {
-        // Create window
-        window = rutils::makeVulkanWindow(info);
+        if (!initialised) {
+            initialised = true;
 
-        // Initialise resources
-        pipelineLayout = rutils::createPipelineLayout(window);
-        pipeline = rutils::createPipeline(window, pipelineLayout.handle);
-        commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+            // Create window
+            window = rutils::makeVulkanWindow(info);
 
-        for (std::size_t i = 0; i < window.swapImages.size(); i++) {
-            commandBuffers.emplace_back(rutils::allocCommandBuffer(window, commandPool.handle));
-            frameDone.emplace_back(rutils::createFence(window.device, VK_FENCE_CREATE_SIGNALED_BIT));
-            imageAvailable.emplace_back(rutils::createSemaphore(window.device));
-            renderFinished.emplace_back(rutils::createSemaphore(window.device));
+            // Initialise resources
+            pipelineLayout = rutils::createPipelineLayout(window);
+            pipeline = rutils::createPipeline(window, pipelineLayout.handle);
+            commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+            for (std::size_t i = 0; i < window.swapImages.size(); i++) {
+                commandBuffers.emplace_back(rutils::allocCommandBuffer(window, commandPool.handle));
+                frameDone.emplace_back(rutils::createFence(window.device, VK_FENCE_CREATE_SIGNALED_BIT));
+                imageAvailable.emplace_back(rutils::createSemaphore(window.device));
+                renderFinished.emplace_back(rutils::createSemaphore(window.device));
+            }
         }
     }
 

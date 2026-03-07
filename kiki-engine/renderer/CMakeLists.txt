@@ -1,6 +1,8 @@
 target_sources(kiki
   PRIVATE
     RenderManager.cpp
+    MaterialManager.cpp
+    MeshManager.cpp
     utils/Devices.cpp
     utils/ToString.cpp
     utils/VulkanWindow.cpp
@@ -27,5 +29,7 @@ target_sources(kiki
     TYPE HEADERS
     FILES 
       RenderManager.hpp
+      MaterialManager.hpp
+      MeshManager.hpp
       WindowInfo.hpp
 )
