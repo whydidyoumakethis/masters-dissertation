@@ -2,6 +2,9 @@
 #include "ECS/World.h"
 #include "ECS/GameObject.h"
 #include "ECS/System.h"
+#include "PhysicsSystem.cpp"
+
+#include <spdlog/spdlog.h>
 
 namespace Kiki {
 	class Engine {
@@ -9,13 +12,18 @@ namespace Kiki {
 		void Init() {
 			_scheduler.RegisterSystem<TransformSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
-			_scheduler.RegisterSystem<PhysicsSystem>();
+			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 		}
 
 		// for game layer to register systems
 		template<typename T, typename... Args>
 		T* RegisterSystem(Args&&... args) {
 			return _scheduler.RegisterSystem<T>(std::forward<Args>(args)...);
+		}
+
+		template<typename T>
+		T* GetSystem() {
+			return _scheduler.GetSystem<T>();
 		}
 
 		void Run() {

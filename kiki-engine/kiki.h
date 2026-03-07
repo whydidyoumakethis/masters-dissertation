@@ -5,3 +5,6 @@
 #include "renderer/RenderManager.hpp"
 #include "input/InputManager.hpp"
 #include "Engine.h"
+#include "physics/PhysicsManager.hpp"
+#include "physics/PhysicsComponents.hpp"
+#include "physics/PhysicsSystem.hpp"

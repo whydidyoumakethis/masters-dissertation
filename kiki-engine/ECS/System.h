@@ -42,6 +42,15 @@ public:
         return ptr;
     }
 
+    template<typename T>
+    T* GetSystem() {
+        for (auto& system : _systems) {
+            T* target = dynamic_cast<T*>(system.get());
+            if (target) return target;
+        }
+        return nullptr;
+    }
+
     void Update(float dt) {
         for (auto& sys : _systems)
             sys->OnUpdate(dt);

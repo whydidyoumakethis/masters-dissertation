@@ -22,6 +22,9 @@ add_subdirectory(renderer)
 
 add_subdirectory(logging)
 add_subdirectory(input)
+
+add_subdirectory(physics)
+
 target_link_libraries(kiki
   PUBLIC
     KikiDeps
