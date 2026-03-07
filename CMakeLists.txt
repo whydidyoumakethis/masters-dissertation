@@ -113,6 +113,7 @@ target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
     PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+    PROJECT_ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets"
 )
 # Kiki Engine
 add_subdirectory(kiki-engine)

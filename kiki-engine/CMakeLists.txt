@@ -4,7 +4,6 @@ add_library(kiki)
 target_sources(kiki
   PRIVATE
     temp.cpp
-    GltfLoader/GltfLoader.cpp
   PUBLIC
     FILE_SET HEADERS
     FILES 
@@ -14,7 +13,7 @@ target_sources(kiki
       ECS/World.h
  "ECS/GameObject.h" "ECS/System.h" "Engine.h"
       
-      GltfLoader/GltfLoader.hpp)
+      GltfLoader/GltfLoader.h)
 
 add_dependencies(kiki shaders)
 
