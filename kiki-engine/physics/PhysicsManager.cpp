@@ -149,7 +149,7 @@ namespace Kiki {
 
         const int cCollisionSteps = 1;
         m_PhysicsSystem->Update(deltaTime, cCollisionSteps, m_TempAllocator.get(), m_JobSystem.get());
-        std::cout << "KikiEngine:Physics Update." << std::endl;
+        // std::cout << "KikiEngine:Physics Update." << std::endl;
     }
 
     void PhysicsManager::Shutdown() {
