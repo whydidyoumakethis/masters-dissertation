@@ -1,75 +1,99 @@
-cmake_minimum_required(VERSION 3.13)
-
+cmake_minimum_required(VERSION 3.15)
 project(KikiEngine)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
-### Dependencies ###
-# volk
+# --- Jolt Physics Configuration ---
+# Must be set before FetchContent to ensure Jolt builds with correct settings
+# Use dynamic MSVC runtime to match the rest of the engine (Fixes LNK2038)
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE INTERNAL "")
+# Prevent Jolt from overriding global compiler flags
+set(OVERRIDE_CXX_FLAGS OFF CACHE INTERNAL "")
+# Enable RTTI and Exceptions for compatibility with EnTT and fastgltf
+set(CPP_RTTI_ENABLED ON CACHE INTERNAL "")
+set(CPP_EXCEPTIONS_ENABLED ON CACHE INTERNAL "")
+
+# Disable Jolt's internal tests and samples to speed up build
+set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
+set(TARGET_SAMPLES OFF CACHE INTERNAL "")
+set(TARGET_HELLO_WORLD OFF CACHE INTERNAL "")
+
+# --- Dependencies ---
+
+# Jolt Physics
 FetchContent_Declare(
-	volk
-	GIT_REPOSITORY	"https://github.com/zeux/volk.git"
-	GIT_TAG 	"d261d2505214c553a9185f310a7dc822cfadc46b"
+    JoltPhysics
+    GIT_REPOSITORY "https://github.com/jrouwe/JoltPhysics.git"
+    GIT_TAG        "v5.5.0"
+    SOURCE_SUBDIR  "Build"
 )
 
-FetchContent_MakeAvailable(volk)
+# volk (Vulkan loader)
+FetchContent_Declare(
+    volk
+    GIT_REPOSITORY "https://github.com/zeux/volk.git"
+    GIT_TAG        "d261d2505214c553a9185f310a7dc822cfadc46b"
+)
 
 # VulkanMemoryAllocator
 FetchContent_Declare(
-	VulkanMemoryAllocator
-	GIT_REPOSITORY	"https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git"
-	GIT_TAG 	"e722e57c891a8fbe3cc73ca56c19dd76be242759"
+    VulkanMemoryAllocator
+    GIT_REPOSITORY "https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git"
+    GIT_TAG        "e722e57c891a8fbe3cc73ca56c19dd76be242759"
 )
-
-FetchContent_MakeAvailable(VulkanMemoryAllocator)
 
 # GLFW
 FetchContent_Declare(
-	glfw
-	GIT_REPOSITORY	"https://github.com/glfw/glfw.git"
-	GIT_TAG 	"7c9ea952338b792cb2f70d7c663e498725073797"
+    glfw
+    GIT_REPOSITORY "https://github.com/glfw/glfw.git"
+    GIT_TAG        "7c9ea952338b792cb2f70d7c663e498725073797"
 )
-
-FetchContent_MakeAvailable(glfw)
 
 # glm
 FetchContent_Declare(
-	glm
-	GIT_REPOSITORY	"https://github.com/g-truc/glm.git"
-	GIT_TAG 	"0af55ccecd98d4e5a8d1fad7de25ba429d60e863" #refs/tags/1.0.1
+    glm
+    GIT_REPOSITORY "https://github.com/g-truc/glm.git"
+    GIT_TAG        "0af55ccecd98d4e5a8d1fad7de25ba429d60e863"
 )
 
-FetchContent_MakeAvailable(glm)
-
-# entt
+# entt (ECS)
 FetchContent_Declare(
     entt
     GIT_REPOSITORY "https://github.com/skypjack/entt.git"
-    GIT_TAG "v3.16.0"
+    GIT_TAG        "v3.16.0"
 )
 
-FetchContent_MakeAvailable(entt)
+# spdlog
+FetchContent_Declare(
+    spdlog
+    GIT_REPOSITORY "https://github.com/gabime/spdlog.git"
+    GIT_TAG        "v1.17.0"
+)
 
-# compile shaders
+# fastgltf
+FetchContent_Declare(
+    fastgltf
+    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
+    GIT_TAG        "v0.9.0"
+)
+
+FetchContent_MakeAvailable(
+    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog fastgltf
+)
+
+# --- Shader Compilation ---
 set(SHADER_IN_DIR ${CMAKE_CURRENT_SOURCE_DIR}/kiki-engine/renderer/shaders)
 set(SHADER_OUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/shaders/compiled)
 
-file(GLOB SHADERS CONFIGURE_DEPENDS
-    ${SHADER_IN_DIR}/*.vert
-    ${SHADER_IN_DIR}/*.frag
-    ${SHADER_IN_DIR}/*.geom
-)
-
-set(COMPILED_SHADERS)
-
+file(GLOB SHADERS CONFIGURE_DEPENDS ${SHADER_IN_DIR}/*.vert ${SHADER_IN_DIR}/*.frag ${SHADER_IN_DIR}/*.geom)
 find_program(GLSLANG_VALIDATOR glslangValidator REQUIRED)
 
 foreach(shader IN LISTS SHADERS)
     get_filename_component(FILENAME ${shader} NAME)
     set(SPV_FILE ${SHADER_OUT_DIR}/${FILENAME}.spv)
-
     add_custom_command(
         OUTPUT ${SPV_FILE}
         COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_OUT_DIR}
@@ -77,36 +101,42 @@ foreach(shader IN LISTS SHADERS)
         DEPENDS ${shader}
         COMMENT "Compiling shader: ${FILENAME}"
     )
-
     list(APPEND COMPILED_SHADERS ${SPV_FILE})
 endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
-# spdlog
-FetchContent_Declare(
-    spdlog
-    GIT_REPOSITORY "https://github.com/gabime/spdlog.git"
-    GIT_TAG "v1.17.0"
-)
-FetchContent_MakeAvailable(spdlog)
 
-# -------- Create an interface library to propagate dependencies --------
-# This helps your subdirectories automatically get volk, glfw, glm
+# --- KikiDeps Interface ---
 add_library(KikiDeps INTERFACE)
+
 target_link_libraries(KikiDeps INTERFACE 
-	volk 
-	glfw 
-	VulkanMemoryAllocator
-	EnTT::EnTT
-	spdlog::spdlog
+    volk 
+    glfw 
+    VulkanMemoryAllocator
+    EnTT::EnTT
+    spdlog::spdlog
+    fastgltf::fastgltf
+    Jolt
 )
-target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
 
-# Kiki Engine
+target_include_directories(KikiDeps INTERFACE 
+    ${glm_SOURCE_DIR}
+    ${joltphysics_SOURCE_DIR} 
+)
+
+target_compile_definitions(KikiDeps INTERFACE
+    PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
+    PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+    
+    # Synchronize Jolt debug/release modes
+    $<$<CONFIG:Debug>:JPH_DEBUG>
+    $<$<NOT:$<CONFIG:Debug>>:JPH_RELEASE>
+    
+    # Instruction set support
+    JPH_USE_SSE4_1 JPH_USE_SSE4_2 JPH_USE_AVX JPH_USE_AVX2
+)
+
+# --- Subdirectories ---
 add_subdirectory(kiki-engine)
-
-# Asset baking
 add_subdirectory(asset-baking)
-
-# Demo game
 add_subdirectory(games/demo)

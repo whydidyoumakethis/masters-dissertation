@@ -8,6 +8,8 @@
 #endif
 #include <GLFW/glfw3.h>
 
+#include "WindowInfo.hpp"
+
 #include <vector>
 #include <cstdint>
 
@@ -47,7 +49,7 @@ namespace rutils {
 			VkExtent2D swapchainExtent;
 	};
 
-	VulkanWindow makeVulkanWindow();
+	VulkanWindow makeVulkanWindow(Kiki::WindowInfo info);
 
 
 	struct SwapChanges {

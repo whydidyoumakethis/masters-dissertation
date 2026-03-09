@@ -27,4 +27,5 @@ target_sources(kiki
     TYPE HEADERS
     FILES 
       RenderManager.hpp
+      WindowInfo.hpp
 )
