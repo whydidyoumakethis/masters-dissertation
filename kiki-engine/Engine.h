@@ -2,7 +2,7 @@
 #include "ECS/World.h"
 #include "ECS/GameObject.h"
 #include "ECS/System.h"
-#include "InputSystem.hpp"
+#include "input/InputSystem.hpp"
 #include "PhysicsSystem.cpp"
 
 #include <spdlog/spdlog.h>
@@ -13,7 +13,7 @@ namespace Kiki {
 		void Init() {
 			_scheduler.RegisterSystem<TransformSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
-			_scheduler.RegisterSystem<InputSystem>();
+			_scheduler.RegisterSystem<Kiki::InputSystem>();
 			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 		}
 
