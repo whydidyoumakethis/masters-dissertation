@@ -5,6 +5,10 @@
 #include "GameObject.h"
 #include "RenderManager.hpp"
 #include "WindowInfo.hpp"
+#include "InputManager.hpp"
+
+#include <iostream>
+
 class System {
 public:
     virtual ~System() = default;
@@ -15,6 +19,7 @@ public:
         Update,
         PostUpdate,
         Render,
+        Input,
         Physics
     };
 

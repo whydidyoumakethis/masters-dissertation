@@ -4,6 +4,9 @@ project(KikiEngine)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
+set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "")
+
 include(FetchContent)
 
 # --- Jolt Physics Configuration ---
@@ -125,16 +128,19 @@ target_include_directories(KikiDeps INTERFACE
 )
 
 target_compile_definitions(KikiDeps INTERFACE
-    PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
-    PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+    PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"
+    PROJECT_BINARY_DIR=\"${CMAKE_BINARY_DIR}\"
     
     # Synchronize Jolt debug/release modes
-    $<$<CONFIG:Debug>:JPH_DEBUG>
-    $<$<NOT:$<CONFIG:Debug>>:JPH_RELEASE>
-    
-    # Instruction set support
-    JPH_USE_SSE4_1 JPH_USE_SSE4_2 JPH_USE_AVX JPH_USE_AVX2
+    # $<$<CONFIG:Debug>:JPH_DEBUG>
+    # $<$<NOT:$<CONFIG:Debug>>:JPH_RELEASE>
 )
+
+# if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+#     target_compile_definitions(KikiDeps INTERFACE JPH_USE_NEON)
+# else()
+#     target_compile_definitions(KikiDeps INTERFACE JPH_USE_SSE4_1 JPH_USE_SSE4_2 JPH_USE_AVX JPH_USE_AVX2)
+# endif()
 
 # --- Subdirectories ---
 add_subdirectory(kiki-engine)

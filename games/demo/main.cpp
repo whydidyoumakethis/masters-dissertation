@@ -58,12 +58,12 @@ void get_context(entt::registry& registry) {
 
 
 
-// TODO: temporary glfw input handling
-void glfwCallback(GLFWwindow* aWindow, int aKey, int /*aScanCode*/, int aAction, int /*aModifierFlags*/) {
-    if (GLFW_KEY_ESCAPE == aKey && GLFW_PRESS == aAction) {
-		glfwSetWindowShouldClose(aWindow, GLFW_TRUE);
-	}
-}
+// // TODO: temporary glfw input handling
+// void glfwCallback(GLFWwindow* aWindow, int aKey, int /*aScanCode*/, int aAction, int /*aModifierFlags*/) {
+//     if (GLFW_KEY_ESCAPE == aKey && GLFW_PRESS == aAction) {
+// 		glfwSetWindowShouldClose(aWindow, GLFW_TRUE);
+// 	}
+// }
 
 
 int main(int argc, char** argv) {
@@ -136,7 +136,7 @@ int main(int argc, char** argv) {
 	Kiki::Engine engine;
 	engine.Init();
 
-    //-------------------Simple test of some functions of the physical module-----------------
+    // -------------------Simple test of some functions of the physical module-----------------
     auto* physics = engine.GetSystem<Kiki::PhysicsSystem>();
     // Create a static ground surface
     auto floor = GameObject::Create("StaticFloor");
