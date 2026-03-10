@@ -37,7 +37,7 @@ namespace Kiki {
     }
 
     void RenderManager::nextFrame() {
-        glfwPollEvents();
+        // glfwPollEvents(); called in input manager
 
         if (recreateSwapchain) {
             // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU

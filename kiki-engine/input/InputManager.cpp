@@ -17,7 +17,7 @@ namespace Kiki {
         }
     }
 
-    void InputManager::update() {
+    void InputManager::update() {        
         // transition keys on each frame
         for (int i = 0; i < GLFW_KEY_LAST; i++) {
             switch (keyStates[i]) {
@@ -49,6 +49,8 @@ namespace Kiki {
         // reset mouse delta
         mouse.dx = 0.f;
         mouse.dy = 0.f;
+
+        glfwPollEvents();
     }
 
     void InputManager::handleKey(GLFWwindow* window, int key, int scanCode, int action, int modifierFlags) {
