@@ -20,13 +20,15 @@ namespace Kiki {
 
 		void Run() {
 			_running = true;
-			while (_running) {
+			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
 				// float dt = _timer.Tick();
 				float dt = 0.016f; // TODO: calculate delta time
 				// TODO: MessageCenter::Flush();
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
+
+			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
 		}
 	void Quit() {
 		_running = false;

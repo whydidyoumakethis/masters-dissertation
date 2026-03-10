@@ -1,6 +1,9 @@
 #ifndef KIKI_RENDERER_MESHMANAGER
 #define KIKI_RENDERER_MESHMANAGER
 
+#include "RenderManager.hpp"
+#include "utils/Buffer.hpp"
+
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
 
@@ -15,7 +18,9 @@ namespace Kiki {
     };
 
     struct Mesh {
-
+        rutils::Buffer positions;
+        rutils::Buffer colors;
+        std::uint32_t vertexCount;
     };
 
     class MeshManager {
@@ -23,7 +28,7 @@ namespace Kiki {
         static MeshManager& get();
 
         int createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices);
-        Mesh getMesh(int id);
+        Mesh* getMesh(int id);
 
         private:
         MeshManager() = default;

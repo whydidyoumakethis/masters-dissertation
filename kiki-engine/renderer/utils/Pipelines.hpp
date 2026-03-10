@@ -5,7 +5,7 @@
 #include "VulkanWindow.hpp"
 
 namespace rutils {
-    PipelineLayout createPipelineLayout(VulkanWindow const& window);
+    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 

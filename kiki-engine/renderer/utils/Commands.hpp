@@ -3,6 +3,7 @@
 
 #include "VulkanWrapper.hpp"
 #include "VulkanWindow.hpp"
+#include "RenderManager.hpp"
 
 namespace rutils {
     struct ImageAndView {
@@ -13,11 +14,18 @@ namespace rutils {
     CommandPool createCommandPool(VulkanWindow const& window, VkCommandPoolCreateFlags flags = 0);
     VkCommandBuffer allocCommandBuffer(VulkanWindow const& window, VkCommandPool pool);
 
-    void recordCommands( 
+    void recordCommands(
 		VkCommandBuffer,
 		VkPipeline,
 		ImageAndView const&,
-		VkExtent2D const&
+		VkExtent2D const&,
+		VkBuffer aPositionBuffer,
+		VkBuffer aColorBuffer,
+		std::uint32_t aVertexCount,
+		VkBuffer aSceneUBO,
+		Kiki::RenderManager::SceneUniform const&,
+		VkPipelineLayout,
+		VkDescriptorSet aSceneDescriptors
 	);
 
 	void submitCommands(

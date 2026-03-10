@@ -3,6 +3,7 @@ target_sources(kiki
     RenderManager.cpp
     MaterialManager.cpp
     MeshManager.cpp
+    utils/VMA.cpp
     utils/Devices.cpp
     utils/ToString.cpp
     utils/VulkanWindow.cpp
@@ -10,6 +11,9 @@ target_sources(kiki
     utils/Shaders.cpp
     utils/Commands.cpp
     utils/Synchronisation.cpp
+    utils/Allocator.cpp
+    utils/Buffer.cpp
+    utils/Descriptors.cpp
 
   PRIVATE
     FILE_SET rendererPrivateHeaders
@@ -23,6 +27,9 @@ target_sources(kiki
       utils/Shaders.hpp
       utils/Commands.hpp
       utils/Synchronisation.hpp
+      utils/Buffer.hpp
+      utils/Allocator.hpp
+      utils/Descriptors.hpp
 
   PUBLIC
     FILE_SET rendererPublicHeaders

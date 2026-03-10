@@ -104,7 +104,7 @@ add_library(KikiDeps INTERFACE)
 target_link_libraries(KikiDeps INTERFACE 
 	volk 
 	glfw 
-	VulkanMemoryAllocator
+	GPUOpen::VulkanMemoryAllocator
 	EnTT::EnTT
 	spdlog::spdlog
     fastgltf::fastgltf

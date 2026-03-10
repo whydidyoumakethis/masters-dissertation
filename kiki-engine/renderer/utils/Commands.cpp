@@ -1,35 +1,9 @@
 #include "Commands.hpp"
 
+#include "Synchronisation.hpp"
 #include "ToString.hpp"
 #include "../../logging/FatalError.hpp"
 
-void imageBarrier(VkCommandBuffer aCmdBuff, VkImage aImage, VkPipelineStageFlags2 aSrcStageMask, VkAccessFlags2 aSrcAccessMask, VkImageLayout aSrcLayout, 
-    VkPipelineStageFlags2 aDstStageMask,VkAccessFlags2 aDstAccessMask, VkImageLayout aDstLayout, VkImageSubresourceRange aRange = VkImageSubresourceRange{VK_IMAGE_ASPECT_COLOR_BIT,0,1,0,1}, 
-    std::uint32_t aSrcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED, std::uint32_t aDstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED) {
-
-    assert( VK_NULL_HANDLE != aCmdBuff );
-    assert( VK_NULL_HANDLE != aImage );
-    VkImageMemoryBarrier2 ibarrier{};
-    ibarrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
-    ibarrier.srcStageMask = aSrcStageMask;
-    ibarrier.srcAccessMask = aSrcAccessMask;
-    ibarrier.dstStageMask = aDstStageMask;
-    ibarrier.dstAccessMask = aDstAccessMask;
-    ibarrier.oldLayout = aSrcLayout;
-    ibarrier.newLayout = aDstLayout;
-    ibarrier.srcQueueFamilyIndex = aSrcQueueFamilyIndex;
-    ibarrier.dstQueueFamilyIndex = aDstQueueFamilyIndex;
-    ibarrier.image = aImage;
-    ibarrier.subresourceRange = aRange;
-
-    VkDependencyInfo deps{};
-    deps.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
-    deps.dependencyFlags = VK_DEPENDENCY_BY_REGION_BIT;
-    deps.imageMemoryBarrierCount = 1;
-    deps.pImageMemoryBarriers = &ibarrier;
-
-    vkCmdPipelineBarrier2( aCmdBuff, &deps );
-}
 
 namespace rutils {
     CommandPool createCommandPool(VulkanWindow const& window, VkCommandPoolCreateFlags flags) {
@@ -65,7 +39,10 @@ namespace rutils {
         return cbuff;
     }
 
-    void recordCommands(VkCommandBuffer aCmdBuff, VkPipeline aGraphicsPipe, ImageAndView const& aColorAttach, VkExtent2D const& aImageExtent) {
+    void recordCommands(VkCommandBuffer aCmdBuff, VkPipeline aGraphicsPipe, ImageAndView const& aColorAttach, VkExtent2D const& aImageExtent, 
+        VkBuffer aPositionBuffer, VkBuffer aColorBuffer, std::uint32_t aVertexCount, VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, 
+        VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors) {
+
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -78,8 +55,29 @@ namespace rutils {
             );
         }
 
+        // Upload scene uniforms
+        rutils::bufferBarrier(aCmdBuff, aSceneUBO,
+            /* Before */
+            VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+            VK_ACCESS_2_UNIFORM_READ_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_CLEAR_BIT,// vkCmdUpdateBuffer() is a ”clear command”
+            VK_ACCESS_2_TRANSFER_WRITE_BIT
+        );
+
+        vkCmdUpdateBuffer( aCmdBuff, aSceneUBO, 0, sizeof(Kiki::RenderManager::SceneUniform), &aSceneUniform );
+
+        rutils::bufferBarrier(aCmdBuff, aSceneUBO,
+            /* Before */
+            VK_PIPELINE_STAGE_2_CLEAR_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+            VK_ACCESS_2_UNIFORM_READ_BIT
+        );
+
         // Barrier: Ensure the color attachment image is in the right layout
-        imageBarrier( aCmdBuff, aColorAttach.image,
+        rutils::imageBarrier(aCmdBuff, aColorAttach.image,
             /* Before */
             VK_PIPELINE_STAGE_2_NONE,
             VK_ACCESS_2_NONE,
@@ -116,8 +114,16 @@ namespace rutils {
         // Begin drawing with our graphics pipeline
         vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsPipe );
 
-        // Draw a triangle = three vertices
-        vkCmdDraw( aCmdBuff, 3, 1, 0, 0 );
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 0, 1, &aSceneDescriptors, 0, nullptr);
+
+        // Bind vertex input
+        VkBuffer buffers[2] = { aPositionBuffer, aColorBuffer };
+        VkDeviceSize offsets[2]{};
+
+        vkCmdBindVertexBuffers( aCmdBuff, 0, 2, buffers, offsets );
+
+        // Draw vertices
+        vkCmdDraw( aCmdBuff, aVertexCount, 1, 0, 0 );
 
         // End rendering
         vkCmdEndRendering( aCmdBuff );
