@@ -73,10 +73,12 @@ namespace rutils {
 
         // Load base image
         int baseWidthi, baseHeighti, baseChannelsi;
-        stbi_uc* data = stbi_load( path.c_str(), &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */ );
+
+        std::string pathStr = path.string();
+        stbi_uc* data = stbi_load( pathStr.c_str(), &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
 
         if (!data) {
-            throw Kiki::FatalError("{}: unable to load texture base image ({})", path.c_str(), stbi_failure_reason());
+            throw Kiki::FatalError("{}: unable to load texture base image ({})", pathStr.c_str(), stbi_failure_reason());
         }
 
         auto const baseWidth = std::uint32_t(baseWidthi);
