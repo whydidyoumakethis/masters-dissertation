@@ -5,6 +5,10 @@
 #include "GameObject.h"
 #include "RenderManager.hpp"
 #include "WindowInfo.hpp"
+#include "InputManager.hpp"
+
+#include <iostream>
+
 class System {
 public:
     virtual ~System() = default;
@@ -15,6 +19,7 @@ public:
         Update,
         PostUpdate,
         Render,
+        Input,
         Physics
     };
 
@@ -40,6 +45,15 @@ public:
             });
         ptr->OnStart();
         return ptr;
+    }
+
+    template<typename T>
+    T* GetSystem() {
+        for (auto& system : _systems) {
+            T* target = dynamic_cast<T*>(system.get());
+            if (target) return target;
+        }
+        return nullptr;
     }
 
     void Update(float dt) {

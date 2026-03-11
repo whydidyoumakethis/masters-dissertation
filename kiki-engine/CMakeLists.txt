@@ -24,6 +24,8 @@ add_subdirectory(logging)
 
 add_subdirectory(input)
 
+add_subdirectory(physics)
+
 add_subdirectory(Components)
 
 target_link_libraries(kiki

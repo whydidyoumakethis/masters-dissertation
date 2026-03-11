@@ -4,4 +4,8 @@
 #include "renderer/WindowInfo.hpp"
 #include "renderer/RenderManager.hpp"
 #include "input/InputManager.hpp"
+#include "input/InputSystem.hpp"
 #include "Engine.h"
+#include "physics/PhysicsManager.hpp"
+#include "physics/PhysicsComponents.hpp"
+#include "physics/PhysicsSystem.hpp"

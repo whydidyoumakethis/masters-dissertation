@@ -18,11 +18,41 @@ namespace Kiki {
             RELEASED
         };
 
+        struct MouseState {
+            KeyState buttonStates[GLFW_MOUSE_BUTTON_LAST];
+            float x = 0.f;
+            float y = 0.f;
+            float dx = 0.f;
+            float dy = 0.f;
+        };
+
         InputManager() = default;
         ~InputManager() = default;
         InputManager(const InputManager&) = delete;
         InputManager& operator=(const InputManager&) = delete;
 
+        GLFWwindow* window;
+
+        KeyState keyStates[GLFW_KEY_LAST]{};
+        MouseState mouse;
+
+        // glfw doesn't want 'self', it just wants the other arguments
+        // so use a static function and forward it
+        static void setKeyState(GLFWwindow* window, int key, int scanCode, int action, int modifierFlags) {
+            InputManager::get().handleKey(window, key, scanCode, action, modifierFlags);
+        }
+
+        static void setMouseButtonState(GLFWwindow* window, int button, int action, int modifierFlags) {
+            InputManager::get().handleMouseButton(window, button, action, modifierFlags);
+        }
+
+        static void setMouseMovementState(GLFWwindow* window, double xPos, double yPos) {
+            InputManager::get().handleMouseMotion(window, (float)xPos, (float)yPos);
+        }
+
+        void handleKey(GLFWwindow* window, int key, int scanCode, int action, int modifierFlags);
+        void handleMouseButton(GLFWwindow* window, int button, int action, int modifierFlags);
+        void handleMouseMotion(GLFWwindow* window, float xPos, float yPos);
 
         public:
         static InputManager& get() {
@@ -30,17 +60,21 @@ namespace Kiki {
             return instance;
         }
 
-        void initialise() {
-            for (int i = 0; i < GLFW_KEY_LAST; i++) {
-                keyStates[i] = KeyState::RELEASED;
-            }
-        }
+        void initialise(GLFWwindow* targetWindow);
+        void update();
     
         bool isKeyDown(int key);
         bool isKeyJustDown(int key);
         bool isKeyUp(int key);
         bool isKeyJustUp(int key);
-        KeyState keyStates[GLFW_KEY_LAST]{};
+
+        bool isMouseButtonDown(int button);
+        bool isMouseButtonJustDown(int button);
+        bool isMouseButtonUp(int button);
+        bool isMouseButtonJustUp(int button);
+
+        void getMousePosition(float &x, float &y);
+        void getMouseDeltaPosition(float &x, float &y);
     };
 }
 
