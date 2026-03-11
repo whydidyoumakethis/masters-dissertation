@@ -418,30 +418,6 @@ namespace Kiki {
         return Material(std::move(texture), std::move(descriptorSet), blendMode);
     }
 
-    void RenderManager::shutdown() {
-        vkDeviceWaitIdle(window.device);
-
-        renderFinished.clear();
-        imageAvailable.clear();
-        frameDone.clear();
-
-        if (!commandBuffers.empty()) {
-            vkFreeCommandBuffers(
-                window.device,
-                commandPool.handle,
-                commandBuffers.size(),
-                commandBuffers.data()
-            );
-            commandBuffers.clear();
-        }
-
-        commandPool = {};
-        pipeline = {};
-        pipelineLayout = {};
-
-        window = {};
-    }
-
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
         float const aspect = aFramebufferWidth / float(aFramebufferHeight);
 
@@ -462,5 +438,42 @@ namespace Kiki {
 
     void RenderManager::setCamera(Camera& c) {
         camera = c;
+    }
+
+    void RenderManager::shutdown() {
+        vkDeviceWaitIdle(window.device);
+
+        tempMesh = {};
+        MaterialManager::get().shutdown();
+        tempTextureCmdPool = {};
+
+        renderFinished.clear();
+        imageAvailable.clear();
+        frameDone.clear();
+
+        if (!commandBuffers.empty()) {
+            vkFreeCommandBuffers(
+                window.device,
+                commandPool.handle,
+                commandBuffers.size(),
+                commandBuffers.data()
+            );
+            commandBuffers.clear();
+        }
+
+        commandPool = {};
+        pipeline = {};
+        pipelineLayout = {};
+
+        sceneUBO = {};
+
+        descriptorPool = {};
+        objectLayout = {};
+        sceneDescriptors = {};
+
+        sampler = {};
+        allocator = {};
+
+        window = {};
     }
 }

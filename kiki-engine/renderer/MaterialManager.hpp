@@ -14,6 +14,7 @@ namespace Kiki {
 
         int createMaterial(std::filesystem::path texture, BlendMode blendMode = BlendMode::OPAQUE);
         Material const& getMaterial(int id);
+        void shutdown();
 
         private:
         MaterialManager() = default;

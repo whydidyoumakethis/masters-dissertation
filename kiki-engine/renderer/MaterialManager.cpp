@@ -15,4 +15,8 @@ namespace Kiki {
     Material const& MaterialManager::getMaterial(int id) {
         return materials[id];
     }
+
+    void MaterialManager::shutdown() {
+        materials.clear();
+    }
 }

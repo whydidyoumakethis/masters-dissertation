@@ -72,7 +72,7 @@ namespace Kiki {
         Mesh tempMesh;
         Material tempMaterial;
 
-        Camera camera;
+        Camera camera; // default cam
 
         public:
         static RenderManager& get();
