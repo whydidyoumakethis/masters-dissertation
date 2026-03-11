@@ -2,6 +2,16 @@
 #include "ECS/World.h"
 #include "ECS/GameObject.h"
 #include "ECS/System.h"
+#include "input/InputSystem.hpp"
+#include "PhysicsSystem.cpp"
+#include "renderer/MeshManager.hpp"
+#include "renderer/MaterialManager.hpp"
+
+#include "../debugging/DebugCamera.hpp"
+
+#include <spdlog/spdlog.h>
+
+#include <chrono>
 
 namespace Kiki {
 	class Engine {
@@ -9,7 +19,8 @@ namespace Kiki {
 		void Init() {
 			_scheduler.RegisterSystem<TransformSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
-			_scheduler.RegisterSystem<PhysicsSystem>();
+			_scheduler.RegisterSystem<Kiki::InputSystem>();
+			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 		}
 
 		// for game layer to register systems
@@ -18,15 +29,56 @@ namespace Kiki {
 			return _scheduler.RegisterSystem<T>(std::forward<Args>(args)...);
 		}
 
+		template<typename T>
+		T* GetSystem() {
+			return _scheduler.GetSystem<T>();
+		}
+
 		void Run() {
 			_running = true;
-			while (_running) {
+
+			// Temp addition for debug cam
+			DebugCamera cam;
+			RenderManager::get().setCamera(cam);
+
+			auto& registry = World::Get().Registry();
+			auto road = World::Get().CreateEntity();
+
+			std::vector<float> p = {
+                -1.f, 0.f, -6.f, // v0
+                -1.f, 0.f, +6.f, // v1
+                +1.f, 0.f, +6.f, // v2
+                +1.f, 0.f, -6.f // v3
+            };
+
+            std::vector<std::uint32_t> i = { 0, 1, 2, 0, 2, 3 };
+
+            std::vector<float> c = {
+                0.f, -6.f, // t0
+                0.f, +6.f, // t1
+                1.f, +6.f, // t2
+                1.f, -6.f // t3
+            };
+
+			registry.emplace<TransformComponent>(road);
+			registry.emplace<MeshComponent>(road, MeshManager::get().createMesh(p, i, c));
+			registry.emplace<MaterialComponent>(road, MaterialManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+
+			auto previousClock = std::chrono::steady_clock::now();
+
+			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
 				// float dt = _timer.Tick();
-				float dt = 0.016f; // TODO: calculate delta time
+				auto const now = std::chrono::steady_clock::now();
+				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
+				previousClock = now;
 				// TODO: MessageCenter::Flush();
+				cam.update(dt);
+				glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyDown(GLFW_KEY_ESCAPE));
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
+
+			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
 		}
 	void Quit() {
 		_running = false;

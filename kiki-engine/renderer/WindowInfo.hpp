@@ -16,7 +16,7 @@ namespace Kiki {
      * @param icon path to the icon to use for the application
      * @param decorations enable/disable window decorations
      */
-    struct WindowInfo{
+    struct WindowInfo {
         int width = 1280;
         int height = 720;
         bool resizeable = true;

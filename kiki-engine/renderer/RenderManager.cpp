@@ -6,12 +6,16 @@
 #include "utils/Commands.hpp"
 #include "utils/Synchronisation.hpp"
 #include "utils/ToString.hpp"
+#include "utils/Descriptors.hpp"
+#include "utils/Texture.hpp"
 #include "../logging/FatalError.hpp"
+#include "MaterialManager.hpp"
+#include "MeshManager.hpp"
 
 #include <iostream>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 
-
-void glfwCallback(GLFWwindow*, int, int, int, int);
 
 namespace Kiki {
     RenderManager& RenderManager::get() {
@@ -27,9 +31,45 @@ namespace Kiki {
             window = rutils::makeVulkanWindow(info);
 
             // Initialise resources
-            pipelineLayout = rutils::createPipelineLayout(window);
+            rutils::DescriptorSetLayout sceneLayout = rutils::createSceneDescriptorLayout(window);
+            objectLayout = rutils::createObjectDescriptorLayout(window);
+            allocator = rutils::createAllocator(window);
+
+            sampler = rutils::createSampler(window);
+
+            sceneUBO = rutils::createBuffer(
+                allocator,
+                sizeof(SceneUniform),
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                0,
+                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+            );
+
+            pipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, objectLayout.handle);
             pipeline = rutils::createPipeline(window, pipelineLayout.handle);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+
+            descriptorPool = rutils::createDescriptorPool(window);
+
+            sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
+
+            VkWriteDescriptorSet desc[1]{};
+
+            VkDescriptorBufferInfo sceneUboInfo{};
+            sceneUboInfo.buffer = sceneUBO.buffer;
+            sceneUboInfo.range = VK_WHOLE_SIZE;
+
+            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[0].dstSet = sceneDescriptors;
+            desc[0].dstBinding = 0;
+            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            desc[0].descriptorCount = 1;
+            desc[0].pBufferInfo = &sceneUboInfo;
+
+
+            constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
+            vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
+
 
             for (std::size_t i = 0; i < window.swapImages.size(); i++) {
                 commandBuffers.emplace_back(rutils::allocCommandBuffer(window, commandPool.handle));
@@ -37,11 +77,17 @@ namespace Kiki {
                 imageAvailable.emplace_back(rutils::createSemaphore(window.device));
                 renderFinished.emplace_back(rutils::createSemaphore(window.device));
             }
+
+            tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
         }
     }
 
+    void RenderManager::draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix) {
+
+    }
+
     void RenderManager::nextFrame() {
-        glfwPollEvents();
+        // glfwPollEvents(); called in input manager
 
         if (recreateSwapchain) {
             // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
@@ -120,6 +166,10 @@ namespace Kiki {
         }
 
         // Record and submit commands for this frame
+        // Prepare data for this frame
+        SceneUniform sceneUniforms{};
+        updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
+
         assert(std::size_t(imageIndex) < window.swapImages.size());
 
         rutils::ImageAndView colorTarget;
@@ -132,7 +182,11 @@ namespace Kiki {
             commandBuffers[frameIndex],
             pipeline.handle,
             colorTarget,
-            window.swapchainExtent
+            window.swapchainExtent,
+            sceneUBO.buffer,
+            sceneUniforms,
+            pipelineLayout.handle,
+            sceneDescriptors
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -168,8 +222,241 @@ namespace Kiki {
         }
     }
 
+    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords) {
+        int posSize = positions.size() * sizeof(float);
+        int indSize = indices.size() * sizeof (std::uint32_t);
+        int texSize = texCoords.size() * sizeof(float);
+
+        // Create on GPU vertex buffer
+        rutils::Buffer vertexPosGPU = rutils::createBuffer(
+            allocator,
+            posSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create on GPU index buffer
+        rutils::Buffer indexGPU = rutils::createBuffer(
+            allocator,
+            indSize,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create on GPU tex coords buffer
+        rutils::Buffer texCoordsGPU = rutils::createBuffer(
+            allocator,
+            texSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create staging buffers
+        rutils::Buffer posStaging = rutils::createBuffer(
+            allocator,
+            posSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer indStaging = rutils::createBuffer(
+            allocator,
+            indSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer texStaging = rutils::createBuffer(
+            allocator,
+            texSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        void* posPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, posStaging.allocation, &posPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(posPtr, positions.data(), posSize);
+        vmaUnmapMemory(allocator.allocator, posStaging.allocation);
+
+        void* indPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, indStaging.allocation, &indPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(indPtr, indices.data(), indSize);
+        vmaUnmapMemory(allocator.allocator, indStaging.allocation);
+
+        void* texPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, texStaging.allocation, &texPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(texPtr, texCoords.data(), texSize);
+        vmaUnmapMemory(allocator.allocator, texStaging.allocation);
+
+        // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
+        // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
+        // transfers, let these take place in the background while performing other tasks.
+        rutils::Fence uploadComplete = rutils::createFence(window.device);
+
+        // Queue data uploads from staging buffers to the final buffers.
+        // This uses a separate command pool for simplicity.
+        rutils::CommandPool uploadPool = rutils::createCommandPool(window);
+        VkCommandBuffer uploadCmd = rutils::allocCommandBuffer(window, uploadPool.handle);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0;
+        beginInfo.pInheritanceInfo = nullptr;
+
+        if (auto const res = vkBeginCommandBuffer(uploadCmd, &beginInfo); VK_SUCCESS != res) {
+            throw FatalError( "Beginning command buffer recording\n"
+                "vkBeginCommandBuffer() returned {}", rutils::toString(res)
+            );
+        }
+
+        VkBufferCopy pcopy{};
+        pcopy.size = posSize;
+
+        vkCmdCopyBuffer(uploadCmd, posStaging.buffer, vertexPosGPU.buffer, 1, &pcopy);
+
+        rutils::bufferBarrier(uploadCmd, vertexPosGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+            VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
+        VkBufferCopy icopy{};
+        icopy.size = indSize;
+
+        vkCmdCopyBuffer(uploadCmd, indStaging.buffer, indexGPU.buffer, 1, &icopy);
+
+        rutils::bufferBarrier(uploadCmd, indexGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT,
+            VK_ACCESS_2_INDEX_READ_BIT
+        );
+
+        VkBufferCopy tcopy{};
+        tcopy.size = texSize;
+
+        vkCmdCopyBuffer(uploadCmd, texStaging.buffer, texCoordsGPU.buffer, 1, &tcopy);
+
+        rutils::bufferBarrier(uploadCmd, texCoordsGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+            VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
+        if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
+            throw FatalError( "Ending command buffer recording\n"
+                "vkEndCommandBuffer() returned {}", rutils::toString(res)
+            );
+        }
+
+        // Submit transfer commands
+        VkCommandBufferSubmitInfo submit[1]{};
+        submit[0].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        submit[0].commandBuffer = uploadCmd;
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = submit;
+
+        if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+            throw FatalError( "Unable to submit command buffer to queue\n"
+                "vkQueueSubmit2() returned {}", rutils::toString(res)
+            );
+        }
+
+        // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
+        // buffers, command pool, ...)
+        //
+        // The code doesn’t destory the resources implicitly – the resources are destroyed by the destructors of the
+        // labutils wrappers for the various objects once we leave the function’s scope.
+        if (auto const res = vkWaitForFences(window.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
+            throw FatalError( "Waiting for upload to complete\n"
+                "vkWaitForFences() returned {}", rutils::toString(res)
+            );
+        }
+
+        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
+    }
+
+    Material RenderManager::allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode) {
+        rutils::Texture texture = rutils::loadImageTexture(texturePath.c_str(), window, tempTextureCmdPool.handle, allocator);
+        
+        VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
+
+        {
+            VkWriteDescriptorSet desc[1]{};
+
+            VkDescriptorImageInfo textureInfo{};
+            textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            textureInfo.imageView = texture.view;
+            textureInfo.sampler = sampler.handle;
+
+            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[0].dstSet = descriptorSet;
+            desc[0].dstBinding = 0;
+            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[0].descriptorCount = 1;
+            desc[0].pImageInfo = &textureInfo;
+
+            constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
+            vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
+        }
+
+        return Material(std::move(texture), std::move(descriptorSet), blendMode);
+    }
+
+    void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
+        float const aspect = aFramebufferWidth / float(aFramebufferHeight);
+
+        aSceneUniforms.projection = glm::perspectiveRH_ZO(
+            glm::radians(60.0f), // fov
+            aspect,
+            0.1f, // near
+            100.0f // far
+        );
+
+        aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
+
+        auto& registry = World::Get().Registry();
+        aSceneUniforms.camera = glm::translate(registry.get<TransformComponent>(camera.camera).position); //world matrix doesn't work yet
+
+        aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
+    }
+
+    void RenderManager::setCamera(Camera& c) {
+        camera = c;
+    }
+
     void RenderManager::shutdown() {
         vkDeviceWaitIdle(window.device);
+
+        MeshManager::get().shutdown();
+        MaterialManager::get().shutdown();
+        tempTextureCmdPool = {};
 
         renderFinished.clear();
         imageAvailable.clear();
@@ -189,12 +476,15 @@ namespace Kiki {
         pipeline = {};
         pipelineLayout = {};
 
+        sceneUBO = {};
+
+        descriptorPool = {};
+        objectLayout = {};
+        sceneDescriptors = {};
+
+        sampler = {};
+        allocator = {};
+
         window = {};
-
-        std::cout << "hi :D" << std::endl;
-    }
-
-    GLFWwindow* RenderManager::getWindow() {
-        return window.window;
     }
 }

@@ -23,7 +23,11 @@ add_subdirectory(logging)
 
 add_subdirectory(input)
 
+add_subdirectory(physics)
+
 add_subdirectory(Components)
+
+add_subdirectory(debugging)
 
 target_link_libraries(kiki
   PUBLIC
