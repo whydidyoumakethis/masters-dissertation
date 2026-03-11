@@ -7,7 +7,9 @@
 #include "utils/Synchronisation.hpp"
 #include "utils/ToString.hpp"
 #include "utils/Descriptors.hpp"
+#include "utils/Texture.hpp"
 #include "../logging/FatalError.hpp"
+#include "MaterialManager.hpp"
 
 #include <iostream>
 #include <glm/gtx/transform.hpp>
@@ -29,7 +31,10 @@ namespace Kiki {
 
             // Initialise resources
             rutils::DescriptorSetLayout sceneLayout = rutils::createSceneDescriptorLayout(window);
+            objectLayout = rutils::createObjectDescriptorLayout(window);
             allocator = rutils::createAllocator(window);
+
+            sampler = rutils::createSampler(window);
 
             sceneUBO = rutils::createBuffer(
                 allocator,
@@ -39,7 +44,7 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
-            pipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle);
+            pipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, objectLayout.handle);
             pipeline = rutils::createPipeline(window, pipelineLayout.handle);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
@@ -82,18 +87,21 @@ namespace Kiki {
                 +1.f, 0.f, -6.f // v3
             };
             std::vector<float> c = {
-                0.4f, 0.4f, 1.0f, // c0
-                0.4f, 1.0f, 0.4f, // c1
-                1.0f, 0.4f, 0.4f, // c2
+                0.f, -6.f, // t0
+                0.f, +6.f, // t1
+                1.f, +6.f, // t2
 
-                0.4f, 0.4f, 1.0f, // c0
-                1.0f, 0.4f, 0.4f, // c2
-                1.0f, 0.4f, 0.0f // c3
+                0.f, -6.f, // t0
+                1.f, +6.f, // t2
+                1.f, -6.f // t3
             };
 
             
-            positions = RenderManager::get().createMeshBuffer(p);
-            colours = RenderManager::get().createMaterialBuffer(c);
+            tempMesh = RenderManager::get().allocateMesh(p, c);
+
+            tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
+            
+            MaterialManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE);
             
         }
     }
@@ -199,13 +207,14 @@ namespace Kiki {
             pipeline.handle,
             colorTarget,
             window.swapchainExtent,
-            positions.buffer,
-            colours.buffer,
-            6,
+            tempMesh.positions.buffer,
+            tempMesh.texCoords.buffer,
+            tempMesh.vertexCount,
             sceneUBO.buffer,
             sceneUniforms,
             pipelineLayout.handle,
-            sceneDescriptors
+            sceneDescriptors,
+            MaterialManager::get().getMaterial(0).descriptorSet
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -241,8 +250,9 @@ namespace Kiki {
         }
     }
 
-    rutils::Buffer RenderManager::createMeshBuffer(std::vector<float> positions) {
+    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<float> texCoords) {
         int posSize = positions.size() * sizeof(float);
+        int texSize = texCoords.size() * sizeof(float);
 
         // Create on GPU vertex buffer
         rutils::Buffer vertexPosGPU = rutils::createBuffer(
@@ -253,10 +263,26 @@ namespace Kiki {
             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
         );
 
-        // Create staging buffer
+        // Create on GPU tex coords buffer
+        rutils::Buffer texCoordsGPU = rutils::createBuffer(
+            allocator,
+            texSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create staging buffers
         rutils::Buffer posStaging = rutils::createBuffer(
             allocator,
             posSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer texStaging = rutils::createBuffer(
+            allocator,
+            texSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
         );
@@ -270,6 +296,15 @@ namespace Kiki {
         std::memcpy(posPtr, positions.data(), posSize);
         vmaUnmapMemory(allocator.allocator, posStaging.allocation);
 
+        void* texPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, texStaging.allocation, &texPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(texPtr, texCoords.data(), texSize);
+        vmaUnmapMemory(allocator.allocator, texStaging.allocation);
+
         // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
         // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
         // transfers, let these take place in the background while performing other tasks.
@@ -291,10 +326,10 @@ namespace Kiki {
             );
         }
 
-        VkBufferCopy copy{};
-        copy.size = posSize;
+        VkBufferCopy pcopy{};
+        pcopy.size = posSize;
 
-        vkCmdCopyBuffer(uploadCmd, posStaging.buffer, vertexPosGPU.buffer, 1, &copy);
+        vkCmdCopyBuffer(uploadCmd, posStaging.buffer, vertexPosGPU.buffer, 1, &pcopy);
 
         rutils::bufferBarrier(uploadCmd, vertexPosGPU.buffer,
             /* Before */
@@ -305,98 +340,12 @@ namespace Kiki {
             VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
         );
 
-        if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
-            throw FatalError( "Ending command buffer recording\n"
-                "vkEndCommandBuffer() returned {}", rutils::toString(res)
-            );
-        }
+        VkBufferCopy tcopy{};
+        tcopy.size = texSize;
 
-        // Submit transfer commands
-        VkCommandBufferSubmitInfo submit[1]{};
-        submit[0].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        submit[0].commandBuffer = uploadCmd;
+        vkCmdCopyBuffer(uploadCmd, texStaging.buffer, texCoordsGPU.buffer, 1, &tcopy);
 
-        VkSubmitInfo2 submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submitInfo.commandBufferInfoCount = 1;
-        submitInfo.pCommandBufferInfos = submit;
-
-        if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw FatalError( "Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", rutils::toString(res)
-            );
-        }
-
-        // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
-        // buffers, command pool, ...)
-        //
-        // The code doesn’t destory the resources implicitly – the resources are destroyed by the destructors of the
-        // labutils wrappers for the various objects once we leave the function’s scope.
-        if (auto const res = vkWaitForFences(window.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
-            throw FatalError( "Waiting for upload to complete\n"
-                "vkWaitForFences() returned {}", rutils::toString(res)
-            );
-        }
-
-        return vertexPosGPU;
-    }
-
-    rutils::Buffer RenderManager::createMaterialBuffer(std::vector<float> colours) {
-        int colSize = colours.size() * sizeof(float);
-
-        // Create on GPU vertex buffer
-        rutils::Buffer vertexColGPU = rutils::createBuffer(
-            allocator,
-            colSize,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            0, // no additional VmaAllocationCreateFlags
-            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
-        );
-
-        // Create staging buffer
-        rutils::Buffer colStaging = rutils::createBuffer(
-            allocator,
-            colSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-        );
-
-        void* colPtr = nullptr;
-        if (auto const res = vmaMapMemory(allocator.allocator, colStaging.allocation, &colPtr); VK_SUCCESS != res) {
-            throw FatalError( "Mapping memory for writing\n"
-                "vmaMapMemory() returned {}", rutils::toString(res)
-            );
-        }
-        std::memcpy(colPtr, colours.data(), colSize);
-        vmaUnmapMemory(allocator.allocator, colStaging.allocation);
-
-        // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
-        // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
-        // transfers, let these take place in the background while performing other tasks.
-        rutils::Fence uploadComplete = rutils::createFence(window.device);
-
-        // Queue data uploads from staging buffers to the final buffers.
-        // This uses a separate command pool for simplicity.
-        rutils::CommandPool uploadPool = rutils::createCommandPool(window);
-        VkCommandBuffer uploadCmd = rutils::allocCommandBuffer(window, uploadPool.handle);
-
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0;
-        beginInfo.pInheritanceInfo = nullptr;
-
-        if (auto const res = vkBeginCommandBuffer(uploadCmd, &beginInfo); VK_SUCCESS != res) {
-            throw FatalError( "Beginning command buffer recording\n"
-                "vkBeginCommandBuffer() returned {}", rutils::toString(res)
-            );
-        }
-
-        VkBufferCopy copy{};
-        copy.size = colSize;
-
-        vkCmdCopyBuffer(uploadCmd, colStaging.buffer, vertexColGPU.buffer, 1, &copy);
-
-        rutils::bufferBarrier(uploadCmd, vertexColGPU.buffer,
+        rutils::bufferBarrier(uploadCmd, texCoordsGPU.buffer,
             /* Before */
             VK_PIPELINE_STAGE_2_COPY_BIT,
             VK_ACCESS_2_TRANSFER_WRITE_BIT,
@@ -438,7 +387,34 @@ namespace Kiki {
             );
         }
 
-        return vertexColGPU;
+        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), positions.size());
+    }
+
+    Material RenderManager::allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode) {
+        rutils::Texture texture = rutils::loadImageTexture(texturePath.c_str(), window, tempTextureCmdPool.handle, allocator);
+        
+        VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
+
+        {
+            VkWriteDescriptorSet desc[1]{};
+
+            VkDescriptorImageInfo textureInfo{};
+            textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            textureInfo.imageView = texture.view;
+            textureInfo.sampler = sampler.handle;
+
+            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[0].dstSet = descriptorSet;
+            desc[0].dstBinding = 0;
+            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[0].descriptorCount = 1;
+            desc[0].pImageInfo = &textureInfo;
+
+            constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
+            vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
+        }
+
+        return Material(std::move(texture), std::move(descriptorSet), blendMode);
     }
 
     void RenderManager::shutdown() {

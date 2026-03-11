@@ -1,26 +1,19 @@
 #ifndef KIKI_RENDERER_MATERIALMANAGER
 #define KIKI_RENDERER_MATERIALMANAGER
 
+#include "RenderManager.hpp"
+
 #include <vector>
 #include <filesystem>
 
 namespace Kiki {
-    enum BlendMode {
-        OPAQUE,
-        TRANSPARENT
-    };
-
-    struct Material {
-        BlendMode blendMode;
-
-    };
 
     class MaterialManager {
         public:
         static MaterialManager& get();
 
         int createMaterial(std::filesystem::path texture, BlendMode blendMode = BlendMode::OPAQUE);
-        Material getMaterial(int id);
+        Material const& getMaterial(int id);
 
         private:
         MaterialManager() = default;

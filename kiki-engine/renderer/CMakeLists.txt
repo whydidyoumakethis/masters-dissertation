@@ -14,6 +14,7 @@ target_sources(kiki
     utils/Allocator.cpp
     utils/Buffer.cpp
     utils/Descriptors.cpp
+    utils/Texture.cpp
 
   PRIVATE
     FILE_SET rendererPrivateHeaders
@@ -30,6 +31,7 @@ target_sources(kiki
       utils/Buffer.hpp
       utils/Allocator.hpp
       utils/Descriptors.hpp
+      utils/Texture.hpp
 
   PUBLIC
     FILE_SET rendererPublicHeaders

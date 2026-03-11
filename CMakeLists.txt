@@ -98,6 +98,14 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fastgltf)
 
+# stb
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY "https://github.com/nothings/stb.git"
+    GIT_TAG "2fb8c5a3deb2110c89669f8d6f36e5833b556b44"
+)
+FetchContent_MakeAvailable(stb)
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
@@ -109,7 +117,10 @@ target_link_libraries(KikiDeps INTERFACE
 	spdlog::spdlog
     fastgltf::fastgltf
 )
-target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
+target_include_directories(KikiDeps INTERFACE 
+    ${glm_SOURCE_DIR}
+    ${stb_SOURCE_DIR}
+)
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
     PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"

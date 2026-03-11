@@ -40,8 +40,8 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, VkPipeline aGraphicsPipe, ImageAndView const& aColorAttach, VkExtent2D const& aImageExtent, 
-        VkBuffer aPositionBuffer, VkBuffer aColorBuffer, std::uint32_t aVertexCount, VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, 
-        VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors) {
+        VkBuffer aPositionBuffer, VkBuffer aTexBuffer, std::uint32_t aVertexCount, VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, 
+        VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors, VkDescriptorSet aObjectDecriptors) {
 
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -116,8 +116,10 @@ namespace rutils {
 
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 0, 1, &aSceneDescriptors, 0, nullptr);
 
+        vkCmdBindDescriptorSets( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &aObjectDecriptors, 0, nullptr );
+
         // Bind vertex input
-        VkBuffer buffers[2] = { aPositionBuffer, aColorBuffer };
+        VkBuffer buffers[2] = { aPositionBuffer, aTexBuffer };
         VkDeviceSize offsets[2]{};
 
         vkCmdBindVertexBuffers( aCmdBuff, 0, 2, buffers, offsets );

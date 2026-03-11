@@ -5,10 +5,11 @@
 #include "../../logging/FatalError.hpp"
 
 namespace rutils {
-    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout) {
+    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout) {
         VkDescriptorSetLayout layouts[] = {
             // Order must match the set = N in the shaders
-            sceneLayout // set 0
+            sceneLayout, // set 0
+            objectLayout
         };
 
         VkPipelineLayoutCreateInfo layoutInfo{};
@@ -70,7 +71,7 @@ namespace rutils {
         vertexInputs[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         vertexInputs[1].binding = 1;
-        vertexInputs[1].stride = sizeof(float)*3;
+        vertexInputs[1].stride = sizeof(float)*2;
         vertexInputs[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
         VkVertexInputAttributeDescription vertexAttributes[2]{};
@@ -81,7 +82,7 @@ namespace rutils {
 
         vertexAttributes[1].binding = 1; // must match binding above
         vertexAttributes[1].location = 1; // must match shader
-        vertexAttributes[1].format = VK_FORMAT_R32G32B32_SFLOAT;
+        vertexAttributes[1].format = VK_FORMAT_R32G32_SFLOAT;
         vertexAttributes[1].offset = 0;
 
         inputInfo.vertexBindingDescriptionCount = 2; // number of vertexInputs above

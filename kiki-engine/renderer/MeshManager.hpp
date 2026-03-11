@@ -17,18 +17,12 @@ namespace Kiki {
         glm::vec2 uv;
     };
 
-    struct Mesh {
-        rutils::Buffer positions;
-        rutils::Buffer colors;
-        std::uint32_t vertexCount;
-    };
-
     class MeshManager {
         public:
         static MeshManager& get();
 
         int createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices);
-        Mesh* getMesh(int id);
+        //Mesh* getMesh(int id);
 
         private:
         MeshManager() = default;
@@ -36,7 +30,7 @@ namespace Kiki {
         MeshManager(const MeshManager&) = delete;
         MeshManager& operator=(const MeshManager&) = delete;
 
-        std::vector<Mesh> meshes;
+        //std::vector<Mesh> meshes;
     };
 }
 

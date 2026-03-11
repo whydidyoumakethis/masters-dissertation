@@ -8,6 +8,7 @@
 #include "utils/Synchronisation.hpp"
 #include "utils/Allocator.hpp"
 #include "utils/Buffer.hpp"
+#include "utils/Texture.hpp"
 #include "WindowInfo.hpp"
 
 #include "MeshManager.hpp"
@@ -20,6 +21,24 @@
 
 
 namespace Kiki {
+    enum BlendMode {
+        OPAQUE,
+        TRANSPARENT
+    };
+    
+    struct Mesh {
+        rutils::Buffer positions;
+        rutils::Buffer texCoords;
+        std::uint32_t vertexCount;
+    };
+
+    struct Material {
+        rutils::Texture texture;
+        VkDescriptorSet descriptorSet;
+        BlendMode blendMode;
+    };
+
+
     class RenderManager {
         private:
         RenderManager() = default;
@@ -43,18 +62,21 @@ namespace Kiki {
         std::vector<rutils::Fence> frameDone;
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
         rutils::DescriptorPool descriptorPool;
+        rutils::DescriptorSetLayout objectLayout;
         VkDescriptorSet sceneDescriptors;
 
         rutils::Allocator allocator;
+        rutils::Sampler sampler;
 
-        rutils::Buffer positions, colours;
+        Mesh tempMesh;
+        Material tempMaterial;
 
         public:
         static RenderManager& get();
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
-        rutils::Buffer createMeshBuffer(std::vector<float> positions);
-        rutils::Buffer createMaterialBuffer(std::vector<float> colours);
+        Mesh allocateMesh(std::vector<float> positions, std::vector<float> texCoords);
+        Material allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
         void nextFrame();
@@ -68,6 +90,8 @@ namespace Kiki {
             glm::mat4 projection;
             glm::mat4 projCam;
         };
+
+        rutils::CommandPool tempTextureCmdPool;
 
         // We want to use vkCmdUpdateBuffer() to update the contents of our uniform buffers. vkCmdUpdateBuffer()
         // has a number of requirements, including the two below. See
