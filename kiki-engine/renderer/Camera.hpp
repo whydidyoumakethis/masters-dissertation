@@ -18,6 +18,7 @@ namespace Kiki {
             registry.emplace<TransformComponent>(camera);
 
             registry.get<TransformComponent>(camera).position = glm::vec3( 0.f, -0.3f, -1.f);
+            registry.get<TransformComponent>(camera).dirty = true;
         }
 
         ~Camera() {

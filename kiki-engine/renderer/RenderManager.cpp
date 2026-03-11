@@ -9,8 +9,7 @@
 #include "utils/Descriptors.hpp"
 #include "utils/Texture.hpp"
 #include "../logging/FatalError.hpp"
-#include "MaterialManager.hpp"
-#include "MeshManager.hpp"
+#include "SceneManager.hpp"
 
 #include <iostream>
 #include <glm/gtx/transform.hpp>
@@ -403,7 +402,7 @@ namespace Kiki {
     }
 
     Material RenderManager::allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode) {
-        rutils::Texture texture = rutils::loadImageTexture(texturePath.c_str(), window, tempTextureCmdPool.handle, allocator);
+        rutils::Texture texture = rutils::loadImageTexture(texturePath, window, tempTextureCmdPool.handle, allocator);
         
         VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
 
@@ -454,8 +453,7 @@ namespace Kiki {
     void RenderManager::shutdown() {
         vkDeviceWaitIdle(window.device);
 
-        MeshManager::get().shutdown();
-        MaterialManager::get().shutdown();
+        SceneManager::get().shutdown();
         tempTextureCmdPool = {};
 
         renderFinished.clear();

@@ -4,7 +4,7 @@
 /**
  * @brief Stores the mesh ID of the object.
  * 
- * Query the MeshManager with the ID to get the actual mesh.
+ * Query the SceneManager with the ID to get the actual mesh.
  * 
  * @param id the mesh ID
  */
