@@ -21,8 +21,9 @@ namespace Kiki {
         public:
         static MeshManager& get();
 
-        int createMesh(std::vector<Vertex> vertices, std::vector<uint32_t> indices);
-        //Mesh* getMesh(int id);
+        int createMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
+        Mesh& getMesh(int id);
+        void shutdown();
 
         private:
         MeshManager() = default;
@@ -30,7 +31,7 @@ namespace Kiki {
         MeshManager(const MeshManager&) = delete;
         MeshManager& operator=(const MeshManager&) = delete;
 
-        //std::vector<Mesh> meshes;
+        std::vector<Mesh> meshes;
     };
 }
 

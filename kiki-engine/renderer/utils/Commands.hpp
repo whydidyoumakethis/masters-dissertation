@@ -19,14 +19,10 @@ namespace rutils {
 		VkPipeline,
 		ImageAndView const&,
 		VkExtent2D const&,
-		VkBuffer aPositionBuffer,
-		VkBuffer aColorBuffer,
-		std::uint32_t aVertexCount,
 		VkBuffer aSceneUBO,
 		Kiki::RenderManager::SceneUniform const&,
 		VkPipelineLayout,
-		VkDescriptorSet aSceneDescriptors,
-		VkDescriptorSet aObjectDecriptors
+		VkDescriptorSet aSceneDescriptors
 	);
 
 	void submitCommands(

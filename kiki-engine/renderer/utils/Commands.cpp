@@ -3,6 +3,13 @@
 #include "Synchronisation.hpp"
 #include "ToString.hpp"
 #include "../../logging/FatalError.hpp"
+#include "../RenderManager.hpp"
+#include "../MaterialManager.hpp"
+#include "../MeshManager.hpp"
+
+#include "../../ECS/World.h"
+
+#include <iostream>
 
 
 namespace rutils {
@@ -40,8 +47,7 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, VkPipeline aGraphicsPipe, ImageAndView const& aColorAttach, VkExtent2D const& aImageExtent, 
-        VkBuffer aPositionBuffer, VkBuffer aTexBuffer, std::uint32_t aVertexCount, VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, 
-        VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors, VkDescriptorSet aObjectDecriptors) {
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors) {
 
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -116,19 +122,27 @@ namespace rutils {
 
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 0, 1, &aSceneDescriptors, 0, nullptr);
 
-        vkCmdBindDescriptorSets( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &aObjectDecriptors, 0, nullptr );
+        auto view = World::Get().Query<TransformComponent, MeshComponent, MaterialComponent>();
 
-        // Bind vertex input
-        VkBuffer buffers[2] = { aPositionBuffer, aTexBuffer };
-        VkDeviceSize offsets[2]{};
+        for (auto [e, transform, meshComponent, materialComponent] : view.each()) {
+            Kiki::Material const& material = Kiki::MaterialManager::get().getMaterial(materialComponent.id);
+            Kiki::Mesh const& mesh = Kiki::MeshManager::get().getMesh(meshComponent.id);
 
-        vkCmdBindVertexBuffers( aCmdBuff, 0, 2, buffers, offsets );
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
 
-        // Draw vertices
-        vkCmdDraw( aCmdBuff, aVertexCount, 1, 0, 0 );
+            // Bind vertex input
+            VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
+            VkDeviceSize offsets[2]{};
+
+            vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
+            vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+            // Draw mesh
+            vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+        }
 
         // End rendering
-        vkCmdEndRendering( aCmdBuff );
+        vkCmdEndRendering(aCmdBuff);
 
         // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
         imageBarrier( aCmdBuff, aColorAttach.image,

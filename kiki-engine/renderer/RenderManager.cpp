@@ -10,6 +10,7 @@
 #include "utils/Texture.hpp"
 #include "../logging/FatalError.hpp"
 #include "MaterialManager.hpp"
+#include "MeshManager.hpp"
 
 #include <iostream>
 #include <glm/gtx/transform.hpp>
@@ -77,33 +78,7 @@ namespace Kiki {
                 renderFinished.emplace_back(rutils::createSemaphore(window.device));
             }
 
-            std::vector<float> p = {
-                -1.f, 0.f, -6.f, // v0
-                -1.f, 0.f, +6.f, // v1
-                +1.f, 0.f, +6.f, // v2
-
-                -1.f, 0.f, -6.f, // v0
-                +1.f, 0.f, +6.f, // v2
-                +1.f, 0.f, -6.f // v3
-            };
-            std::vector<float> c = {
-                0.f, -6.f, // t0
-                0.f, +6.f, // t1
-                1.f, +6.f, // t2
-
-                0.f, -6.f, // t0
-                1.f, +6.f, // t2
-                1.f, -6.f // t3
-            };
-
-            
-            tempMesh = RenderManager::get().allocateMesh(p, c);
-
             tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
-            
-            MaterialManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE);
-
-            
         }
     }
 
@@ -208,14 +183,10 @@ namespace Kiki {
             pipeline.handle,
             colorTarget,
             window.swapchainExtent,
-            tempMesh.positions.buffer,
-            tempMesh.texCoords.buffer,
-            tempMesh.vertexCount,
             sceneUBO.buffer,
             sceneUniforms,
             pipelineLayout.handle,
-            sceneDescriptors,
-            MaterialManager::get().getMaterial(0).descriptorSet
+            sceneDescriptors
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -251,8 +222,9 @@ namespace Kiki {
         }
     }
 
-    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<float> texCoords) {
+    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords) {
         int posSize = positions.size() * sizeof(float);
+        int indSize = indices.size() * sizeof (std::uint32_t);
         int texSize = texCoords.size() * sizeof(float);
 
         // Create on GPU vertex buffer
@@ -260,6 +232,15 @@ namespace Kiki {
             allocator,
             posSize,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create on GPU index buffer
+        rutils::Buffer indexGPU = rutils::createBuffer(
+            allocator,
+            indSize,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             0, // no additional VmaAllocationCreateFlags
             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
         );
@@ -281,6 +262,13 @@ namespace Kiki {
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
         );
 
+        rutils::Buffer indStaging = rutils::createBuffer(
+            allocator,
+            indSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
         rutils::Buffer texStaging = rutils::createBuffer(
             allocator,
             texSize,
@@ -296,6 +284,15 @@ namespace Kiki {
         }
         std::memcpy(posPtr, positions.data(), posSize);
         vmaUnmapMemory(allocator.allocator, posStaging.allocation);
+
+        void* indPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, indStaging.allocation, &indPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(indPtr, indices.data(), indSize);
+        vmaUnmapMemory(allocator.allocator, indStaging.allocation);
 
         void* texPtr = nullptr;
         if (auto const res = vmaMapMemory(allocator.allocator, texStaging.allocation, &texPtr); VK_SUCCESS != res) {
@@ -339,6 +336,20 @@ namespace Kiki {
             /* A f t e r */
             VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
             VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
+        VkBufferCopy icopy{};
+        icopy.size = indSize;
+
+        vkCmdCopyBuffer(uploadCmd, indStaging.buffer, indexGPU.buffer, 1, &icopy);
+
+        rutils::bufferBarrier(uploadCmd, indexGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT,
+            VK_ACCESS_2_INDEX_READ_BIT
         );
 
         VkBufferCopy tcopy{};
@@ -388,7 +399,7 @@ namespace Kiki {
             );
         }
 
-        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), positions.size());
+        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
     Material RenderManager::allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode) {
@@ -443,7 +454,7 @@ namespace Kiki {
     void RenderManager::shutdown() {
         vkDeviceWaitIdle(window.device);
 
-        tempMesh = {};
+        MeshManager::get().shutdown();
         MaterialManager::get().shutdown();
         tempTextureCmdPool = {};
 

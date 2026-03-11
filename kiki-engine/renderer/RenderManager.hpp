@@ -12,7 +12,6 @@
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
 
-#include "MeshManager.hpp"
 
 #include <glm/glm.hpp>
 
@@ -30,7 +29,9 @@ namespace Kiki {
     struct Mesh {
         rutils::Buffer positions;
         rutils::Buffer texCoords;
+        rutils::Buffer indices;
         std::uint32_t vertexCount;
+        std::uint32_t indexCount;
     };
 
     struct Material {
@@ -78,7 +79,7 @@ namespace Kiki {
         static RenderManager& get();
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<float> texCoords);
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
         Material allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);

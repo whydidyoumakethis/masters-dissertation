@@ -4,6 +4,8 @@
 #include "ECS/System.h"
 #include "input/InputSystem.hpp"
 #include "PhysicsSystem.cpp"
+#include "renderer/MeshManager.hpp"
+#include "renderer/MaterialManager.hpp"
 
 #include "../debugging/DebugCamera.hpp"
 
@@ -38,6 +40,29 @@ namespace Kiki {
 			// Temp addition for debug cam
 			DebugCamera cam;
 			RenderManager::get().setCamera(cam);
+
+			auto& registry = World::Get().Registry();
+			auto road = World::Get().CreateEntity();
+
+			std::vector<float> p = {
+                -1.f, 0.f, -6.f, // v0
+                -1.f, 0.f, +6.f, // v1
+                +1.f, 0.f, +6.f, // v2
+                +1.f, 0.f, -6.f // v3
+            };
+
+            std::vector<std::uint32_t> i = { 0, 1, 2, 0, 2, 3 };
+
+            std::vector<float> c = {
+                0.f, -6.f, // t0
+                0.f, +6.f, // t1
+                1.f, +6.f, // t2
+                1.f, -6.f // t3
+            };
+
+			registry.emplace<TransformComponent>(road);
+			registry.emplace<MeshComponent>(road, MeshManager::get().createMesh(p, i, c));
+			registry.emplace<MaterialComponent>(road, MaterialManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
 
 			auto previousClock = std::chrono::steady_clock::now();
 
