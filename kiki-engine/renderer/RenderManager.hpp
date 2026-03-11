@@ -10,6 +10,7 @@
 #include "utils/Buffer.hpp"
 #include "utils/Texture.hpp"
 #include "WindowInfo.hpp"
+#include "Camera.hpp"
 
 #include "MeshManager.hpp"
 
@@ -71,6 +72,8 @@ namespace Kiki {
         Mesh tempMesh;
         Material tempMaterial;
 
+        Camera camera;
+
         public:
         static RenderManager& get();
         void initialise(WindowInfo info = Kiki::WindowInfo{});
@@ -81,6 +84,8 @@ namespace Kiki {
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
         void nextFrame();
         void shutdown();
+
+        void setCamera(Camera&);
 
         GLFWwindow* getWindow() { return window.window; };
         bool isInitialised() { return initialised; };

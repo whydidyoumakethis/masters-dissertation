@@ -41,4 +41,5 @@ target_sources(kiki
       MaterialManager.hpp
       MeshManager.hpp
       WindowInfo.hpp
+      Camera.hpp
 )

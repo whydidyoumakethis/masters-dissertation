@@ -102,6 +102,7 @@ namespace Kiki {
             tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
             
             MaterialManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE);
+
             
         }
     }
@@ -453,8 +454,13 @@ namespace Kiki {
 
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
 
-        aSceneUniforms.camera = glm::translate(glm::vec3( 0.f, -0.3f, -1.f));
+        auto& registry = World::Get().Registry();
+        aSceneUniforms.camera = glm::translate(registry.get<TransformComponent>(camera.camera).position); //world matrix doesn't work yet
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
+    }
+
+    void RenderManager::setCamera(Camera& c) {
+        camera = c;
     }
 }

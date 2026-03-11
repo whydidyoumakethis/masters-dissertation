@@ -5,7 +5,11 @@
 #include "input/InputSystem.hpp"
 #include "PhysicsSystem.cpp"
 
+#include "../debugging/DebugCamera.hpp"
+
 #include <spdlog/spdlog.h>
+
+#include <chrono>
 
 namespace Kiki {
 	class Engine {
@@ -30,10 +34,21 @@ namespace Kiki {
 
 		void Run() {
 			_running = true;
+
+			// Temp addition for debug cam
+			DebugCamera cam;
+			RenderManager::get().setCamera(cam);
+
+			auto previousClock = std::chrono::steady_clock::now();
+
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
 				// float dt = _timer.Tick();
-				float dt = 0.016f; // TODO: calculate delta time
+				auto const now = std::chrono::steady_clock::now();
+				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
+				previousClock = now;
 				// TODO: MessageCenter::Flush();
+				cam.update(dt);
+				glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyDown(GLFW_KEY_ESCAPE));
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
