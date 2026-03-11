@@ -98,6 +98,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(fastgltf)
 
+FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY "https://github.com/assimp/assimp.git"
+    GIT_TAG "v6.0.4"
+)
+FetchContent_MakeAvailable(assimp)
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
@@ -108,6 +115,7 @@ target_link_libraries(KikiDeps INTERFACE
 	EnTT::EnTT
 	spdlog::spdlog
     fastgltf::fastgltf
+    assimp::assimp
 )
 target_include_directories(KikiDeps INTERFACE ${glm_SOURCE_DIR})
 target_compile_definitions(KikiDeps INTERFACE
