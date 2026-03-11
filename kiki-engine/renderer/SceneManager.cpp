@@ -27,6 +27,14 @@ namespace Kiki {
     }
 
     void SceneManager::clearLevel() {
+        auto& registry = World::Get().Registry();
+
+        auto view = World::Get().Query<MeshComponent, MaterialComponent>();
+
+        for (auto [e, meshComponent, materialComponent] : view.each()) {
+            registry.destroy(e);
+        }
+
         materials.clear();
         meshes.clear();
     }

@@ -1,6 +1,7 @@
 #include "DebugCamera.hpp"
 
 #include "../input/InputManager.hpp"
+#include "../renderer/SceneManager.hpp"
 
 namespace Kiki {
     void DebugCamera::update(float dt) {
@@ -20,5 +21,8 @@ namespace Kiki {
             transform.position += glm::vec3(0.0f, -move, 0.0f);
         if (inputManager.isKeyDown(GLFW_KEY_Q))
             transform.position += glm::vec3(0.0f, move, 0.0f);
+
+        if (inputManager.isKeyDown(GLFW_KEY_F))
+            SceneManager::get().clearLevel();
     }
 }
