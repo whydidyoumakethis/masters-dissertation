@@ -125,6 +125,12 @@ FetchContent_Declare(
     GIT_TAG "2fb8c5a3deb2110c89669f8d6f36e5833b556b44"
 )
 FetchContent_MakeAvailable(stb)
+FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY "https://github.com/assimp/assimp.git"
+    GIT_TAG "v6.0.4"
+)
+FetchContent_MakeAvailable(assimp)
 
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
@@ -144,6 +150,7 @@ target_include_directories(KikiDeps INTERFACE
     ${glm_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR} 
     ${stb_SOURCE_DIR}
+    assimp::assimp
 )
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"
@@ -152,6 +159,9 @@ target_compile_definitions(KikiDeps INTERFACE
     # Synchronize Jolt debug/release modes
     # $<$<CONFIG:Debug>:JPH_DEBUG>
     # $<$<NOT:$<CONFIG:Debug>>:JPH_RELEASE>
+    PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
+    PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+    PROJECT_ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets"
 )
 
 # if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")

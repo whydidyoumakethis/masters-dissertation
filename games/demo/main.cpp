@@ -5,7 +5,7 @@
 #include <entt/entt.hpp>
 #include <GLFW/glfw3.h>
 
-#include <GltfLoader/GltfLoader.hpp>
+#include <GltfLoader/GltfLoader.h>
 
 #include <Jolt/Jolt.h>
 
@@ -133,6 +133,9 @@ int main(int argc, char** argv) {
     //renderManager.shutdown();
 
     //return 0;
+	mesh mesh = Kiki::GltfLoader::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH)/"test.glb");
+
+    Kiki::GltfLoader::debugPrintMesh(mesh);
 	Kiki::Engine engine;
 	engine.Init();
 
