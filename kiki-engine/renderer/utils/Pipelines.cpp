@@ -5,18 +5,24 @@
 #include "../../logging/FatalError.hpp"
 
 namespace rutils {
-    PipelineLayout createPipelineLayout(VulkanWindow const& window) {
+    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout) {
+        VkDescriptorSetLayout layouts[] = {
+            // Order must match the set = N in the shaders
+            sceneLayout, // set 0
+            objectLayout
+        };
+
         VkPipelineLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        layoutInfo.setLayoutCount = 0;
-        layoutInfo.pSetLayouts = nullptr;
+        layoutInfo.setLayoutCount = sizeof(layouts)/sizeof(layouts[0]); // updated!
+        layoutInfo.pSetLayouts = layouts; // updated!
         layoutInfo.pushConstantRangeCount = 0;
         layoutInfo.pPushConstantRanges = nullptr;
 
         VkPipelineLayout layout = VK_NULL_HANDLE;
-        if (auto const res = vkCreatePipelineLayout( window.device, &layoutInfo, nullptr, &layout ); VK_SUCCESS != res) {
+        if (auto const res = vkCreatePipelineLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
             throw Kiki::FatalError( "Unable to create pipeline layout\n"
-                "vkCreatePipelineLayout() returned {}", rutils::toString(res)
+                "vkCreatePipelineLayout() returned {}", toString(res)
             );
         }
 
@@ -31,8 +37,8 @@ namespace rutils {
         // This uses a Vulkan 1.4 feature (from VK KHR maintenance5), which allows us to skip the VkShaderModule
         // creation and instead directly pass SPIR-V code to the pipeline creation.
         std::filesystem::current_path(PROJECT_BINARY_DIR);
-        auto const vShader = rutils::loadShader("shaders/compiled/triangle.vert.spv"); // TODO: update file path, temporarily hardocded
-        auto const fShader = rutils::loadShader("shaders/compiled/triangle.frag.spv");
+        auto const vShader = rutils::loadShader("shaders/compiled/default.vert.spv");
+        auto const fShader = rutils::loadShader("shaders/compiled/default.frag.spv");
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -55,9 +61,34 @@ namespace rutils {
         stages[1].pName = "main";
         stages[1].pNext = &code[1];
 
-        // For now, we don’t have any vertex input attributes - the geometry is generated/defined in the vertex shader.
+        // Define vertex input
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        VkVertexInputBindingDescription vertexInputs[2]{};
+        vertexInputs[0].binding = 0;
+        vertexInputs[0].stride = sizeof(float)*3;
+        vertexInputs[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        vertexInputs[1].binding = 1;
+        vertexInputs[1].stride = sizeof(float)*2;
+        vertexInputs[1].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        VkVertexInputAttributeDescription vertexAttributes[2]{};
+        vertexAttributes[0].binding = 0; // must match binding above
+        vertexAttributes[0].location = 0; // must match shader
+        vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
+        vertexAttributes[0].offset = 0;
+
+        vertexAttributes[1].binding = 1; // must match binding above
+        vertexAttributes[1].location = 1; // must match shader
+        vertexAttributes[1].format = VK_FORMAT_R32G32_SFLOAT;
+        vertexAttributes[1].offset = 0;
+
+        inputInfo.vertexBindingDescriptionCount = 2; // number of vertexInputs above
+        inputInfo.pVertexBindingDescriptions = vertexInputs;
+        inputInfo.vertexAttributeDescriptionCount = 2; // number of vertexAttributes above
+        inputInfo.pVertexAttributeDescriptions = vertexAttributes;
 
         // Define which primitive (point, line, triangle, ...) the input is assembled into for rasterization.
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};

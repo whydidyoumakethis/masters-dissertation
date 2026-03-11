@@ -218,7 +218,7 @@ namespace rutils {
 		} else {
 			monitor = glfwGetPrimaryMonitor();
 			if (monitor == NULL) {
-				throw Kiki::FatalError("Invalid monitor index given");
+				throw Kiki::FatalError("Invalid monitor index given & no primary monitor found");
 			}
 		}
 
