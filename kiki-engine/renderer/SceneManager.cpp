@@ -1,5 +1,7 @@
 #include "SceneManager.hpp"
 
+#include <volk.h>
+
 namespace Kiki {
     SceneManager& SceneManager::get() {
         static SceneManager instance;
@@ -27,6 +29,8 @@ namespace Kiki {
     }
 
     void SceneManager::clearLevel() {
+        vkDeviceWaitIdle(RenderManager::get().getDevice());
+
         auto& registry = World::Get().Registry();
 
         auto view = World::Get().Query<MeshComponent, MaterialComponent>();

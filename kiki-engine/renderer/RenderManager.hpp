@@ -88,6 +88,7 @@ namespace Kiki {
 
         void setCamera(Camera&);
 
+        VkDevice& getDevice() { return window.device; };
         GLFWwindow* getWindow() { return window.window; };
         bool isInitialised() { return initialised; };
 
