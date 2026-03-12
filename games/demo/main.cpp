@@ -138,6 +138,7 @@ int main(int argc, char** argv) {
 	Kiki::Engine engine;
 	engine.Init();
 
+    /*
     // -------------------Simple test of some functions of the physical module-----------------
     // auto* physics = engine.GetSystem<Kiki::PhysicsSystem>();
     // // Create a static ground surface
