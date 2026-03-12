@@ -80,7 +80,7 @@ namespace Kiki {
 				: static_cast<int>(texture.data.size() * sizeof(RGBA));
 
 			registry.emplace<MaterialComponent>(test_cube,
-				SceneManager::get().createMaterial(texPtr, texSize, BlendMode::OPAQUE));
+				SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
 
 			Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
