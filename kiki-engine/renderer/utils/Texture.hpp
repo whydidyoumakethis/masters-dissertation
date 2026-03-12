@@ -3,6 +3,7 @@
 
 #include <volk.h>
 #include <vk_mem_alloc.h>
+#include <stb_image.h>
 
 #include "VulkanWrapper.hpp"
 #include "Allocator.hpp"
@@ -29,7 +30,7 @@ namespace rutils {
 			VmaAllocator mAllocator = VK_NULL_HANDLE;
 	};
 
-	Texture loadImageTexture(unsigned char* buffer, int bufferLength, VulkanWindow const&, VkCommandPool, Allocator const&);
+	Texture loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&);
 
 	Texture loadImageTextureFromFile(std::filesystem::path path, VulkanWindow const&, VkCommandPool, Allocator const&);
 

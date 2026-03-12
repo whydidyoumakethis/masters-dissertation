@@ -14,6 +14,7 @@
 
 
 #include <glm/glm.hpp>
+#include <stb_image.h>
 
 
 
@@ -80,7 +81,7 @@ namespace Kiki {
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
-        Material allocateMaterial(unsigned char* buffer, int bufferLength, BlendMode blendMode);
+        Material allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti, BlendMode blendMode);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
         void nextFrame();
