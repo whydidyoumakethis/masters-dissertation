@@ -110,6 +110,43 @@ endforeach()
 add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
 
 # --- KikiDeps Interface ---
+# fastGLTF
+FetchContent_Declare(
+    fastgltf
+    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
+    GIT_TAG "v0.9.0"
+)
+FetchContent_MakeAvailable(fastgltf)
+
+# stb
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY "https://github.com/nothings/stb.git"
+    GIT_TAG "2fb8c5a3deb2110c89669f8d6f36e5833b556b44"
+)
+FetchContent_MakeAvailable(stb)
+
+#assimp
+set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+set(ASSIMP_INSTALL OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+set(ASSIMP_ANDROID_JNIIOSYSTEM OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    assimp
+    GIT_REPOSITORY "https://github.com/assimp/assimp.git"
+    GIT_TAG "v6.0.4"
+)
+FetchContent_MakeAvailable(assimp)
+
+# -------- Create an interface library to propagate dependencies --------
+# This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
 
 target_link_libraries(KikiDeps INTERFACE 
@@ -119,14 +156,16 @@ target_link_libraries(KikiDeps INTERFACE
     EnTT::EnTT
     spdlog::spdlog
     fastgltf::fastgltf
+    assimp::assimp
     Jolt
 )
 
 target_include_directories(KikiDeps INTERFACE 
     ${glm_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR} 
+    ${stb_SOURCE_DIR}
+    
 )
-
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"
     PROJECT_BINARY_DIR=\"${CMAKE_BINARY_DIR}\"
@@ -134,6 +173,9 @@ target_compile_definitions(KikiDeps INTERFACE
     # Synchronize Jolt debug/release modes
     # $<$<CONFIG:Debug>:JPH_DEBUG>
     # $<$<NOT:$<CONFIG:Debug>>:JPH_RELEASE>
+    PROJECT_ROOT_PATH="${CMAKE_SOURCE_DIR}"
+    PROJECT_BINARY_DIR="${CMAKE_BINARY_DIR}"
+    PROJECT_ASSETS_PATH="${CMAKE_SOURCE_DIR}/assets"
 )
 
 # if (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
