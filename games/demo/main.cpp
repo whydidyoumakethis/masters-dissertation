@@ -5,7 +5,8 @@
 #include <entt/entt.hpp>
 #include <GLFW/glfw3.h>
 
-#include <GltfLoader/GltfLoader.h>
+//#include <GltfLoader/GltfLoader.h>
+#include <GltfLoader/GltfLoaderAssimp.h>
 
 #include <Jolt/Jolt.h>
 
@@ -133,9 +134,11 @@ int main(int argc, char** argv) {
     //renderManager.shutdown();
 
     //return 0;
-	mesh mesh = Kiki::GltfLoader::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH)/"test.glb");
+	Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH)/"test_cube_tex.glb");
+	Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
 
-    Kiki::GltfLoader::debugPrintMesh(mesh);
+    Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+	Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 	Kiki::Engine engine;
 	engine.Init();
 

@@ -143,6 +143,7 @@ target_link_libraries(KikiDeps INTERFACE
     EnTT::EnTT
     spdlog::spdlog
     fastgltf::fastgltf
+    assimp::assimp
     Jolt
 )
 
@@ -150,7 +151,7 @@ target_include_directories(KikiDeps INTERFACE
     ${glm_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR} 
     ${stb_SOURCE_DIR}
-    assimp::assimp
+    
 )
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"
