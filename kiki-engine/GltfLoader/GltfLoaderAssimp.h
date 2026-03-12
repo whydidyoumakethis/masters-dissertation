@@ -1,5 +1,6 @@
-#include <filesystem>
+#pragma once
 
+#include <filesystem>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -7,6 +8,7 @@
 #include <iostream>
 
 #define ASSIMP_FLAGS = aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
+
 
 struct Mmesh {
 	std::vector<float> vertices;
@@ -53,12 +55,15 @@ namespace Kiki {
 			out.normals.reserve(mesh->mNumVertices);
 			out.uvs.reserve(mesh->mNumVertices);
 			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
-				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+				out.vertices.emplace_back(mesh->mVertices[i].x);
+				out.vertices.emplace_back(mesh->mVertices[i].y);
+				out.vertices.emplace_back(mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
 					out.normals.emplace_back(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
 				}
 				if (mesh->HasTextureCoords(0)) {
-					out.uvs.emplace_back(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+					out.uvs.emplace_back(mesh->mTextureCoords[0][i].x);
+					out.uvs.emplace_back(mesh->mTextureCoords[0][i].y);
 				}
 			}
 			for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
