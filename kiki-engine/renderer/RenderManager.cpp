@@ -401,8 +401,8 @@ namespace Kiki {
         return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
-    Material RenderManager::allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode) {
-        rutils::Texture texture = rutils::loadImageTexture(texturePath.string().c_str(), window, tempTextureCmdPool.handle, allocator);
+    Material RenderManager::allocateMaterial(unsigned char* buffer, int bufferLength, BlendMode blendMode) {
+        rutils::Texture texture = rutils::loadImageTexture(buffer, bufferLength, window, tempTextureCmdPool.handle, allocator);
         
         VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
 

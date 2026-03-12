@@ -59,7 +59,9 @@ namespace Kiki {
 				out.vertices.emplace_back(mesh->mVertices[i].y);
 				out.vertices.emplace_back(mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
-					out.normals.emplace_back(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+					out.normals.emplace_back(mesh->mNormals[i].x);
+					out.normals.emplace_back(mesh->mNormals[i].y);
+					out.normals.emplace_back(mesh->mNormals[i].z);
 				}
 				if (mesh->HasTextureCoords(0)) {
 					out.uvs.emplace_back(mesh->mTextureCoords[0][i].x);

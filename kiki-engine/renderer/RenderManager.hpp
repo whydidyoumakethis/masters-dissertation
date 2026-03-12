@@ -80,7 +80,7 @@ namespace Kiki {
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
-        Material allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode);
+        Material allocateMaterial(unsigned char* buffer, int bufferLength, BlendMode blendMode);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
         void nextFrame();

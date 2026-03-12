@@ -8,8 +8,8 @@ namespace Kiki {
         return instance;
     }
 
-    int SceneManager::createMaterial(std::filesystem::path texture, BlendMode blendMode) {
-        materials.emplace_back(RenderManager::get().allocateMaterial(texture, blendMode));
+    int SceneManager::createMaterial(unsigned char* buffer, int bufferLength, BlendMode blendMode) {
+        materials.emplace_back(RenderManager::get().allocateMaterial(buffer, bufferLength, blendMode));
 
         return materials.size() - 1;
     }
