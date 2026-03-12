@@ -2,6 +2,7 @@
 #define KIKI_RENDERER_SYNCHRONISATION
 
 #include "VulkanWrapper.hpp"
+#include <cstdint>
 
 namespace rutils {
     Fence createFence(VkDevice device, VkFenceCreateFlags flags = 0);

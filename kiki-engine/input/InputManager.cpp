@@ -15,6 +15,14 @@ namespace Kiki {
         for (int i = 0; i < GLFW_MOUSE_BUTTON_LAST; i++) {
             mouse.buttonStates[i] = KeyState::RELEASED;
         }
+
+        gamepad.connected = false;
+        for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++) {
+            gamepad.buttonStates[i] = KeyState::RELEASED;
+        }
+        for (int i = 0; i <= GLFW_GAMEPAD_AXIS_LAST; i++) {
+            gamepad.axes[i] = 0.0f;
+        }
     }
 
     void InputManager::update() {        
@@ -46,11 +54,44 @@ namespace Kiki {
             }
         }
 
+        for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++) {
+            if (gamepad.buttonStates[i] == KeyState::JUST_DOWN) gamepad.buttonStates[i] = KeyState::DOWN;
+            else if (gamepad.buttonStates[i] == KeyState::JUST_RELEASED) gamepad.buttonStates[i] = KeyState::RELEASED;
+        }
+
         // reset mouse delta
         mouse.dx = 0.f;
         mouse.dy = 0.f;
 
         glfwPollEvents();
+
+		//Polling gamepad state
+        GLFWgamepadstate state;
+
+        if (glfwGetGamepadState(GLFW_JOYSTICK_1, &state)) {
+            gamepad.connected = true;
+
+            for (int i = 0; i <= GLFW_GAMEPAD_BUTTON_LAST; i++) {
+                bool isPressed = (state.buttons[i] == GLFW_PRESS);
+                KeyState& current = gamepad.buttonStates[i];
+
+                if (isPressed) {
+                    if (current == RELEASED || current == JUST_RELEASED) current = JUST_DOWN;
+                }
+                else {
+                    if (current == DOWN || current == JUST_DOWN) current = JUST_RELEASED;
+                }
+            }
+
+			//Deadzone handling for axes
+            for (int i = 0; i <= GLFW_GAMEPAD_AXIS_LAST; i++) {
+                float val = state.axes[i];
+                gamepad.axes[i] = (std::abs(val) < deadzone) ? 0.0f : val;
+            }
+        }
+        else {
+            gamepad.connected = false;
+        }
     }
 
     void InputManager::handleKey(GLFWwindow* window, int key, int scanCode, int action, int modifierFlags) {
@@ -112,5 +153,25 @@ namespace Kiki {
     void InputManager::getMouseDeltaPosition(float &x, float &y) {
         x = mouse.dx;
         y = mouse.dy;
+    }
+
+    bool InputManager::isGamepadButtonDown(int b) {
+        return gamepad.buttonStates[b] == KeyState::DOWN || gamepad.buttonStates[b] == KeyState::JUST_DOWN;
+    }
+
+    bool InputManager::isGamepadButtonJustDown(int b) {
+        return gamepad.buttonStates[b] == KeyState::JUST_DOWN;
+    }
+
+    float InputManager::getGamepadAxis(int a) {
+        return gamepad.axes[a];
+    }
+
+    bool InputManager::isGamepadButtonUp(int b) {
+        return gamepad.buttonStates[b] == KeyState::RELEASED || gamepad.buttonStates[b] == KeyState::JUST_RELEASED;
+    }
+
+    bool InputManager::isGamepadButtonJustUp(int b) {
+        return gamepad.buttonStates[b] == KeyState::JUST_RELEASED;
     }
 }

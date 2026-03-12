@@ -26,6 +26,16 @@ namespace Kiki {
             float dy = 0.f;
         };
 
+        struct GamepadState {
+            bool connected = false;
+            KeyState buttonStates[GLFW_GAMEPAD_BUTTON_LAST + 1];
+            float axes[GLFW_GAMEPAD_AXIS_LAST + 1];
+        };
+
+        GamepadState gamepad;
+
+        float deadzone = 0.15f;
+
         InputManager() = default;
         ~InputManager() = default;
         InputManager(const InputManager&) = delete;
@@ -75,6 +85,17 @@ namespace Kiki {
 
         void getMousePosition(float &x, float &y);
         void getMouseDeltaPosition(float &x, float &y);
+
+		//FOR GAMEPAD
+        bool isGamepadConnected() const { return gamepad.connected; }
+
+        bool isGamepadButtonDown(int button);
+        bool isGamepadButtonJustDown(int button);
+        bool isGamepadButtonUp(int button);
+        bool isGamepadButtonJustUp(int button);
+
+		float getGamepadAxis(int axis); //FROM -1.0 to 1.0
+        void setGamepadDeadzone(float value) { deadzone = value; }
     };
 }
 

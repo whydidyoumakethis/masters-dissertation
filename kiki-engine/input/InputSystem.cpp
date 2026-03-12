@@ -13,6 +13,30 @@ namespace Kiki {
     }
 
     void InputSystem::OnUpdate(float dt) {
+        
+        inputManager.update();
+
+        if (inputManager.isGamepadConnected()) {
+ 
+			//A Button
+            if (inputManager.isGamepadButtonJustDown(GLFW_GAMEPAD_BUTTON_A)) {
+                spdlog::warn("Gamepad: A Button Jump!");
+            }
+
+            //RT
+            float rt = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_RIGHT_TRIGGER);
+            if (rt > 0.1f) {
+                spdlog::info("Gas Pedal: {:.2f}", rt);
+            }
+
+			//left stick
+            float lx = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_LEFT_X);
+            float ly = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_LEFT_Y);
+            if (std::abs(lx) > 0.1f || std::abs(ly) > 0.1f) {
+                spdlog::info("Moving Stick: X={:.2f}, Y={:.2f}", lx, ly);
+            }
+        }
+        
         // example usage
         if (inputManager.isKeyJustDown(GLFW_KEY_E)) {
             spdlog::info("E key was just pressed");

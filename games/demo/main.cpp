@@ -134,14 +134,11 @@ int main(int argc, char** argv) {
     //renderManager.shutdown();
 
     //return 0;
-	Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH)/"test_cube_tex.glb");
-	Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
 
-    Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
-	Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 	Kiki::Engine engine;
 	engine.Init();
 
+    /*
     // -------------------Simple test of some functions of the physical module-----------------
     // auto* physics = engine.GetSystem<Kiki::PhysicsSystem>();
     // // Create a static ground surface

@@ -8,6 +8,7 @@
 
 #include "../debugging/DebugCamera.hpp"
 
+#include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -59,9 +60,30 @@ namespace Kiki {
                 1.f, -6.f // t3
             };
 
-			registry.emplace<TransformComponent>(road);
-			registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
-			registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+			// registry.emplace<TransformComponent>(road);
+			// registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
+			// registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+
+			auto test_cube = World::Get().CreateEntity();
+			registry.emplace<TransformComponent>(test_cube);
+
+			Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+			Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+
+			registry.emplace<MeshComponent>(test_cube, SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+			const bool isCompressed = !texture.rawData.empty();
+			unsigned char* texPtr = isCompressed
+				? (unsigned char*)texture.rawData.data()
+				: (unsigned char*)texture.data.data();
+			int texSize = isCompressed
+				? static_cast<int>(texture.rawData.size())
+				: static_cast<int>(texture.data.size() * sizeof(RGBA));
+
+			registry.emplace<MaterialComponent>(test_cube,
+				SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
+
+			Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
 			auto previousClock = std::chrono::steady_clock::now();
 

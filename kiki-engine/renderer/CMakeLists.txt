@@ -3,6 +3,7 @@ target_sources(kiki
     RenderManager.cpp
     SceneManager.cpp
     utils/VMA.cpp
+    utils/STB.cpp
     utils/Devices.cpp
     utils/ToString.cpp
     utils/VulkanWindow.cpp
