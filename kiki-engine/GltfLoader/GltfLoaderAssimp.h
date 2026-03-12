@@ -96,21 +96,21 @@ namespace Kiki {
 			out.name = texture->mFilename.C_Str();
 			out.data.reserve(texture->mWidth * texture->mHeight);
 			out.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(texture->pcData), texture->mWidth, &out.width, &out.height, &out.channels, 4);
-			if (texture->mHeight == 0) {
-				// Compressed texture
-				const uint8_t* raw = reinterpret_cast<const uint8_t*>(texture->pcData);
-				out.rawData.assign(raw, raw + texture->mWidth);
-				out.width = 0;
-				out.height = 0;
-				return out;
-			}
-			for (unsigned int i = 0; i < texture->mWidth * texture->mHeight; i++) {
-				aiTexel texel = texture->pcData[i];
-				out.data.emplace_back(texel.r, texel.g, texel.b, texel.a);
-			}
-			out.width = texture->mWidth;
-			out.height = texture->mHeight;
-			out.channels = 4; // Assimp always loads textures as RGBA
+			// if (texture->mHeight == 0) {
+			// 	// Compressed texture
+			// 	const uint8_t* raw = reinterpret_cast<const uint8_t*>(texture->pcData);
+			// 	out.rawData.assign(raw, raw + texture->mWidth);
+			// 	out.width = 0;
+			// 	out.height = 0;
+			// 	return out;
+			// }
+			// for (unsigned int i = 0; i < texture->mWidth * texture->mHeight; i++) {
+			// 	aiTexel texel = texture->pcData[i];
+			// 	out.data.emplace_back(texel.r, texel.g, texel.b, texel.a);
+			// }
+			// out.width = texture->mWidth;
+			// out.height = texture->mHeight;
+			// out.channels = 4; // Assimp always loads textures as RGBA
 			return out;
 		}
 		

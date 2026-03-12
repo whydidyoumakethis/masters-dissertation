@@ -15,6 +15,9 @@
 
 #include <glm/glm.hpp>
 #include <stb_image.h>
+#include <string.h>
+#include <cstring>
+
 
 
 

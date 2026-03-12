@@ -1,5 +1,4 @@
 #include "Texture.hpp"
-#define STB_IMAGE_IMPLEMENTATION
 
 #include <bit>
 #include <print>
