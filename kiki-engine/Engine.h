@@ -8,6 +8,7 @@
 
 #include "../debugging/DebugCamera.hpp"
 
+#include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -62,6 +63,17 @@ namespace Kiki {
 			registry.emplace<TransformComponent>(road);
 			registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
 			registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+
+			auto test_cube = World::Get().CreateEntity();
+			registry.emplace<TransformComponent>(test_cube);
+
+			Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+			Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+
+			registry.emplace<MeshComponent>(test_cube, SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+
+			Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
 			auto previousClock = std::chrono::steady_clock::now();
 

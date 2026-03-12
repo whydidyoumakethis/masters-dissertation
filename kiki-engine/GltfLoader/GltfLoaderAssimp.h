@@ -9,9 +9,9 @@
 #define ASSIMP_FLAGS = aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
 
 struct Mmesh {
-	std::vector<glm::vec3> vertices;
+	std::vector<float> vertices;
 	std::vector<glm::vec3> normals;
-	std::vector<glm::vec2> uvs;
+	std::vector<float> uvs;
 	std::vector<uint32_t> indices;
 };
 
@@ -97,22 +97,22 @@ namespace Kiki {
 
 
 		static void debugPrintMesh(const Mmesh& mesh) {
-			std::cout << "Vertices: " << mesh.vertices.size() << std::endl;
-			for (const auto& vertex : mesh.vertices) {
-				std::cout << "  " << vertex.x << ", " << vertex.y << ", " << vertex.z << std::endl;
-			}
-			std::cout << "Normals: " << mesh.normals.size() << std::endl;
-			for (const auto& normal : mesh.normals) {
-				std::cout << "  " << normal.x << ", " << normal.y << ", " << normal.z << std::endl;
-			}
-			std::cout << "UVs: " << mesh.uvs.size() << std::endl;
-			for (const auto& uv : mesh.uvs) {
-				std::cout << "  " << uv.x << ", " << uv.y << std::endl;
-			}
-			std::cout << "Indices: " << mesh.indices.size() << std::endl;
-			for (const auto& index : mesh.indices) {
-				std::cout << "  " << index << std::endl;
-			}
+			//std::cout << "Vertices: " << mesh.vertices.size() << std::endl;
+			//for (const auto& vertex : mesh.vertices) {
+			//	std::cout << "  " << vertex.x << ", " << vertex.y << ", " << vertex.z << std::endl;
+			//}
+			//std::cout << "Normals: " << mesh.normals.size() << std::endl;
+			//for (const auto& normal : mesh.normals) {
+			//	std::cout << "  " << normal.x << ", " << normal.y << ", " << normal.z << std::endl;
+			//}
+			//std::cout << "UVs: " << mesh.uvs.size() << std::endl;
+			//for (const auto& uv : mesh.uvs) {
+			//	std::cout << "  " << uv.x << ", " << uv.y << std::endl;
+			//}
+			//std::cout << "Indices: " << mesh.indices.size() << std::endl;
+			//for (const auto& index : mesh.indices) {
+			//	std::cout << "  " << index << std::endl;
+			//}
 		}
 
 		static void debugPrintTexture(const Mtexture& texture) {
