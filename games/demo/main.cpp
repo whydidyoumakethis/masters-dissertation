@@ -136,6 +136,7 @@ int main(int argc, char** argv) {
 	Kiki::Engine engine;
 	engine.Init();
 
+    /*
     // -------------------Simple test of some functions of the physical module-----------------
     auto* physics = engine.GetSystem<Kiki::PhysicsSystem>();
     // Create a static ground surface
@@ -152,6 +153,8 @@ int main(int argc, char** argv) {
     physics->AddImpulse(ball->GetEntity(), glm::vec3(100.0f, 0.0f, 0.0f));
 
     spdlog::info("Physics World Initialized. Watch the ball fall!");
+    */
+    
 
     engine.Run();
 
