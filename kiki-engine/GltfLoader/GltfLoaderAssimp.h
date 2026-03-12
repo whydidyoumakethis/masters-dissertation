@@ -22,6 +22,7 @@ struct RGBA {
 };
 struct Mtexture {
 	std::vector<RGBA> data;
+	std::vector<uint8_t> rawData; // For compressed textures
 	int width;
 	int height;
 	int channels;
@@ -91,6 +92,14 @@ namespace Kiki {
 			Mtexture out{};
 			out.name = texture->mFilename.C_Str();
 			out.data.reserve(texture->mWidth * texture->mHeight);
+			if (texture->mHeight == 0) {
+				// Compressed texture
+				const uint8_t* raw = reinterpret_cast<const uint8_t*>(texture->pcData);
+				out.rawData.assign(raw, raw + texture->mWidth);
+				out.width = 0;
+				out.height = 0;
+				return out;
+			}
 			for (unsigned int i = 0; i < texture->mWidth * texture->mHeight; i++) {
 				aiTexel texel = texture->pcData[i];
 				out.data.emplace_back(texel.r, texel.g, texel.b, texel.a);
