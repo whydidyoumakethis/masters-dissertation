@@ -52,3 +52,4 @@ build/output/
 .vs/
 out/*
 
+.DS_STORE

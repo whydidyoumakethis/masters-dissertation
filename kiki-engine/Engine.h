@@ -4,8 +4,7 @@
 #include "ECS/System.h"
 #include "input/InputSystem.hpp"
 #include "PhysicsSystem.cpp"
-#include "renderer/MeshManager.hpp"
-#include "renderer/MaterialManager.hpp"
+#include "renderer/SceneManager.hpp"
 
 #include "../debugging/DebugCamera.hpp"
 
@@ -61,8 +60,8 @@ namespace Kiki {
             };
 
 			registry.emplace<TransformComponent>(road);
-			registry.emplace<MeshComponent>(road, MeshManager::get().createMesh(p, i, c));
-			registry.emplace<MaterialComponent>(road, MaterialManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+			registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
+			registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
 
 			auto previousClock = std::chrono::steady_clock::now();
 

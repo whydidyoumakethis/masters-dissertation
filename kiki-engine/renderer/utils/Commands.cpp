@@ -4,8 +4,7 @@
 #include "ToString.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
-#include "../MaterialManager.hpp"
-#include "../MeshManager.hpp"
+#include "../SceneManager.hpp"
 
 #include "../../ECS/World.h"
 
@@ -125,8 +124,8 @@ namespace rutils {
         auto view = World::Get().Query<TransformComponent, MeshComponent, MaterialComponent>();
 
         for (auto [e, transform, meshComponent, materialComponent] : view.each()) {
-            Kiki::Material const& material = Kiki::MaterialManager::get().getMaterial(materialComponent.id);
-            Kiki::Mesh const& mesh = Kiki::MeshManager::get().getMesh(meshComponent.id);
+            Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(materialComponent.id);
+            Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(meshComponent.id);
 
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
 

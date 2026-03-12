@@ -1,8 +1,7 @@
 target_sources(kiki
   PRIVATE
     RenderManager.cpp
-    MaterialManager.cpp
-    MeshManager.cpp
+    SceneManager.cpp
     utils/VMA.cpp
     utils/Devices.cpp
     utils/ToString.cpp
@@ -38,8 +37,7 @@ target_sources(kiki
     TYPE HEADERS
     FILES 
       RenderManager.hpp
-      MaterialManager.hpp
-      MeshManager.hpp
+      SceneManager.hpp
       WindowInfo.hpp
       Camera.hpp
 )

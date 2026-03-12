@@ -142,22 +142,22 @@ int main(int argc, char** argv) {
 	Kiki::Engine engine;
 	engine.Init();
 
- //   // -------------------Simple test of some functions of the physical module-----------------
- //   auto* physics = engine.GetSystem<Kiki::PhysicsSystem>();
- //   // Create a static ground surface
- //   auto floor = GameObject::Create("StaticFloor");
- //   floor->SetPosition({ 0.0f, 0.0f, 0.0f });
- //   floor->AddComponent<Kiki::BoxColliderComponent>(glm::vec3(50.0f, 1.0f, 50.0f));
- //   floor->AddComponent<Kiki::RigidBodyComponent>(JPH::EMotionType::Static, (uint16_t)0);
+    // -------------------Simple test of some functions of the physical module-----------------
+    // auto* physics = engine.GetSystem<Kiki::PhysicsSystem>();
+    // // Create a static ground surface
+    // auto floor = GameObject::Create("StaticFloor");
+    // floor->SetPosition({ 0.0f, 0.0f, 0.0f });
+    // floor->AddComponent<Kiki::BoxColliderComponent>(glm::vec3(50.0f, 1.0f, 50.0f));
+    // floor->AddComponent<Kiki::RigidBodyComponent>(JPH::EMotionType::Static, (uint16_t)0);
 
-	//// Create a dynamic ball
- //   auto ball = GameObject::Create("FallingBall");
- //   ball->SetPosition({ 0.0f, 10.0f, 0.0f }); //10m high
- //   ball->AddComponent<Kiki::SphereColliderComponent>(0.5f);
- //   ball->AddComponent<Kiki::RigidBodyComponent>(JPH::EMotionType::Dynamic, (uint16_t)1, 0.5f);
- //   physics->AddImpulse(ball->GetEntity(), glm::vec3(100.0f, 0.0f, 0.0f));
+	// // Create a dynamic ball
+    // auto ball = GameObject::Create("FallingBall");
+    // ball->SetPosition({ 0.0f, 10.0f, 0.0f }); //10m high
+    // ball->AddComponent<Kiki::SphereColliderComponent>(0.5f);
+    // ball->AddComponent<Kiki::RigidBodyComponent>(JPH::EMotionType::Dynamic, (uint16_t)1, 0.5f);
+    // physics->AddImpulse(ball->GetEntity(), glm::vec3(100.0f, 0.0f, 0.0f));
 
- //   spdlog::info("Physics World Initialized. Watch the ball fall!");
+    // spdlog::info("Physics World Initialized. Watch the ball fall!");
 
     engine.Run();
 

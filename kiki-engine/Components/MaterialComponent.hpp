@@ -4,7 +4,7 @@
 /**
  * @brief Stores the material ID of the object.
  * 
- * Query the MaterialManager with the ID to get the actual material.
+ * Query the SceneManager with the ID to get the actual material.
  * 
  * @param id the material ID
  */

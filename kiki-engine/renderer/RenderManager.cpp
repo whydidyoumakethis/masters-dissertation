@@ -9,8 +9,7 @@
 #include "utils/Descriptors.hpp"
 #include "utils/Texture.hpp"
 #include "../logging/FatalError.hpp"
-#include "MaterialManager.hpp"
-#include "MeshManager.hpp"
+#include "SceneManager.hpp"
 
 #include <iostream>
 #include <glm/gtx/transform.hpp>
@@ -454,8 +453,7 @@ namespace Kiki {
     void RenderManager::shutdown() {
         vkDeviceWaitIdle(window.device);
 
-        MeshManager::get().shutdown();
-        MaterialManager::get().shutdown();
+        SceneManager::get().shutdown();
         tempTextureCmdPool = {};
 
         renderFinished.clear();
