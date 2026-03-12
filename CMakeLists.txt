@@ -125,6 +125,16 @@ FetchContent_Declare(
     GIT_TAG "2fb8c5a3deb2110c89669f8d6f36e5833b556b44"
 )
 FetchContent_MakeAvailable(stb)
+
+#assimp
+set(ASSIMP_BUILD_ALL_EXPORTERS_BY_DEFAULT OFF CACHE BOOL "" FORCE)
+set(ASSIMP_NO_EXPORT ON CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_SAMPLES OFF CACHE BOOL "" FORCE)
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+
+set(ASSIMP_ANDROID_JNIIOSYSTEM OFF CACHE BOOL "" FORCE)
+set(ASSIMP_BUILD_ASSIMP_TOOLS OFF CACHE BOOL "" FORCE)
+
 FetchContent_Declare(
     assimp
     GIT_REPOSITORY "https://github.com/assimp/assimp.git"
@@ -143,6 +153,7 @@ target_link_libraries(KikiDeps INTERFACE
     EnTT::EnTT
     spdlog::spdlog
     fastgltf::fastgltf
+    assimp::assimp
     Jolt
 )
 
@@ -150,7 +161,7 @@ target_include_directories(KikiDeps INTERFACE
     ${glm_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR} 
     ${stb_SOURCE_DIR}
-    assimp::assimp
+    
 )
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"

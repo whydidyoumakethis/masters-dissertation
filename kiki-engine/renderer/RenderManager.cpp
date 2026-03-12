@@ -402,7 +402,7 @@ namespace Kiki {
     }
 
     Material RenderManager::allocateMaterial(std::filesystem::path texturePath, BlendMode blendMode) {
-        rutils::Texture texture = rutils::loadImageTexture(texturePath, window, tempTextureCmdPool.handle, allocator);
+        rutils::Texture texture = rutils::loadImageTexture(texturePath.string().c_str(), window, tempTextureCmdPool.handle, allocator);
         
         VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
 
