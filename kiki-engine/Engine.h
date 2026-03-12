@@ -71,7 +71,7 @@ namespace Kiki {
 			Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
 
 			registry.emplace<MeshComponent>(test_cube, SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
-			registry.emplace<MaterialComponent>(test_cube, 0);
+			//registry.emplace<MaterialComponent>(test_cube, 0);
 			Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 

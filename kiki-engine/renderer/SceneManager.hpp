@@ -11,7 +11,7 @@ namespace Kiki {
         public:
         static SceneManager& get();
 
-        int createMaterial(unsigned char* buffer, int bufferLength, BlendMode blendMode = BlendMode::OPAQUE);
+        int createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti, BlendMode blendMode = BlendMode::OPAQUE);
         Material const& getMaterial(int id);
 
         int createMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);

@@ -11,7 +11,6 @@
 #include <cassert>
 #include <cstring> // for std::memcpy()
 
-#include <stb_image.h>
 
 #include "../../logging/FatalError.hpp"
 #include "Synchronisation.hpp"
@@ -65,19 +64,19 @@ namespace rutils {
 		return *this;
 	}
 
-    Texture loadImageTexture(unsigned char* buffer, int bufferLength, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator) {
-		// Flip images vertically by default. Vulkan expects the first scanline to be the bottom-most scanline. PNG et al.
-        // instead define the first scanline to be the top-most one.
-        stbi_set_flip_vertically_on_load( 1 );
+    Texture loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator) {
+		// // Flip images vertically by default. Vulkan expects the first scanline to be the bottom-most scanline. PNG et al.
+        // // instead define the first scanline to be the top-most one.
+        // stbi_set_flip_vertically_on_load( 1 );
 
-        // Load base image
-        int baseWidthi, baseHeighti, baseChannelsi;
+        // // Load base image
+        // int baseWidthi, baseHeighti;// baseChannelsi;
 
-        stbi_uc* data = stbi_load_from_memory( buffer, bufferLength, &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
+        // stbi_uc* data = stbi_load_from_memory( buffer, bufferLength, &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
 
-        if (!data) {
-            throw Kiki::FatalError("{}: unable to load texture base image", stbi_failure_reason());
-        }
+        // if (!data) {
+        //     throw Kiki::FatalError("{}: unable to load texture base image", stbi_failure_reason());
+        // }
 
         auto const baseWidth = std::uint32_t(baseWidthi);
         auto const baseHeight = std::uint32_t(baseHeighti);
@@ -94,11 +93,11 @@ namespace rutils {
             );
         }
 
-        std::memcpy(sptr, data, sizeInBytes);
+        std::memcpy(sptr, imageData, sizeInBytes);
         vmaUnmapMemory(aAllocator.allocator, staging.allocation);
 
         // Free image data
-        stbi_image_free(data);
+        stbi_image_free(imageData);
 
         // Create image
         Texture ret = createImageTexture(aAllocator, baseWidth, baseHeight, VK_FORMAT_R8G8B8A8_SRGB, aContext, 
