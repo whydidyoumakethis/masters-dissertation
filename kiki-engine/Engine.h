@@ -60,9 +60,9 @@ namespace Kiki {
                 1.f, -6.f // t3
             };
 
-			registry.emplace<TransformComponent>(road);
-			registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
-			registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+			// registry.emplace<TransformComponent>(road);
+			// registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
+			// registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
 
 			auto test_cube = World::Get().CreateEntity();
 			registry.emplace<TransformComponent>(test_cube);

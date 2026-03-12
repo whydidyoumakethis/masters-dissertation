@@ -29,7 +29,9 @@ namespace rutils {
 			VmaAllocator mAllocator = VK_NULL_HANDLE;
 	};
 
-	Texture loadImageTexture(std::filesystem::path path, VulkanWindow const&, VkCommandPool, Allocator const&);
+	Texture loadImageTexture(unsigned char* buffer, int bufferLength, VulkanWindow const&, VkCommandPool, Allocator const&);
+
+	Texture loadImageTextureFromFile(std::filesystem::path path, VulkanWindow const&, VkCommandPool, Allocator const&);
 
 	Texture createImageTexture(Allocator const&, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat, VulkanWindow const& window, VkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
 
