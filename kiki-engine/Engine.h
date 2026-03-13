@@ -59,10 +59,17 @@ namespace Kiki {
                 1.f, +6.f, // t2
                 1.f, -6.f // t3
             };
+			//
+			stbi_set_flip_vertically_on_load( 1 );
 
-			// registry.emplace<TransformComponent>(road);
-			// registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
-			// registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
+			// Load base image
+			int baseWidthi, baseHeighti, baseChannelsi;
+
+			stbi_uc* data = stbi_load( (std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png").c_str(), &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
+			//
+			registry.emplace<TransformComponent>(road);
+			registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
+			registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(data, baseWidthi, baseHeighti, BlendMode::OPAQUE));
 
 			auto test_cube = World::Get().CreateEntity();
 			registry.emplace<TransformComponent>(test_cube);

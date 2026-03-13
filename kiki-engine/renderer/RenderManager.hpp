@@ -8,7 +8,7 @@
 #include "utils/Synchronisation.hpp"
 #include "utils/Allocator.hpp"
 #include "utils/Buffer.hpp"
-#include "utils/Texture.hpp"
+#include "utils/Image.hpp"
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
 
@@ -39,7 +39,7 @@ namespace Kiki {
     };
 
     struct Material {
-        rutils::Texture texture;
+        rutils::Image texture;
         VkDescriptorSet descriptorSet;
         BlendMode blendMode;
     };
@@ -71,6 +71,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout objectLayout;
         VkDescriptorSet sceneDescriptors;
 
+        rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;
 

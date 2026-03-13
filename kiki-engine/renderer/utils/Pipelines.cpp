@@ -153,6 +153,16 @@ namespace rutils {
         VkFormat const colorFormats[] = { window.swapchainFormat };
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachmentFormats = colorFormats;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+
+        // Pipeline depth info
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_TRUE;
+        depthInfo.depthWriteEnable = VK_TRUE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
 
         // Create pipeline
         VkGraphicsPipelineCreateInfo pipeInfo{};
@@ -168,7 +178,7 @@ namespace rutils {
         pipeInfo.pViewportState = &viewportInfo;
         pipeInfo.pRasterizationState = &rasterInfo;
         pipeInfo.pMultisampleState = &samplingInfo;
-        pipeInfo.pDepthStencilState = nullptr; // no depth or stencil buffers
+        pipeInfo.pDepthStencilState = &depthInfo;
         pipeInfo.pColorBlendState = &blendInfo;
         pipeInfo.pDynamicState = nullptr; // no dynamic states
 

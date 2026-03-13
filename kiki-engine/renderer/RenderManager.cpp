@@ -7,7 +7,7 @@
 #include "utils/Synchronisation.hpp"
 #include "utils/ToString.hpp"
 #include "utils/Descriptors.hpp"
-#include "utils/Texture.hpp"
+#include "utils/Image.hpp"
 #include "../logging/FatalError.hpp"
 #include "SceneManager.hpp"
 
@@ -49,6 +49,8 @@ namespace Kiki {
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
             descriptorPool = rutils::createDescriptorPool(window);
+
+            depthBuffer = rutils::createDepthBuffer(window, allocator);
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -97,6 +99,8 @@ namespace Kiki {
             rutils::recreateSwapchain(window);
 
             pipeline = rutils::createPipeline(window, pipelineLayout.handle);
+
+            depthBuffer = rutils::createDepthBuffer(window, allocator);
             
             recreateSwapchain = false;
         }
@@ -181,6 +185,7 @@ namespace Kiki {
             commandBuffers[frameIndex],
             pipeline.handle,
             colorTarget,
+            depthBuffer,
             window.swapchainExtent,
             sceneUBO.buffer,
             sceneUniforms,
@@ -402,7 +407,7 @@ namespace Kiki {
     }
 
     Material RenderManager::allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti, BlendMode blendMode) {
-        rutils::Texture texture = rutils::loadImageTexture(imageData, baseWidthi, baseHeighti, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image texture = rutils::loadImageTexture(imageData, baseWidthi, baseHeighti, window, tempTextureCmdPool.handle, allocator);
         
         VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
 
@@ -474,6 +479,7 @@ namespace Kiki {
         pipeline = {};
         pipelineLayout = {};
 
+        depthBuffer = {};
         sceneUBO = {};
 
         descriptorPool = {};

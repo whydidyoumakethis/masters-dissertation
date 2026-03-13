@@ -18,6 +18,7 @@ namespace rutils {
 		VkCommandBuffer,
 		VkPipeline,
 		ImageAndView const&,
+		Image const& aDepthAttach,
 		VkExtent2D const&,
 		VkBuffer aSceneUBO,
 		Kiki::RenderManager::SceneUniform const&,
