@@ -213,7 +213,7 @@ int main(int argc, char** argv) {
     std::cout << baseChannelsi << std::endl;
 
     registry.emplace<MaterialComponent>(explosion, Kiki::SceneManager::get().createMaterial(data, baseWidthi, baseHeighti));
-    registry.emplace<TransparencyComponent>(explosion);
+    registry.emplace<TransparencyComponent>(explosion, 0.5f, true);
 
     auto test_cube = World::Get().CreateEntity();
     registry.emplace<TransformComponent>(test_cube);
@@ -230,8 +230,8 @@ int main(int argc, char** argv) {
         ? static_cast<int>(texture.rawData.size())
         : static_cast<int>(texture.data.size() * sizeof(RGBA));
 
-    registry.emplace<MaterialComponent>(test_cube,
-        Kiki::SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height));
+    // registry.emplace<MaterialComponent>(test_cube,
+    //     Kiki::SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height));
 
     Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
     Kiki::GltfLoaderAssimp::debugPrintTexture(texture);

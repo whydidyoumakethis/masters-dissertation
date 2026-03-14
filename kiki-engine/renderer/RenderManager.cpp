@@ -81,6 +81,36 @@ namespace Kiki {
             }
 
             tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
+
+            // Create null texture
+            stbi_set_flip_vertically_on_load(1);
+
+            int width, height, c;
+
+            stbi_uc* emptyTexture = stbi_load((std::filesystem::path(PROJECT_ROOT_PATH) / "assets/empty.png").string().c_str(), &width, &height, &c, 4 /* want 4 c h a n n e l s = RGBA */);
+
+            noTexture = rutils::loadImageTexture(emptyTexture, width, height, window, tempTextureCmdPool.handle, allocator);
+        
+            noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, objectLayout.handle);
+
+            {
+                VkWriteDescriptorSet desc[1]{};
+
+                VkDescriptorImageInfo textureInfo{};
+                textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+                textureInfo.imageView = noTexture.view;
+                textureInfo.sampler = sampler.handle;
+
+                desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+                desc[0].dstSet = noTextureDst;
+                desc[0].dstBinding = 0;
+                desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+                desc[0].descriptorCount = 1;
+                desc[0].pImageInfo = &textureInfo;
+
+                constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
+                vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
+            }
         }
     }
 
@@ -193,7 +223,8 @@ namespace Kiki {
             sceneUBO.buffer,
             sceneUniforms,
             pipelineLayout.handle,
-            sceneDescriptors
+            sceneDescriptors,
+            noTextureDst
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -409,7 +440,7 @@ namespace Kiki {
         return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
-    Material RenderManager::allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti, BlendMode blendMode) {
+    Material RenderManager::allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
         rutils::Image texture = rutils::loadImageTexture(imageData, baseWidthi, baseHeighti, window, tempTextureCmdPool.handle, allocator);
         
         VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
@@ -433,7 +464,7 @@ namespace Kiki {
             vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
         }
 
-        return Material(std::move(texture), std::move(descriptorSet), blendMode);
+        return Material(std::move(texture), std::move(descriptorSet));
     }
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
@@ -462,6 +493,9 @@ namespace Kiki {
         vkDeviceWaitIdle(window.device);
 
         SceneManager::get().shutdown();
+        noTextureDst = {};
+        noTexture = {};
+
         tempTextureCmdPool = {};
 
         renderFinished.clear();

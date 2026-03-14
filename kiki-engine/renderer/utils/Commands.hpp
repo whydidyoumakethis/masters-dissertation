@@ -24,7 +24,8 @@ namespace rutils {
 		VkBuffer aSceneUBO,
 		Kiki::RenderManager::SceneUniform const&,
 		VkPipelineLayout,
-		VkDescriptorSet aSceneDescriptors
+		VkDescriptorSet aSceneDescriptors,
+		VkDescriptorSet noTexture
 	);
 
 	void submitCommands(

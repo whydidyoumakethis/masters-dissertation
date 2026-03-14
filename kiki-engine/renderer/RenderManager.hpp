@@ -25,11 +25,6 @@
 
 
 namespace Kiki {
-    enum BlendMode {
-        OPAQUE,
-        TRANSPARENT
-    };
-    
     struct Mesh {
         rutils::Buffer positions;
         rutils::Buffer texCoords;
@@ -41,7 +36,6 @@ namespace Kiki {
     struct Material {
         rutils::Image texture;
         VkDescriptorSet descriptorSet;
-        BlendMode blendMode;
     };
 
 
@@ -76,8 +70,8 @@ namespace Kiki {
         rutils::Allocator allocator;
         rutils::Sampler sampler;
 
-        Mesh tempMesh;
-        Material tempMaterial;
+        rutils::Image noTexture;
+        VkDescriptorSet noTextureDst;
 
         Camera camera; // default cam
 
@@ -86,7 +80,7 @@ namespace Kiki {
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
-        Material allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti, BlendMode blendMode);
+        Material allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
         void nextFrame();

@@ -5,4 +5,6 @@ target_sources(kiki
     FILES 
       MaterialComponent.hpp
       MeshComponent.hpp
+      TransparencyComponent.hpp
+      ColourComponent.hpp
 )

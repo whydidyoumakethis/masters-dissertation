@@ -2,7 +2,9 @@
 
 #include "Synchronisation.hpp"
 #include "ToString.hpp"
+#include "Pipelines.hpp"
 #include "Components/TransparencyComponent.hpp"
+#include "Components/ColourComponent.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -47,7 +49,7 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, VkPipeline aGraphicsPipe, VkPipeline alphaPipeline, ImageAndView const& aColorAttach, Image const& aDepthAttach, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors) {
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors, VkDescriptorSet noTexture) {
 
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -146,17 +148,31 @@ namespace rutils {
 
         auto& world = World::Get();
         auto& registry = world.Registry();
-        auto view = world.Query<TransformComponent, MeshComponent, MaterialComponent>();
+        auto view = world.Query<TransformComponent, MeshComponent>();
 
         std::vector<entt::entity> transparent;
 
         // TODO: Update so all objects with same material are drawn at same time to minimise descriptor set bind calls
-        for (auto [e, transform, meshComponent, materialComponent] : view.each()) {
+        for (auto [e, transform, meshComponent] : view.each()) {
             if (!registry.all_of<TransparencyComponent>(e)) {
-                Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(materialComponent.id);
                 Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(meshComponent.id);
 
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+                if (registry.all_of<MaterialComponent>(e)) {
+                    Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
+                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+                } else {
+                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &noTexture, 0, nullptr);
+                }
+
+                glm::vec3 colour;
+
+                if (registry.all_of<ColourComponent>(e)) {
+                    colour = registry.get<ColourComponent>(e).colour;
+                } else {
+                    colour = glm::vec3(0.3f, 0.3f, 0.3f);
+                }
+
+                ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
 
                 // Bind vertex input
                 VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
@@ -164,6 +180,8 @@ namespace rutils {
 
                 vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
                 vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                vkCmdPushConstants(aCmdBuff, aGraphicsLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
                 // Draw mesh
                 vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
@@ -178,10 +196,26 @@ namespace rutils {
         // TODO: sort transparent objects
 
         for (auto e : transparent) {
-            Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
             Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
+            TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
+            TransformComponent const& transform = registry.get<TransformComponent>(e);
 
-            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+            if (registry.all_of<MaterialComponent>(e)) {
+                Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+            } else {
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &noTexture, 0, nullptr);
+            }
+
+            glm::vec3 colour;
+
+            if (registry.all_of<ColourComponent>(e)) {
+                colour = registry.get<ColourComponent>(e).colour;
+            } else {
+                colour = glm::vec3(0.3f, 0.3f, 0.3f);
+            }
+
+            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
 
             // Bind vertex input
             VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
@@ -189,6 +223,8 @@ namespace rutils {
 
             vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+            vkCmdPushConstants(aCmdBuff, aGraphicsLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
             // Draw mesh
             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
