@@ -5,6 +5,7 @@
 #include "input/InputSystem.hpp"
 #include "PhysicsSystem.cpp"
 #include "renderer/SceneManager.hpp"
+#include "Components/TransparencyComponent.hpp"
 
 #include "../debugging/DebugCamera.hpp"
 
@@ -70,6 +71,35 @@ namespace Kiki {
 			registry.emplace<TransformComponent>(road);
 			registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
 			registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(data, baseWidthi, baseHeighti, BlendMode::OPAQUE));
+
+			// Vertex data
+			std::vector<float> points = {
+				-1.5f, +1.5f, -4.f, // v0
+				-1.5f, -0.5f, -4.f, // v1
+				+1.5f, -0.5f, -4.f, // v2
+				+1.5f, +1.5f, -4.f // v3
+			};
+
+			std::vector<std::uint32_t> indices = { 0, 1, 2, 0, 2, 3 };
+
+			std::vector<float> tex = {
+				0.f, 1.f, // t0
+				0.f, 0.f, // t1
+				1.f, 0.f, // t2
+				1.f, 1.f // t3
+			};
+
+			auto explosion = World::Get().CreateEntity();
+
+			registry.emplace<TransformComponent>(explosion);
+			registry.emplace<MeshComponent>(explosion, SceneManager::get().createMesh(points, indices, tex));
+
+			data = stbi_load( (std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/explosion.png").c_str(), &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
+
+			std::cout << baseChannelsi << std::endl;
+
+			registry.emplace<MaterialComponent>(explosion, SceneManager::get().createMaterial(data, baseWidthi, baseHeighti, BlendMode::OPAQUE));
+			registry.emplace<TransparencyComponent>(explosion);
 
 			auto test_cube = World::Get().CreateEntity();
 			registry.emplace<TransformComponent>(test_cube);

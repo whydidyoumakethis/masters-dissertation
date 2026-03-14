@@ -59,6 +59,7 @@ namespace Kiki {
 
         rutils::PipelineLayout pipelineLayout;
         rutils::Pipeline pipeline;
+        rutils::Pipeline alphaPipeline;
         rutils::CommandPool commandPool;
 
         rutils::Buffer sceneUBO;

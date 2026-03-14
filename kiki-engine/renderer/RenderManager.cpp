@@ -46,6 +46,7 @@ namespace Kiki {
 
             pipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, objectLayout.handle);
             pipeline = rutils::createPipeline(window, pipelineLayout.handle);
+            alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
             descriptorPool = rutils::createDescriptorPool(window);
@@ -99,6 +100,7 @@ namespace Kiki {
             rutils::recreateSwapchain(window);
 
             pipeline = rutils::createPipeline(window, pipelineLayout.handle);
+            alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
@@ -184,6 +186,7 @@ namespace Kiki {
         rutils::recordCommands(
             commandBuffers[frameIndex],
             pipeline.handle,
+            alphaPipeline.handle,
             colorTarget,
             depthBuffer,
             window.swapchainExtent,
@@ -477,6 +480,7 @@ namespace Kiki {
 
         commandPool = {};
         pipeline = {};
+        alphaPipeline = {};
         pipelineLayout = {};
 
         depthBuffer = {};

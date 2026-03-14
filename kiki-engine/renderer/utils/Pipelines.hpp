@@ -7,6 +7,7 @@
 namespace rutils {
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 
 #endif
