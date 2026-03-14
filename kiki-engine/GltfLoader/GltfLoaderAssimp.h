@@ -12,9 +12,9 @@
 
 
 struct Mmesh {
-	std::vector<float> vertices;
+	std::vector<glm::vec3> vertices;
 	std::vector<glm::vec3> normals;
-	std::vector<float> uvs;
+	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
 };
 
@@ -58,17 +58,12 @@ namespace Kiki {
 			out.normals.reserve(mesh->mNumVertices);
 			out.uvs.reserve(mesh->mNumVertices);
 			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
-				out.vertices.emplace_back(mesh->mVertices[i].x);
-				out.vertices.emplace_back(mesh->mVertices[i].y);
-				out.vertices.emplace_back(mesh->mVertices[i].z);
+				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
-					out.normals.emplace_back(mesh->mNormals[i].x);
-					out.normals.emplace_back(mesh->mNormals[i].y);
-					out.normals.emplace_back(mesh->mNormals[i].z);
+					out.normals.emplace_back(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
 				}
 				if (mesh->HasTextureCoords(0)) {
-					out.uvs.emplace_back(mesh->mTextureCoords[0][i].x);
-					out.uvs.emplace_back(mesh->mTextureCoords[0][i].y);
+					out.uvs.emplace_back(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
 				}
 			}
 			for (unsigned int i = 0; i < mesh->mNumFaces; i++) {

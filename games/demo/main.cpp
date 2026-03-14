@@ -7,6 +7,7 @@
 
 //#include <GltfLoader/GltfLoader.h>
 #include <GltfLoader/GltfLoaderAssimp.h>
+#include "renderer/SceneManager.hpp"
 
 #include <Jolt/Jolt.h>
 
@@ -154,6 +155,86 @@ int main(int argc, char** argv) {
     // physics->AddImpulse(ball->GetEntity(), glm::vec3(100.0f, 0.0f, 0.0f));
 
     // spdlog::info("Physics World Initialized. Watch the ball fall!");
+
+    auto& registry = World::Get().Registry();
+    auto road = World::Get().CreateEntity();
+
+    std::vector<glm::vec3> p = {
+        glm::vec3(-1.f, 0.f, -6.f), // v0
+        glm::vec3(-1.f, 0.f, +6.f), // v1
+        glm::vec3(+1.f, 0.f, +6.f), // v2
+        glm::vec3(+1.f, 0.f, -6.f) // v3
+    };
+
+    std::vector<std::uint32_t> i = { 0, 1, 2, 0, 2, 3 };
+
+    std::vector<glm::vec2> c = {
+        glm::vec2(0.f, -6.f), // t0
+        glm::vec2(0.f, +6.f), // t1
+        glm::vec2(1.f, +6.f), // t2
+        glm::vec2(1.f, -6.f) // t3
+    };
+    //
+    stbi_set_flip_vertically_on_load( 1 );
+
+    // Load base image
+    int baseWidthi, baseHeighti, baseChannelsi;
+
+    stbi_uc* data = stbi_load( (std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png").c_str(), &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
+    //
+    registry.emplace<TransformComponent>(road);
+    registry.emplace<MeshComponent>(road, Kiki::SceneManager::get().createMesh(p, i, c));
+    registry.emplace<MaterialComponent>(road, Kiki::SceneManager::get().createMaterial(data, baseWidthi, baseHeighti));
+
+    // Vertex data
+    std::vector<glm::vec3> points = {
+        glm::vec3(-1.5f, +1.5f, -4.f), // v0
+        glm::vec3(-1.5f, -0.5f, -4.f), // v1
+        glm::vec3(+1.5f, -0.5f, -4.f), // v2
+        glm::vec3(+1.5f, +1.5f, -4.f) // v3
+    };
+
+    std::vector<std::uint32_t> indices = { 0, 1, 2, 0, 2, 3 };
+
+    std::vector<glm::vec2> tex = {
+        glm::vec2(0.f, 1.f), // t0
+        glm::vec2(0.f, 0.f), // t1
+        glm::vec2(1.f, 0.f), // t2
+        glm::vec2(1.f, 1.f) // t3
+    };
+
+    auto explosion = World::Get().CreateEntity();
+
+    registry.emplace<TransformComponent>(explosion);
+    registry.emplace<MeshComponent>(explosion, Kiki::SceneManager::get().createMesh(points, indices, tex));
+
+    data = stbi_load( (std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/explosion.png").c_str(), &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
+
+    std::cout << baseChannelsi << std::endl;
+
+    registry.emplace<MaterialComponent>(explosion, Kiki::SceneManager::get().createMaterial(data, baseWidthi, baseHeighti));
+    registry.emplace<TransparencyComponent>(explosion);
+
+    auto test_cube = World::Get().CreateEntity();
+    registry.emplace<TransformComponent>(test_cube);
+
+    Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+    Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+
+    registry.emplace<MeshComponent>(test_cube, Kiki::SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+    const bool isCompressed = !texture.rawData.empty();
+    unsigned char* texPtr = isCompressed
+        ? (unsigned char*)texture.rawData.data()
+        : (unsigned char*)texture.data.data();
+    int texSize = isCompressed
+        ? static_cast<int>(texture.rawData.size())
+        : static_cast<int>(texture.data.size() * sizeof(RGBA));
+
+    registry.emplace<MaterialComponent>(test_cube,
+        Kiki::SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height));
+
+    Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+    Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
     engine.Run();
 

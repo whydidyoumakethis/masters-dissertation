@@ -18,8 +18,21 @@ namespace Kiki {
         return materials[id];
     }
 
-    int SceneManager::createMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords) {
-        meshes.emplace_back(RenderManager::get().allocateMesh(positions, indices, texCoords));
+    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec2> const& texCoords) {
+        std::vector<float> p, t;
+
+        for (glm::vec3 pos : positions) {
+            p.emplace_back(pos.x);
+            p.emplace_back(pos.y);
+            p.emplace_back(pos.z);
+        }
+
+        for (glm::vec2 texCoord : texCoords) {
+            t.emplace_back(texCoord.x);
+            t.emplace_back(texCoord.y);
+        }
+
+        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, t));
 
         return meshes.size() - 1;
     }
