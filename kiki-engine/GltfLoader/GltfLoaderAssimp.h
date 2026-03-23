@@ -8,7 +8,7 @@
 #include <iostream>
 #include <stb_image.h>
 
-#define ASSIMP_FLAGS = aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
+#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
 
 
 struct Mmesh {
@@ -47,7 +47,7 @@ namespace Kiki {
 	public:
 		static Mmesh loadMesh(const std::filesystem::path& path) {
 			Assimp::Importer importer;
-			const aiScene* scene = importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate);
+			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 				throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
 			}
@@ -82,7 +82,7 @@ namespace Kiki {
 
 		static Mtexture loadTexture(const std::filesystem::path& path) {
 			Assimp::Importer importer;
-			const aiScene* scene = importer.ReadFile(path.string(), aiProcess_Triangulate | aiProcess_FlipUVs | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate);
+			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 				throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
 			}
@@ -117,22 +117,27 @@ namespace Kiki {
 
 
 		static void debugPrintMesh(const Mmesh& mesh) {
-			//std::cout << "Vertices: " << mesh.vertices.size() << std::endl;
-			//for (const auto& vertex : mesh.vertices) {
-			//	std::cout << "  " << vertex.x << ", " << vertex.y << ", " << vertex.z << std::endl;
-			//}
-			//std::cout << "Normals: " << mesh.normals.size() << std::endl;
-			//for (const auto& normal : mesh.normals) {
-			//	std::cout << "  " << normal.x << ", " << normal.y << ", " << normal.z << std::endl;
-			//}
-			//std::cout << "UVs: " << mesh.uvs.size() << std::endl;
-			//for (const auto& uv : mesh.uvs) {
-			//	std::cout << "  " << uv.x << ", " << uv.y << std::endl;
-			//}
-			//std::cout << "Indices: " << mesh.indices.size() << std::endl;
-			//for (const auto& index : mesh.indices) {
-			//	std::cout << "  " << index << std::endl;
-			//}
+			// std::cout << "Vertices: " << mesh.vertices.size() << std::endl;
+			// for (const auto& vertex : mesh.vertices) {
+			// 	std::cout << "  " << vertex.x << ", " << vertex.y << ", " << vertex.z << std::endl;
+			// }
+			// std::cout << "Normals: " << mesh.normals.size() << std::endl;
+			// for (const auto& normal : mesh.normals) {
+			// 	std::cout << "  " << normal.x << ", " << normal.y << ", " << normal.z << std::endl;
+			// }
+			// std::cout << "UVs: " << mesh.uvs.size() << std::endl;
+			// for (const auto& uv : mesh.uvs) {
+			// 	std::cout << "  " << uv.x << ", " << uv.y << std::endl;
+			// }
+			// std::cout << "Indices: " << mesh.indices.size() << std::endl;
+			// for (const auto& index : mesh.indices) {
+			// 	std::cout << "  " << index << std::endl;
+			// }
+
+			// std::cout << "UVs: " << mesh.uvs.size() << std::endl;
+			// for (const auto& uv : mesh.uvs) {
+			// 	std::cout << uv << std::endl;
+			// }
 		}
 
 		static void debugPrintTexture(const Mtexture& texture) {
