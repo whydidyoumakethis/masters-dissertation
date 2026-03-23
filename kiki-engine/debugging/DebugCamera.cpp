@@ -22,6 +22,8 @@ namespace Kiki {
         if (inputManager.isKeyDown(GLFW_KEY_Q))
             transform.position += glm::vec3(0.0f, move, 0.0f);
 
+        transform.dirty = true;
+
         if (inputManager.isKeyDown(GLFW_KEY_F))
             SceneManager::get().clearLevel();
     }
