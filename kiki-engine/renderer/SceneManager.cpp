@@ -49,7 +49,7 @@ namespace Kiki {
         Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName);
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName);
         registry.emplace<TransformComponent>(model);
-        registry.emplace<MeshComponent>(model, SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
         const bool isCompressed = !texture.rawData.empty();
         unsigned char* texPtr = isCompressed
             	? (unsigned char*)texture.rawData.data()
@@ -59,7 +59,7 @@ namespace Kiki {
             	: static_cast<int>(texture.data.size() * sizeof(RGBA));
 
         registry.emplace<MaterialComponent>(model,
-            	SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
+            	createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
 
         Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);

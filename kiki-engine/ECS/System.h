@@ -79,8 +79,12 @@ public:
         auto view = World::Get().Query<TransformComponent>();
         for (auto [entity, transform] : view.each()) {
             if (!transform.dirty) continue;
-			// TODO: calculate world matrix
+			// calculate world matrix without parent-child relationship for now
+            glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
+            glm::mat4 rotation = glm::mat4_cast(transform.rotation);
+            glm::mat4 scale = glm::scale(glm::mat4(1.0f), transform.scale);
 
+            transform.worldMatrix = translation * rotation * scale;
             transform.dirty = false;
         }
     }
