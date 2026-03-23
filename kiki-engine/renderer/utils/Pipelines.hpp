@@ -4,9 +4,20 @@
 #include "VulkanWrapper.hpp"
 #include "VulkanWindow.hpp"
 
+#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
+
 namespace rutils {
+    struct ObjectData {
+        glm::mat4 model;
+        glm::vec4 baseColour;
+        std::uint32_t sprite = 0;
+        std::uint32_t padding[3];
+    };
+
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 
 #endif

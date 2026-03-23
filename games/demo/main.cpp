@@ -7,6 +7,7 @@
 
 //#include <GltfLoader/GltfLoader.h>
 #include <GltfLoader/GltfLoaderAssimp.h>
+#include "renderer/SceneManager.hpp"
 
 #include <Jolt/Jolt.h>
 
