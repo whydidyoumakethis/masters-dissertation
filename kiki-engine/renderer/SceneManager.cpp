@@ -55,6 +55,7 @@ namespace Kiki {
         materials.clear();
         meshes.clear();
     }
+
     void SceneManager::loadModel(const std::string modelName) {
         auto model = World::Get().CreateEntity();
         auto& registry = World::Get().Registry();
@@ -63,13 +64,6 @@ namespace Kiki {
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName);
         registry.emplace<TransformComponent>(model);
         registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
-        const bool isCompressed = !texture.rawData.empty();
-        unsigned char* texPtr = isCompressed
-            	? (unsigned char*)texture.rawData.data()
-            	: (unsigned char*)texture.data.data();
-        int texSize = isCompressed
-            	? static_cast<int>(texture.rawData.size())
-            	: static_cast<int>(texture.data.size() * sizeof(RGBA));
 
         registry.emplace<MaterialComponent>(model,
             	createMaterial(texture.rawDataPtr, texture.width, texture.height));
@@ -77,6 +71,7 @@ namespace Kiki {
         Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
     }
+    
     void SceneManager::shutdown() {
         materials.clear();
         meshes.clear();
