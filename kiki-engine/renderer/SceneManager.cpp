@@ -72,7 +72,7 @@ namespace Kiki {
             	: static_cast<int>(texture.data.size() * sizeof(RGBA));
 
         registry.emplace<MaterialComponent>(model,
-            	createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
+            	createMaterial(texture.rawDataPtr, texture.width, texture.height));
 
         Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);

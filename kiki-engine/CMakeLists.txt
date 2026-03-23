@@ -3,11 +3,9 @@ add_library(kiki)
 
 target_sources(kiki
   PRIVATE
-    temp.cpp
   PUBLIC
     FILE_SET HEADERS
     FILES 
-      temp.h
       Event/Event.h
       Timer/Timer.h
       ECS/World.h
