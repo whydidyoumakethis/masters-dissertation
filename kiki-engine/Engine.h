@@ -64,27 +64,26 @@ namespace Kiki {
 			// registry.emplace<MeshComponent>(road, SceneManager::get().createMesh(p, i, c));
 			// registry.emplace<MaterialComponent>(road, SceneManager::get().createMaterial(std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/asphalt.png", BlendMode::OPAQUE));
 
-			auto test_cube = World::Get().CreateEntity();
-			registry.emplace<TransformComponent>(test_cube);
+			//auto test_cube = World::Get().CreateEntity();
+			//
 
-			Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
-			Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+			//Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+			//Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "test_cube_tex.glb");
+			//registry.emplace<TransformComponent>(test_cube);
+			//registry.emplace<MeshComponent>(test_cube, SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+			//const bool isCompressed = !texture.rawData.empty();
+			//unsigned char* texPtr = isCompressed
+			//	? (unsigned char*)texture.rawData.data()
+			//	: (unsigned char*)texture.data.data();
+			//int texSize = isCompressed
+			//	? static_cast<int>(texture.rawData.size())
+			//	: static_cast<int>(texture.data.size() * sizeof(RGBA));
 
-			registry.emplace<MeshComponent>(test_cube, SceneManager::get().createMesh(mesh.vertices, mesh.indices, mesh.uvs));
-			const bool isCompressed = !texture.rawData.empty();
-			unsigned char* texPtr = isCompressed
-				? (unsigned char*)texture.rawData.data()
-				: (unsigned char*)texture.data.data();
-			int texSize = isCompressed
-				? static_cast<int>(texture.rawData.size())
-				: static_cast<int>(texture.data.size() * sizeof(RGBA));
+			//registry.emplace<MaterialComponent>(test_cube,
+			//	SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
 
-			registry.emplace<MaterialComponent>(test_cube,
-				SceneManager::get().createMaterial(texture.rawDataPtr, texture.width, texture.height, BlendMode::OPAQUE));
-
-			Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
-			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
-
+			//Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 			auto previousClock = std::chrono::steady_clock::now();
 
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {

@@ -154,7 +154,7 @@ int main(int argc, char** argv) {
     // physics->AddImpulse(ball->GetEntity(), glm::vec3(100.0f, 0.0f, 0.0f));
 
     // spdlog::info("Physics World Initialized. Watch the ball fall!");
-
+    Kiki::SceneManager::get().loadModel("test_cube_tex.glb");
     engine.Run();
 
 }

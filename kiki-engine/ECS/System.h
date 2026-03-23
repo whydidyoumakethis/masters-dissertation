@@ -80,6 +80,7 @@ public:
         for (auto [entity, transform] : view.each()) {
             if (!transform.dirty) continue;
 			// TODO: calculate world matrix
+
             transform.dirty = false;
         }
     }
@@ -131,11 +132,4 @@ private:
     GLFWwindow* window = nullptr;
 };
 
-class PhysicsSystem : public System {
-public:
-    Phase GetPhase() const override { return Phase::Physics; }
 
-    void OnUpdate(float dt) override {
-		// TODO: physics update
-    }
-};
