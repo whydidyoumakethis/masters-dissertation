@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include <iostream>
 #include <stb_image.h>
+#include <Components/ColourComponent.hpp>
 
 #define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
 
@@ -22,6 +23,7 @@ struct RGBA {
 	uint8_t r, g, b, a;
 };
 struct Mtexture {
+	bool hastexture = true;
 	std::vector<RGBA> data;
 	std::vector<uint8_t> rawData; // For compressed textures
 	stbi_uc* rawDataPtr;
@@ -81,11 +83,10 @@ namespace Kiki {
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
 				throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
 			}
+			if (scene->HasTextures() == false) return Mtexture(false);
+
 			const aiTexture* texture = scene->mTextures[0]; // For simplicity, we only load the first texture
 			
-			if (!texture) {
-				throw std::runtime_error("Failed to load texture: " + path.string() + " from glTF file: " + path.string());
-			}
 			stbi_set_flip_vertically_on_load(1);
 			Mtexture out{};
 			out.name = texture->mFilename.C_Str();
