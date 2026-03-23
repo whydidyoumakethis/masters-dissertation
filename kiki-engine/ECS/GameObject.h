@@ -39,7 +39,7 @@ public:
 		reg.emplace<TagComponent>(_entity, entt::hashed_string(name.c_str()),name);
     }
     ~GameObject() {
-        World::Get().DestroyEntity(_entity);
+        //World::Get().DestroyEntity(_entity);
     }
 
 	Entity GetEntity() const { return _entity; }
