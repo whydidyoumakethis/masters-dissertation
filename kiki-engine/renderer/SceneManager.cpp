@@ -65,13 +65,17 @@ namespace Kiki {
         registry.emplace<TransformComponent>(model);
         registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
 
-        registry.emplace<MaterialComponent>(model,
-            	createMaterial(texture.rawDataPtr, texture.width, texture.height));
+        if (texture.hastexture) {
+            registry.emplace<MaterialComponent>(model,
+                    createMaterial(texture.rawDataPtr, texture.width, texture.height));
+        }
+
+        registry.emplace<ColourComponent>(model, glm::vec3(1, 0, 0));
 
         Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
     }
-    
+
     void SceneManager::shutdown() {
         materials.clear();
         meshes.clear();
