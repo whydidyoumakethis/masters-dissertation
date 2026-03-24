@@ -12,6 +12,7 @@
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
 #include "utils/Pipelines.hpp"
+#include "GltfLoader/GltfLoaderAssimp.h"
 
 
 #include <glm/glm.hpp>
@@ -36,6 +37,7 @@ namespace Kiki {
 
     struct Material {
         rutils::Image texture;
+        rutils::Image roughnessMetalness;
         VkDescriptorSet descriptorSet;
     };
 
@@ -69,6 +71,7 @@ namespace Kiki {
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
         rutils::DescriptorPool descriptorPool;
         rutils::DescriptorSetLayout objectLayout;
+        rutils::DescriptorSetLayout materialLayout;
         VkDescriptorSet sceneDescriptors;
 
         rutils::Image depthBuffer;
@@ -85,7 +88,7 @@ namespace Kiki {
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
-        Material allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti);
+        Material allocateMaterial(Mtexture materialData);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
         void nextFrame();

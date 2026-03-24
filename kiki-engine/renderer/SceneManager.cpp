@@ -8,11 +8,11 @@ namespace Kiki {
         return instance;
     }
 
-    int SceneManager::createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
-        materials.emplace_back(RenderManager::get().allocateMaterial(imageData, baseWidthi, baseHeighti));
+    // int SceneManager::createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
+    //     materials.emplace_back(RenderManager::get().allocateMaterial(imageData, baseWidthi, baseHeighti));
 
-        return materials.size() - 1;
-    }
+    //     return materials.size() - 1;
+    // }
 
     Material const& SceneManager::getMaterial(int id) {
         return materials[id];
@@ -66,8 +66,10 @@ namespace Kiki {
         registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
 
         if (texture.hastexture) {
-            registry.emplace<MaterialComponent>(model,
-                    createMaterial(texture.rawDataPtr, texture.width, texture.height));
+            materials.emplace_back(RenderManager::get().allocateMaterial(texture));
+            int id = materials.size() - 1;
+
+            registry.emplace<MaterialComponent>(model, id);
         }
 
         registry.emplace<ColourComponent>(model, glm::vec3(1, 0, 0));

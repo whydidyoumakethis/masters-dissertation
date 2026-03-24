@@ -9,6 +9,7 @@
 namespace rutils {
     DescriptorSetLayout createSceneDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createObjectDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createMaterialDescriptorLayout(VulkanWindow const& window);
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors = 2048, std::uint32_t aMaxSets = 1024);
     VkDescriptorSet allocDescSet(VulkanWindow const& window, VkDescriptorPool aPool, VkDescriptorSetLayout aSetLayout);
 }

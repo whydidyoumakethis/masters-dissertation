@@ -32,6 +32,7 @@ namespace Kiki {
             // Initialise resources
             rutils::DescriptorSetLayout sceneLayout = rutils::createSceneDescriptorLayout(window);
             objectLayout = rutils::createObjectDescriptorLayout(window);
+            materialLayout = rutils::createMaterialDescriptorLayout(window);
             allocator = rutils::createAllocator(window);
 
             sampler = rutils::createSampler(window);
@@ -439,31 +440,43 @@ namespace Kiki {
         return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
-    Material RenderManager::allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
-        rutils::Image texture = rutils::loadImageTexture(imageData, baseWidthi, baseHeighti, window, tempTextureCmdPool.handle, allocator);
-        
-        VkDescriptorSet descriptorSet = rutils::allocDescSet( window, descriptorPool.handle, objectLayout.handle );
+    Material RenderManager::allocateMaterial(Mtexture textureData) {
+        rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
 
-        {
-            VkWriteDescriptorSet desc[1]{};
+        VkDescriptorImageInfo textureInfo[2]{};
 
-            VkDescriptorImageInfo textureInfo{};
-            textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            textureInfo.imageView = texture.view;
-            textureInfo.sampler = sampler.handle;
+        // base colour
+        textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        textureInfo[0].imageView = texture.view;
+        textureInfo[0].sampler = sampler.handle;
 
-            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            desc[0].dstSet = descriptorSet;
-            desc[0].dstBinding = 0;
-            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-            desc[0].descriptorCount = 1;
-            desc[0].pImageInfo = &textureInfo;
+        // roughness and metalness
+        textureInfo[1].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        textureInfo[1].imageView = roughnessMetalness.view;
+        textureInfo[1].sampler = sampler.handle;
 
-            constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
-            vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
-        }
+        VkDescriptorSet descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, objectLayout.handle);
 
-        return Material(std::move(texture), std::move(descriptorSet));
+        VkWriteDescriptorSet desc[2]{};
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = descriptorSet;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &textureInfo[0];
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = descriptorSet;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &textureInfo[1];
+
+        constexpr auto numSets = sizeof(desc) / sizeof(desc[0]);
+        vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
+
+        return Material(std::move(texture), std::move(roughnessMetalness), std::move(descriptorSet));
     }
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
