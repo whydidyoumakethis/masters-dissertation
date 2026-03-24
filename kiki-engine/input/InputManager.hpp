@@ -96,6 +96,10 @@ namespace Kiki {
 
 		float getGamepadAxis(int axis); //FROM -1.0 to 1.0
         void setGamepadDeadzone(float value) { deadzone = value; }
+
+        // Enable/disable cursor for the window
+        void disableCursor();
+        void enableCursor();
     };
 }
 
