@@ -526,7 +526,7 @@ namespace Kiki {
             glm::radians(60.0f), // fov
             aspect,
             0.1f, // near
-            100.0f // far
+            2000.0f // far
         );
 
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis

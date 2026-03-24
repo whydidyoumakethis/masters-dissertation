@@ -94,17 +94,29 @@ namespace Kiki {
 			mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
 			mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
 
-			int i = std::stoi(textureName.C_Str() + 1);
-			int j = std::stoi(roughName.C_Str() + 1);
-			const aiTexture* texture = scene->mTextures[i];
-			const aiTexture* rough = scene->mTextures[j];
+			std::cout << textureName.C_Str() << "~" << roughName.C_Str() << std::endl;
+
 			
 			stbi_set_flip_vertically_on_load(1);
 			Mtexture out{};
-			out.name = texture->mFilename.C_Str();
-			out.data.reserve(texture->mWidth * texture->mHeight);
-			out.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(texture->pcData), texture->mWidth, &out.width, &out.height, &out.channels, 4);
-			out.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(rough->pcData), rough->mWidth, &out.width, &out.height, &out.channels, 4);
+			//out.name = texture->mFilename.C_Str();
+			//out.data.reserve(texture->mWidth * texture->mHeight);
+			if (textureName.length > 0) {
+				int i = std::stoi(textureName.C_Str() + 1);
+				const aiTexture* texture = scene->mTextures[i];
+				out.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(texture->pcData), texture->mWidth, &out.width, &out.height, &out.channels, 4);
+			} else {
+				out.rawDataPtr = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").c_str(), &out.width, &out.height, &out.channels, 4);
+			}
+
+			if (roughName.length > 0) {
+				int j = std::stoi(roughName.C_Str() + 1);
+				const aiTexture* rough = scene->mTextures[j];
+				out.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(rough->pcData), rough->mWidth, &out.width, &out.height, &out.channels, 4);
+			} else {
+				out.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").c_str(), &out.width, &out.height, &out.channels, 4);
+			}
+			
 			// if (texture->mHeight == 0) {
 			// 	// Compressed texture
 			// 	const uint8_t* raw = reinterpret_cast<const uint8_t*>(texture->pcData);
