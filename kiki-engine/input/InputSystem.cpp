@@ -62,7 +62,5 @@ namespace Kiki {
         else if (inputManager.isMouseButtonJustUp(GLFW_MOUSE_BUTTON_RIGHT)) {
             spdlog::info("Right click was just released");
         }
-
-        inputManager.update();
     }
 }
