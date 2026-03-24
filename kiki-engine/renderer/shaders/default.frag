@@ -54,5 +54,5 @@ void main() {
     vec3 finalColour = emissive + ambient(sceneAmbient, baseColour) + (brdfResult * lightColour * nDotLPos);
     finalColour = clamp(finalColour, 0.f, 1.f);
 
-    oColor = vec4(uScene.lightColour.rgb, 1.f);
+    oColor = vec4(finalColour.rgb, 1.f);
 }
