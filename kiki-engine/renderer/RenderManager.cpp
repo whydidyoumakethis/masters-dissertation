@@ -31,7 +31,6 @@ namespace Kiki {
 
             // Initialise resources
             rutils::DescriptorSetLayout sceneLayout = rutils::createSceneDescriptorLayout(window);
-            objectLayout = rutils::createObjectDescriptorLayout(window);
             materialLayout = rutils::createMaterialDescriptorLayout(window);
             allocator = rutils::createAllocator(window);
 
@@ -45,7 +44,7 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
-            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, objectLayout.handle);
+            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelines = rutils::create_all_pipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
@@ -91,7 +90,7 @@ namespace Kiki {
 
             noTexture = rutils::loadImageTexture(emptyTexture, width, height, window, tempTextureCmdPool.handle, allocator);
         
-            noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, objectLayout.handle);
+            noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
             {
                 VkWriteDescriptorSet desc[1]{};
@@ -120,7 +119,7 @@ namespace Kiki {
 
     void RenderManager::nextFrame() {
         // glfwPollEvents(); called in input manager
-
+        
         if (recreateSwapchain) {
             // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
             // to finish processing.
@@ -260,10 +259,11 @@ namespace Kiki {
         }
     }
 
-    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords) {
+    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords) {
         int posSize = positions.size() * sizeof(float);
         int indSize = indices.size() * sizeof (std::uint32_t);
         int texSize = texCoords.size() * sizeof(float);
+        int normalsSize = normals.size() * sizeof(float);
 
         // Create on GPU vertex buffer
         rutils::Buffer vertexPosGPU = rutils::createBuffer(
@@ -292,6 +292,15 @@ namespace Kiki {
             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
         );
 
+        // Create on GPU normal buffer
+        rutils::Buffer normalsGPU = rutils::createBuffer(
+            allocator,
+            normalsSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
         // Create staging buffers
         rutils::Buffer posStaging = rutils::createBuffer(
             allocator,
@@ -310,6 +319,13 @@ namespace Kiki {
         rutils::Buffer texStaging = rutils::createBuffer(
             allocator,
             texSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer normalsStaging = rutils::createBuffer(
+            allocator,
+            normalsSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
         );
@@ -340,6 +356,15 @@ namespace Kiki {
         }
         std::memcpy(texPtr, texCoords.data(), texSize);
         vmaUnmapMemory(allocator.allocator, texStaging.allocation);
+
+        void* normalsPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, normalsStaging.allocation, &normalsPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(normalsPtr, normals.data(), normalsSize);
+        vmaUnmapMemory(allocator.allocator, normalsStaging.allocation);
 
         // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
         // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
@@ -404,6 +429,21 @@ namespace Kiki {
             VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
         );
 
+        VkBufferCopy ncopy{};
+        ncopy.size = normalsSize;
+
+        vkCmdCopyBuffer(uploadCmd, normalsStaging.buffer, normalsGPU.buffer, 1, &ncopy);
+
+        rutils::bufferBarrier(uploadCmd, normalsGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+            VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
+    
         if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
             throw FatalError( "Ending command buffer recording\n"
                 "vkEndCommandBuffer() returned {}", rutils::toString(res)
@@ -437,7 +477,7 @@ namespace Kiki {
             );
         }
 
-        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
+        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
     Material RenderManager::allocateMaterial(Mtexture textureData) {
@@ -538,7 +578,6 @@ namespace Kiki {
         sceneUBO = {};
 
         descriptorPool = {};
-        objectLayout = {};
         sceneDescriptors = {};
 
         sampler = {};

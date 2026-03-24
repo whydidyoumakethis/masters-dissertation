@@ -30,6 +30,7 @@ namespace Kiki {
     struct Mesh {
         rutils::Buffer positions;
         rutils::Buffer texCoords;
+        rutils::Buffer normals;
         rutils::Buffer indices;
         std::uint32_t vertexCount;
         std::uint32_t indexCount;
@@ -70,7 +71,6 @@ namespace Kiki {
         std::vector<rutils::Fence> frameDone;
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
         rutils::DescriptorPool descriptorPool;
-        rutils::DescriptorSetLayout objectLayout;
         rutils::DescriptorSetLayout materialLayout;
         VkDescriptorSet sceneDescriptors;
 
@@ -87,7 +87,7 @@ namespace Kiki {
         static RenderManager& get();
         void initialise(WindowInfo info = Kiki::WindowInfo{});
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
         Material allocateMaterial(Mtexture materialData);
         
         void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);

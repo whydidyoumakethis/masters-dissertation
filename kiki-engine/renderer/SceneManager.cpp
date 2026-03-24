@@ -18,8 +18,8 @@ namespace Kiki {
         return materials[id];
     }
 
-    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec2> const& texCoords) {
-        std::vector<float> p, t;
+    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords) {
+        std::vector<float> p, t, n;
 
         for (glm::vec3 pos : positions) {
             p.emplace_back(pos.x);
@@ -32,7 +32,13 @@ namespace Kiki {
             t.emplace_back(texCoord.y);
         }
 
-        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, t));
+        for (glm::vec3 norm : normals) {
+            n.emplace_back(norm.x);
+            n.emplace_back(norm.y);
+            n.emplace_back(norm.z);
+        }
+
+        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t));
 
         return meshes.size() - 1;
     }
@@ -63,7 +69,7 @@ namespace Kiki {
         Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, index);
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, mesh.matIndex);
         registry.emplace<TransformComponent>(model);
-        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
 
         if (texture.hastexture) {
             materials.emplace_back(RenderManager::get().allocateMaterial(texture));

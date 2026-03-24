@@ -175,10 +175,10 @@ namespace rutils {
                 ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
 
                 // Bind vertex input
-                VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
-                VkDeviceSize offsets[2]{};
+                VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
+                VkDeviceSize offsets[3]{};
 
-                vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
+                vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
                 vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                 vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
@@ -218,10 +218,10 @@ namespace rutils {
             ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
 
             // Bind vertex input
-            VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
-            VkDeviceSize offsets[2]{};
+            VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
+            VkDeviceSize offsets[3]{};
 
-            vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
+            vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
