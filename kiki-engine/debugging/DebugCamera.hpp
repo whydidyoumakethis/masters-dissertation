@@ -10,7 +10,8 @@ namespace Kiki {
         float speed = 1.7f;
         float speedUp = 5.0f;
         float slowDown = 0.05f;
-        float sensitivity = 0.01f;
+        float sensitivity = 0.75f;
+        float lastX, lastY;
 
         Kiki::InputManager& inputManager = Kiki::InputManager::get();
         entt::registry& registry = World::Get().Registry();

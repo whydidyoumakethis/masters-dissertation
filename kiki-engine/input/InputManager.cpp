@@ -174,4 +174,12 @@ namespace Kiki {
     bool InputManager::isGamepadButtonJustUp(int b) {
         return gamepad.buttonStates[b] == KeyState::JUST_RELEASED;
     }
+
+    void InputManager::disableCursor() {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    }
+
+    void InputManager::enableCursor() {
+        glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+    }
 }

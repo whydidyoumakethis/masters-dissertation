@@ -532,7 +532,7 @@ namespace Kiki {
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
 
         auto& registry = World::Get().Registry();
-        aSceneUniforms.camera = registry.get<TransformComponent>(camera.camera).worldMatrix; //world matrix doesn't work yet
+        aSceneUniforms.camera = glm::inverse(registry.get<TransformComponent>(camera.camera).worldMatrix); //world matrix doesn't work yet
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
     }
