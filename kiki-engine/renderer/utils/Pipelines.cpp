@@ -76,11 +76,11 @@ namespace rutils {
         assemblyInfo->primitiveRestartEnable = VK_FALSE;
     }
 
-    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout) {
+    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout) {
         VkDescriptorSetLayout layouts[] = {
             // Order must match the set = N in the shaders
             sceneLayout, // set 0
-            objectLayout
+            materialLayout
         };
 
         VkPushConstantRange pushRange{};

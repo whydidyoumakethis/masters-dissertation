@@ -175,7 +175,7 @@ namespace rutils {
                 ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
 
                 // Bind vertex input
-                VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
+                VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
                 VkDeviceSize offsets[2]{};
 
                 vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
@@ -218,7 +218,7 @@ namespace rutils {
             ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
 
             // Bind vertex input
-            VkBuffer buffers[2] = { mesh.positions.buffer, mesh.texCoords.buffer };
+            VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
             VkDeviceSize offsets[2]{};
 
             vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
