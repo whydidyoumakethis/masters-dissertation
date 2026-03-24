@@ -48,8 +48,8 @@ namespace rutils {
         return cbuff;
     }
 
-    void recordCommands(VkCommandBuffer aCmdBuff, VkPipeline aGraphicsPipe, VkPipeline alphaPipeline, ImageAndView const& aColorAttach, Image const& aDepthAttach, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkPipelineLayout aGraphicsLayout, VkDescriptorSet aSceneDescriptors, VkDescriptorSet noTexture) {
+    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, VkExtent2D const& aImageExtent, 
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet noTexture) {
 
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -142,9 +142,9 @@ namespace rutils {
         vkCmdBeginRendering( aCmdBuff, &renderInfo );
 
         // Begin drawing with our graphics pipeline
-        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsPipe );
+        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.pbr.handle );
 
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 0, 1, &aSceneDescriptors, 0, nullptr);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
 
         auto& world = World::Get();
         auto& registry = world.Registry();
@@ -159,9 +159,9 @@ namespace rutils {
 
                 if (registry.all_of<MaterialComponent>(e)) {
                     Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
-                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
                 } else {
-                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &noTexture, 0, nullptr);
+                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                 }
 
                 glm::vec3 colour;
@@ -181,7 +181,7 @@ namespace rutils {
                 vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
                 vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-                vkCmdPushConstants(aCmdBuff, aGraphicsLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
                 // Draw mesh
                 vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
@@ -190,8 +190,8 @@ namespace rutils {
             }
         }
 
-        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, alphaPipeline);
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 0, 1, &aSceneDescriptors, 0, nullptr);
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.pbr_alpha.handle);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
 
         // TODO: sort transparent objects
 
@@ -202,9 +202,9 @@ namespace rutils {
 
             if (registry.all_of<MaterialComponent>(e)) {
                 Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &material.descriptorSet, 0, nullptr);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
             } else {
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, aGraphicsLayout, 1, 1, &noTexture, 0, nullptr);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
             }
 
             glm::vec3 colour;
@@ -224,7 +224,7 @@ namespace rutils {
             vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdPushConstants(aCmdBuff, aGraphicsLayout, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
             // Draw mesh
             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);

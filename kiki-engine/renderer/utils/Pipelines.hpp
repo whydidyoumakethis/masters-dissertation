@@ -15,6 +15,24 @@ namespace rutils {
         std::uint32_t padding[3];
     };
 
+    struct Pipelines {
+        rutils::Pipeline pbr;
+        rutils::Pipeline pbr_alpha;
+        rutils::Pipeline deferred_geometry;
+        rutils::Pipeline deferred_geometry_alpha;
+        rutils::Pipeline deferred_lighting;
+    };
+
+    struct PipelineLayouts {
+        PipelineLayout pbrPipelineLayout;
+        PipelineLayout deferredPipelineLayout;
+    };
+
+    Pipelines create_all_pipelines(
+        VulkanWindow const& window,
+        PipelineLayouts const& pipelineLayouts
+    );
+
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);

@@ -44,9 +44,8 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
-            pipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, objectLayout.handle);
-            pipeline = rutils::createPipeline(window, pipelineLayout.handle);
-            alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
+            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, objectLayout.handle);
+            pipelines = rutils::create_all_pipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
             descriptorPool = rutils::createDescriptorPool(window);
@@ -129,8 +128,9 @@ namespace Kiki {
             // Recreate resources
             rutils::recreateSwapchain(window);
 
-            pipeline = rutils::createPipeline(window, pipelineLayout.handle);
-            alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
+            // pipeline = rutils::createPipeline(window, pipelineLayout.handle);
+            // alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
+            rutils::create_all_pipelines(window, pipelineLayouts);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
@@ -215,14 +215,13 @@ namespace Kiki {
 
         rutils::recordCommands(
             commandBuffers[frameIndex],
-            pipeline.handle,
-            alphaPipeline.handle,
+            pipelines,
+            pipelineLayouts,
             colorTarget,
             depthBuffer,
             window.swapchainExtent,
             sceneUBO.buffer,
             sceneUniforms,
-            pipelineLayout.handle,
             sceneDescriptors,
             noTextureDst
         );
@@ -513,9 +512,14 @@ namespace Kiki {
         }
 
         commandPool = {};
-        pipeline = {};
-        alphaPipeline = {};
-        pipelineLayout = {};
+
+        pipelines.pbr = {};
+        pipelines.pbr_alpha = {};
+        pipelines.deferred_geometry = {};
+        pipelines.deferred_geometry_alpha = {};
+
+        pipelineLayouts.pbrPipelineLayout = {};
+        pipelineLayouts.deferredPipelineLayout = {};
 
         depthBuffer = {};
         sceneUBO = {};

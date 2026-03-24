@@ -11,6 +11,7 @@
 #include "utils/Image.hpp"
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
+#include "utils/Pipelines.hpp"
 
 
 #include <glm/glm.hpp>
@@ -38,7 +39,6 @@ namespace Kiki {
         VkDescriptorSet descriptorSet;
     };
 
-
     class RenderManager {
         private:
         RenderManager() = default;
@@ -51,9 +51,14 @@ namespace Kiki {
 
         rutils::VulkanWindow window;
 
-        rutils::PipelineLayout pipelineLayout;
-        rutils::Pipeline pipeline;
-        rutils::Pipeline alphaPipeline;
+        // rutils::PipelineLayout pipelineLayout;
+        // rutils::Pipeline pipeline;
+        // rutils::Pipeline alphaPipeline;
+        rutils::PipelineLayouts pipelineLayouts;
+
+        rutils::Pipelines pipelines;
+        
+
         rutils::CommandPool commandPool;
 
         rutils::Buffer sceneUBO;

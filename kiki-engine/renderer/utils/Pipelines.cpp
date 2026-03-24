@@ -5,6 +5,15 @@
 #include "../../logging/FatalError.hpp"
 
 namespace rutils {
+    Pipelines create_all_pipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
+        Pipelines pipelines;
+
+        pipelines.pbr = createPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
+        pipelines.pbr_alpha = createAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
+
+        return pipelines;
+    }
+
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout objectLayout) {
         VkDescriptorSetLayout layouts[] = {
             // Order must match the set = N in the shaders
