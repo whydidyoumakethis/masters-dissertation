@@ -104,6 +104,9 @@ namespace Kiki {
             glm::mat4 camera;
             glm::mat4 projection;
             glm::mat4 projCam;
+            glm::vec4 lightPos;
+            glm::vec4 lightColour;
+            glm::vec4 cameraPos;
         };
 
         rutils::CommandPool tempTextureCmdPool;

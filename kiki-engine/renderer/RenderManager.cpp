@@ -535,6 +535,10 @@ namespace Kiki {
         aSceneUniforms.camera = glm::inverse(registry.get<TransformComponent>(camera.camera).worldMatrix); //world matrix doesn't work yet
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
+
+		aSceneUniforms.lightPos = glm::vec4(1.f, 0.f, 0.f, 0.f);
+		aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
+		aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
     }
 
     void RenderManager::setCamera(Camera& c) {

@@ -10,7 +10,11 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     mat4 camera;
     mat4 projection;
     mat4 projCam;
+    vec4 lightPos;
+    vec4 lightColour;
+    vec4 cameraPos;
 } uScene;
+
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
