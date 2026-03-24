@@ -442,7 +442,7 @@ namespace Kiki {
 
     Material RenderManager::allocateMaterial(Mtexture textureData) {
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
-        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
 
         VkDescriptorImageInfo textureInfo[2]{};
 
@@ -456,7 +456,7 @@ namespace Kiki {
         textureInfo[1].imageView = roughnessMetalness.view;
         textureInfo[1].sampler = sampler.handle;
 
-        VkDescriptorSet descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, objectLayout.handle);
+        VkDescriptorSet descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
         VkWriteDescriptorSet desc[2]{};
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;

@@ -20,7 +20,8 @@ namespace Kiki {
         void clearLevel();
         void shutdown();
 
-        void loadModel(const std::string modelName);
+        void loadModel(const std::string modelName, int index = 0);
+        void loadScene(const std::string sceneName);
 
         private:
         SceneManager() = default;

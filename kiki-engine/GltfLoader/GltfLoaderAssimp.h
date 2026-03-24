@@ -17,6 +17,7 @@ struct Mmesh {
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
+	int matIndex;
 };
 
 struct RGBA {
@@ -48,7 +49,7 @@ struct Mtexture {
 namespace Kiki {
 	class GltfLoaderAssimp {
 	public:
-		static Mmesh loadMesh(const std::filesystem::path& path) {
+		static Mmesh loadMesh(const std::filesystem::path& path, int index) {
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -56,10 +57,11 @@ namespace Kiki {
 			}
 
 			Mmesh out{};
-			aiMesh* mesh = scene->mMeshes[0]; // For simplicity, we only load the first mesh
+			aiMesh* mesh = scene->mMeshes[index]; // For simplicity, we only load the first mesh
 			out.vertices.reserve(mesh->mNumVertices);
 			out.normals.reserve(mesh->mNumVertices);
 			out.uvs.reserve(mesh->mNumVertices);
+			out.matIndex = mesh->mMaterialIndex;
 			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
 				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
@@ -78,7 +80,7 @@ namespace Kiki {
 			return out;
 		}
 
-		static Mtexture loadTexture(const std::filesystem::path& path) {
+		static Mtexture loadTexture(const std::filesystem::path& path, int index) {
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -86,8 +88,18 @@ namespace Kiki {
 			}
 			if (scene->HasTextures() == false) return Mtexture(false);
 
-			const aiTexture* texture = scene->mTextures[0]; // For simplicity, we only load the first texture
-			const aiTexture* rough = scene->mTextures[1]; // For simplicity, we only load the first texture
+			const aiMaterial* mat = scene->mMaterials[index];
+			aiString textureName;// = scene->mTextures[0]; // For simplicity, we only load the first texture
+			aiString roughName;// = scene->mTextures[1]; // For simplicity, we only load the first texture
+			mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
+			mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
+
+			std::cout << textureName.C_Str() << " ~ " << roughName.C_Str() << std::endl;
+
+			int i = std::stoi(textureName.C_Str() + 1);
+			int j = std::stoi(roughName.C_Str() + 1);
+			const aiTexture* texture = scene->mTextures[i];
+			const aiTexture* rough = scene->mTextures[j];
 			
 			stbi_set_flip_vertically_on_load(1);
 			Mtexture out{};
