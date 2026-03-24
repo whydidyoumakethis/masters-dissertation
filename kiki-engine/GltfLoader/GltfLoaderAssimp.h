@@ -94,8 +94,6 @@ namespace Kiki {
 			mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
 			mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
 
-			std::cout << textureName.C_Str() << " ~ " << roughName.C_Str() << std::endl;
-
 			int i = std::stoi(textureName.C_Str() + 1);
 			int j = std::stoi(roughName.C_Str() + 1);
 			const aiTexture* texture = scene->mTextures[i];
