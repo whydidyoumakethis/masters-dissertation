@@ -176,9 +176,9 @@ namespace rutils {
 
                 // Bind vertex input
                 VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-                VkDeviceSize offsets[2]{};
+                VkDeviceSize offsets[3]{};
 
-                vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
+                vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
                 vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                 vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
@@ -219,9 +219,9 @@ namespace rutils {
 
             // Bind vertex input
             VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-            VkDeviceSize offsets[2]{};
+            VkDeviceSize offsets[3]{};
 
-            vkCmdBindVertexBuffers(aCmdBuff, 0, 2, buffers, offsets);
+            vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
