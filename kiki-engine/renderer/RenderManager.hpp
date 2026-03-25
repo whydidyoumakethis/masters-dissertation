@@ -92,9 +92,10 @@ namespace Kiki {
         static RenderManager& get();
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
-        Material allocateMaterial(Mtexture materialData);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});
+        Material allocateMaterial(const Mtexture& materialData);
+        
         void nextFrame();
         void shutdown();
 
