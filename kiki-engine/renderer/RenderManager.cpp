@@ -12,6 +12,7 @@
 #include "SceneManager.hpp"
 
 #include <iostream>
+#include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -487,6 +488,33 @@ namespace Kiki {
 
     void RenderManager::setCamera(Camera& c) {
         camera = c;
+    }
+
+    void RenderManager::setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info) {
+        info.Instance = window.instance;
+        info.PhysicalDevice = window.physicalDevice;
+        info.Device = window.device;
+        info.QueueFamily = window.presentFamilyIndex;
+        info.Queue = window.presentQueue;
+        info.PipelineCache = nullptr;
+        info.DescriptorPool = descriptorPool.handle;
+        info.MinImageCount = 2;
+        info.ImageCount = 2;
+        info.Allocator = nullptr;
+        info.UseDynamicRendering = true;
+        info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
+        info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &window.swapchainFormat;
+        info.PipelineInfoMain.RenderPass = nullptr;
+        info.PipelineInfoMain.Subpass = 0;
+        info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        info.CheckVkResultFn = [](VkResult err) {
+            if (err == 0)
+                return;
+            spdlog::error("DebugInterface Vulkan Error: {}", rutils::toString(err));
+            if (err < 0) 
+                abort();
+        };
     }
 
     void RenderManager::shutdown() {
