@@ -309,11 +309,6 @@ namespace rutils {
         //     vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
         // }
 
-#       ifndef NDEBUG
-        ImGui::Render();
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
-#       endif
-
         // End rendering
         vkCmdEndRendering(aCmdBuff);
 
@@ -415,6 +410,12 @@ namespace rutils {
 
 		vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
 		vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+#       ifndef NDEBUG
+        ImGui::Render();
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
+#       endif
+
 		vkCmdEndRendering(aCmdBuff);
 
         // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
