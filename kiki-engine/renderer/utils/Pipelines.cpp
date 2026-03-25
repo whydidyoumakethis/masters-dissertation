@@ -4,12 +4,17 @@
 #include "Shaders.hpp"
 #include "../../logging/FatalError.hpp"
 
+#include <print>
+
 namespace rutils {
     Pipelines create_all_pipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
         Pipelines pipelines;
 
         pipelines.pbr = createPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.pbr_alpha = createAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
+        pipelines.deferred_geometry = createDeferredGeometryPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
+        // pipelines.deferred_geometry_alpha = createDeferredGeometryAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
+        pipelines.deferred_lighting = createDeferredLightingPipeline(window, pipelineLayouts.deferredPipelineLayout.handle);
 
         return pipelines;
     }
@@ -127,15 +132,30 @@ namespace rutils {
 
         // Define shader stages in the pipeline
         VkPipelineShaderStageCreateInfo stages[2]{};
+        // stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        // stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        // stages[0].pName = "main";
+        // stages[0].pNext = &code[0];
+
+        // stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        // stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        // stages[1].pName = "main";
+        // stages[1].pNext = &code[1];
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(window.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(window.device, &code[1], nullptr, &fragModule);
+
         stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
         stages[0].pName = "main";
-        stages[0].pNext = &code[0];
 
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
         stages[1].pName = "main";
-        stages[1].pNext = &code[1];
 
         VkVertexInputBindingDescription vertexInputs[3]{};
         VkVertexInputAttributeDescription vertexAttributes[3]{};
@@ -353,7 +373,7 @@ namespace rutils {
     }
 
 
-    Pipeline create_deferred_geometry_pipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+    Pipeline createDeferredGeometryPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
         auto const vertSpirV = rutils::loadShader("shaders/compiled/default.vert.spv");
@@ -466,13 +486,13 @@ namespace rutils {
 
         VkPipeline pipe = VK_NULL_HANDLE;
         if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
-            throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+            throw Kiki::FatalError("Unable to create deferred pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
         }
 
         return Pipeline(aWindow.device, pipe);
     }
 
-    Pipeline create_deferred_geometry_alpha_pipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+    Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
         auto const vertSpirV = rutils::loadShader("shaders/compiled/default.vert.spv");
@@ -601,7 +621,7 @@ namespace rutils {
         return Pipeline(aWindow.device, pipe);
     }
 
-    Pipeline create_deferred_lighting_pipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+    Pipeline createDeferredLightingPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
         auto const vertSpirV = rutils::loadShader("shaders/compiled/fullscreen.vert.spv");

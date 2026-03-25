@@ -60,6 +60,7 @@ namespace Kiki {
         rutils::PipelineLayouts pipelineLayouts;
 
         rutils::Pipelines pipelines;
+        rutils::DescriptorSetLayout gBufferLayout;
         
 
         rutils::CommandPool commandPool;

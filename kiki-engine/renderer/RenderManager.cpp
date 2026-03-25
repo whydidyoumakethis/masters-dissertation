@@ -32,6 +32,7 @@ namespace Kiki {
             // Initialise resources
             rutils::DescriptorSetLayout sceneLayout = rutils::createSceneDescriptorLayout(window);
             materialLayout = rutils::createMaterialDescriptorLayout(window);
+            gBufferLayout = rutils::createGBufferDescriptorLayout(window);
             allocator = rutils::createAllocator(window);
 
             sampler = rutils::createSampler(window);
@@ -45,6 +46,7 @@ namespace Kiki {
             );
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
+            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
             pipelines = rutils::create_all_pipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 

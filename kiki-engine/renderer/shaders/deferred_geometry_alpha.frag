@@ -7,9 +7,8 @@ layout(location = 1) in vec3 v2fNormal;
 layout(location = 2) in vec3 v2fWorldSpace;
 
 layout(set = 1, binding = 0) uniform sampler2D uTexColor;
-layout(set = 1, binding = 1) uniform sampler2D uTexRoughness;
-layout(set = 1, binding = 2) uniform sampler2D uTexMetalness;
-layout(set = 1, binding = 3) uniform sampler2D uTexAlphaMask;
+layout(set = 1, binding = 1) uniform sampler2D uTexRoughnessMetalness;
+layout(set = 1, binding = 2) uniform sampler2D uTexAlphaMask;
 
 layout(location = 0) out vec4 gTexColour;
 layout(location = 1) out vec4 gNormal;
@@ -24,8 +23,8 @@ void main()
     }
 
     // Beckman roughness = roughness^2
-    float roughness = pow(texture(uTexRoughness, v2fTexCoord).r, 2.f);
-    float metalness = texture(uTexMetalness, v2fTexCoord).r;
+    float roughness = pow(texture(uTexRoughnessMetalness, v2fTexCoord).g, 2.f);
+    float metalness = texture(uTexRoughnessMetalness, v2fTexCoord).b;
     vec3 baseColour = texture(uTexColor, v2fTexCoord).rgb;
     vec3 normal = normalize(v2fNormal);
 
