@@ -49,7 +49,7 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet noTexture) {
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture) {
 
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -109,24 +109,81 @@ namespace rutils {
             VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 }
         );
 
-        // Begin rendering
-        VkRenderingAttachmentInfo colorAttach[1]{};
-        colorAttach[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        colorAttach[0].imageView = aColorAttach.view;
-        colorAttach[0].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-        colorAttach[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        colorAttach[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-        colorAttach[0].clearValue.color.float32[0] = 0.1f;
-        colorAttach[0].clearValue.color.float32[1] = 0.1f;
-        colorAttach[0].clearValue.color.float32[2] = 0.1f;
-        colorAttach[0].clearValue.color.float32[3] = 1.f;
+        rutils::imageBarrier(aCmdBuff, gbuffers.textureColour.image,
+			// before
+			VK_PIPELINE_STAGE_2_NONE,
+			VK_ACCESS_2_NONE,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			// after
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		);
+	
+		rutils::imageBarrier(aCmdBuff, gbuffers.normals.image,
+			// before
+			VK_PIPELINE_STAGE_2_NONE,
+			VK_ACCESS_2_NONE,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			// after
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		);
+	
+		rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
+			// before
+			VK_PIPELINE_STAGE_2_NONE,
+			VK_ACCESS_2_NONE,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			// after
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		);
+
+		// begin rendering
+		VkRenderingAttachmentInfo gBufferAttachments[3]{};
+
+		// texture colour
+		gBufferAttachments[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		gBufferAttachments[0].imageView = gbuffers.textureColour.view;
+		gBufferAttachments[0].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+		gBufferAttachments[0].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		gBufferAttachments[0].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		gBufferAttachments[0].clearValue.color.float32[0] = 0.1f;
+		gBufferAttachments[0].clearValue.color.float32[1] = 0.1f;
+		gBufferAttachments[0].clearValue.color.float32[2] = 0.1f;
+		gBufferAttachments[0].clearValue.color.float32[3] = 1.f;
+
+		// normals
+		gBufferAttachments[1].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		gBufferAttachments[1].imageView = gbuffers.normals.view;
+		gBufferAttachments[1].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+		gBufferAttachments[1].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		gBufferAttachments[1].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		gBufferAttachments[1].clearValue.color.float32[0] = 1.f;
+		gBufferAttachments[1].clearValue.color.float32[1] = 1.f;
+		gBufferAttachments[1].clearValue.color.float32[2] = 1.f;
+		gBufferAttachments[1].clearValue.color.float32[3] = 0.f;
+
+		// roughness and metalness
+		gBufferAttachments[2].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		gBufferAttachments[2].imageView = gbuffers.roughnessMetalness.view;
+		gBufferAttachments[2].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+		gBufferAttachments[2].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		gBufferAttachments[2].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		gBufferAttachments[2].clearValue.color.float32[0] = 0.f;
+		gBufferAttachments[2].clearValue.color.float32[1] = 0.f;
+		gBufferAttachments[2].clearValue.color.float32[2] = 0.f;
+		gBufferAttachments[2].clearValue.color.float32[3] = 0.f;
 
         VkRenderingAttachmentInfo depthAttach{};
         depthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depthAttach.imageView = aDepthAttach.view;
         depthAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
         depthAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-        depthAttach.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+        depthAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
         depthAttach.clearValue.depthStencil.depth = 1.f;
   
         VkRenderingInfo renderInfo{};
@@ -135,14 +192,14 @@ namespace rutils {
         renderInfo.renderArea.offset = VkOffset2D{ 0, 0 };
         renderInfo.renderArea.extent = aImageExtent;
 
-        renderInfo.colorAttachmentCount = 1;
-        renderInfo.pColorAttachments = colorAttach;
+        renderInfo.colorAttachmentCount = 3;
+        renderInfo.pColorAttachments = gBufferAttachments;
         renderInfo.pDepthAttachment = &depthAttach;
 
         vkCmdBeginRendering( aCmdBuff, &renderInfo );
 
         // Begin drawing with our graphics pipeline
-        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.pbr.handle );
+        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry.handle );
 
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
 
@@ -190,48 +247,137 @@ namespace rutils {
             }
         }
 
-        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.pbr_alpha.handle);
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+        // vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry_alpha.handle);
+        // vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
 
-        // TODO: sort transparent objects
+        // // TODO: sort transparent objects
 
-        for (auto e : transparent) {
-            Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
-            TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
-            TransformComponent const& transform = registry.get<TransformComponent>(e);
+        // for (auto e : transparent) {
+        //     Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
+        //     TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
+        //     TransformComponent const& transform = registry.get<TransformComponent>(e);
 
-            if (registry.all_of<MaterialComponent>(e)) {
-                Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
-            } else {
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
-            }
+        //     if (registry.all_of<MaterialComponent>(e)) {
+        //         Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
+        //         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
+        //     } else {
+        //         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
+        //     }
 
-            glm::vec3 colour;
+        //     glm::vec3 colour;
 
-            if (registry.all_of<ColourComponent>(e)) {
-                colour = registry.get<ColourComponent>(e).colour;
-            } else {
-                colour = glm::vec3(0.3f, 0.3f, 0.3f);
-            }
+        //     if (registry.all_of<ColourComponent>(e)) {
+        //         colour = registry.get<ColourComponent>(e).colour;
+        //     } else {
+        //         colour = glm::vec3(0.3f, 0.3f, 0.3f);
+        //     }
 
-            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
+        //     ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
 
-            // Bind vertex input
-            VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-            VkDeviceSize offsets[3]{};
+        //     // Bind vertex input
+        //     VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
+        //     VkDeviceSize offsets[3]{};
 
-            vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
-            vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+        //     vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
+        //     vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+        //     vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
-            // Draw mesh
-            vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
-        }
+        //     // Draw mesh
+        //     vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+        // }
 
         // End rendering
         vkCmdEndRendering(aCmdBuff);
+
+		// deferred lighting pass
+
+		// ensure g buffer images are in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		rutils::imageBarrier(aCmdBuff, gbuffers.textureColour.image,
+			// before
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			// after
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		);
+	
+		rutils::imageBarrier(aCmdBuff, gbuffers.normals.image,
+			// before
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			// after
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		);
+	
+		rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
+			// before
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			// after
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		);
+
+
+		rutils::imageBarrier(aCmdBuff, aDepthAttach.image,
+			// before
+			VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+			VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+			// after
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			// which part
+			VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1}
+		);
+
+        VkRenderingAttachmentInfo lightingAttach{};
+		lightingAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		lightingAttach.imageView = aColorAttach.view;
+		lightingAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+		lightingAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		lightingAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		lightingAttach.clearValue.color.float32[0] = 0.f;
+		lightingAttach.clearValue.color.float32[1] = 0.f;
+		lightingAttach.clearValue.color.float32[2] = 0.f;
+		lightingAttach.clearValue.color.float32[3] = 1.f;
+
+		VkRenderingAttachmentInfo depthAttachLighting{};
+		depthAttachLighting.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		depthAttachLighting.imageView = aDepthAttach.view;
+		depthAttachLighting.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+
+		VkRenderingInfo lightingInfo{};
+		lightingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+		lightingInfo.layerCount = 1;
+		lightingInfo.renderArea.offset = VkOffset2D{0, 0};
+		lightingInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+		lightingInfo.colorAttachmentCount = 1;
+		lightingInfo.pColorAttachments = &lightingAttach;
+
+		vkCmdBeginRendering(aCmdBuff, &lightingInfo);
+
+		// draw fullscreen quad
+		vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_lighting.handle);
+
+		VkDescriptorSet sets[] = {
+			aSceneDescriptors,
+			deferredLightingDescriptors
+		};
+
+		vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
+		vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+		vkCmdEndRendering(aCmdBuff);
 
         // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
         imageBarrier( aCmdBuff, aColorAttach.image,

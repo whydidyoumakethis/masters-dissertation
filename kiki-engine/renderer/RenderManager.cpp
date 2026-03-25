@@ -57,7 +57,7 @@ namespace Kiki {
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
-	        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
 
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
@@ -137,7 +137,7 @@ namespace Kiki {
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
             gbuffers = rutils::createAllGBufferImages(window, allocator);
-	        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
 
             recreateSwapchain = false;
         }
@@ -231,6 +231,7 @@ namespace Kiki {
             sceneUBO.buffer,
             sceneUniforms,
             sceneDescriptors,
+            deferredLightingDescriptors,
             noTextureDst
         );
 
@@ -544,9 +545,9 @@ namespace Kiki {
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
-		aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
-		aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
-		aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
+        aSceneUniforms.lightPos = glm::vec4(0.f, -10.f, 0.f, 0.f);
+        aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
+        aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
     }
 
     void RenderManager::setCamera(Camera& c) {
@@ -559,6 +560,9 @@ namespace Kiki {
         SceneManager::get().shutdown();
         noTextureDst = {};
         noTexture = {};
+
+        gbuffers = {};
+        depthBuffer = {};
 
         tempTextureCmdPool = {};
 

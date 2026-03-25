@@ -25,6 +25,7 @@ namespace rutils {
 		VkBuffer aSceneUBO,
 		Kiki::RenderManager::SceneUniform const&,
 		VkDescriptorSet aSceneDescriptors,
+		VkDescriptorSet deferredLightingDescriptors,
 		VkDescriptorSet noTexture
 	);
 

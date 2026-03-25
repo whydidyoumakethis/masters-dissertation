@@ -707,7 +707,7 @@ namespace rutils {
         VkFormat const colorFormats[] = {aWindow.swapchainFormat};
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachmentFormats = colorFormats;
-        renderingInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
         // create pipeline
         VkGraphicsPipelineCreateInfo pipeInfo{};
