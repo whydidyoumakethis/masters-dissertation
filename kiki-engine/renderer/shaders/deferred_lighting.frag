@@ -33,7 +33,7 @@ vec3 reconstructWorldPos(vec2 uv) {
     ndc.y = (uv.y * 2.f) - 1.f;
 
     // use depth for Z
-    ndc.z = (depth * 2.f) - 1.f;
+    ndc.z = depth;
 
     // transform to world space
     vec4 worldPos = inverse(uScene.projCam) * vec4(ndc, 1.f);
@@ -79,7 +79,7 @@ void main()
     // half vector from the light and view directions
     vec3 halfVector = normalize(lightDirection + viewDirection);
 
-    float nDotLPos = max(dot(normal, lightDirection), 0.f);
+    float nDotLPos = max(dot(normal, lightDirection), 0.05f);
 
     vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
     vec3 lighting =  brdfResult * lightColour * nDotLPos;
@@ -87,5 +87,5 @@ void main()
     vec3 finalColour = emissive + ambient(sceneAmbient, baseColour) + lighting;
     finalColour = clamp(finalColour, 0.f, 1.f);
 
-    oColor = vec4(finalColour, 1.f);
+    oColor = vec4(finalColour, 1.0);
 }
