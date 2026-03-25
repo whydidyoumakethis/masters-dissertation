@@ -48,7 +48,7 @@ namespace rutils {
         return cbuff;
     }
 
-    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, VkExtent2D const& aImageExtent, 
+    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
         VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet noTexture) {
 
         // Begin recording commands

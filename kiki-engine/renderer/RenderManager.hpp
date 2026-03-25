@@ -62,6 +62,7 @@ namespace Kiki {
         rutils::Pipelines pipelines;
         rutils::DescriptorSetLayout gBufferLayout;
         
+        rutils::GBuffers gbuffers;
 
         rutils::CommandPool commandPool;
 
@@ -72,8 +73,11 @@ namespace Kiki {
         std::vector<rutils::Fence> frameDone;
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
         rutils::DescriptorPool descriptorPool;
+
+        rutils::DescriptorSetLayout sceneLayout;
         rutils::DescriptorSetLayout materialLayout;
         VkDescriptorSet sceneDescriptors;
+        VkDescriptorSet deferredLightingDescriptors;
 
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
@@ -86,12 +90,11 @@ namespace Kiki {
 
         public:
         static RenderManager& get();
-        void initialise(WindowInfo info = Kiki::WindowInfo{});
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
         Material allocateMaterial(Mtexture materialData);
-        
-        void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
+
+        void initialise(WindowInfo info = Kiki::WindowInfo{});
         void nextFrame();
         void shutdown();
 

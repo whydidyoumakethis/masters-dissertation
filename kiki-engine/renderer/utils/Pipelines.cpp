@@ -7,7 +7,7 @@
 #include <print>
 
 namespace rutils {
-    Pipelines create_all_pipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
+    Pipelines createAllPipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
         Pipelines pipelines;
 
         pipelines.pbr = createPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);

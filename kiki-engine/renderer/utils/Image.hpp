@@ -30,6 +30,12 @@ namespace rutils {
 			VmaAllocator mAllocator = VK_NULL_HANDLE;
 	};
 
+	struct GBuffers {
+		rutils::Image textureColour;
+		rutils::Image normals;
+		rutils::Image roughnessMetalness;
+	};
+
 	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&);
 
 	Image createImageTexture(Allocator const&, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat, VulkanWindow const& window, VkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
@@ -39,6 +45,8 @@ namespace rutils {
 	std::uint32_t computeMipLevelCount(std::uint32_t aWidth, std::uint32_t aHeight);
 
 	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator);
+	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator);
+	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format);
 }
 
 #endif
