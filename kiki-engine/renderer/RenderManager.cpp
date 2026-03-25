@@ -12,6 +12,7 @@
 #include "SceneManager.hpp"
 
 #include <iostream>
+#include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
@@ -30,7 +31,7 @@ namespace Kiki {
             window = rutils::makeVulkanWindow(info);
 
             // Initialise resources
-            rutils::DescriptorSetLayout sceneLayout = rutils::createSceneDescriptorLayout(window);
+            sceneLayout = rutils::createSceneDescriptorLayout(window);
             materialLayout = rutils::createMaterialDescriptorLayout(window);
             gBufferLayout = rutils::createGBufferDescriptorLayout(window);
             allocator = rutils::createAllocator(window);
@@ -47,31 +48,37 @@ namespace Kiki {
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
-            pipelines = rutils::create_all_pipelines(window, pipelineLayouts);
+            pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
             descriptorPool = rutils::createDescriptorPool(window);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
 
+            gbuffers = rutils::createAllGBufferImages(window, allocator);
+
+            deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
+
+
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
-            VkWriteDescriptorSet desc[1]{};
+            VkWriteDescriptorSet sceneDesc[1]{};
 
             VkDescriptorBufferInfo sceneUboInfo{};
             sceneUboInfo.buffer = sceneUBO.buffer;
             sceneUboInfo.range = VK_WHOLE_SIZE;
 
-            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-            desc[0].dstSet = sceneDescriptors;
-            desc[0].dstBinding = 0;
-            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-            desc[0].descriptorCount = 1;
-            desc[0].pBufferInfo = &sceneUboInfo;
+            sceneDesc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            sceneDesc[0].dstSet = sceneDescriptors;
+            sceneDesc[0].dstBinding = 0;
+            sceneDesc[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            sceneDesc[0].descriptorCount = 1;
+            sceneDesc[0].pBufferInfo = &sceneUboInfo;
 
 
-            constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
-            vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
+            constexpr auto sceneNumSets = sizeof(sceneDesc)/sizeof(sceneDesc[0]);
+            vkUpdateDescriptorSets( window.device, sceneNumSets, sceneDesc, 0, nullptr );
 
 
             for (std::size_t i = 0; i < window.swapImages.size(); i++) {
@@ -94,29 +101,23 @@ namespace Kiki {
         
             noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
-            {
-                VkWriteDescriptorSet desc[1]{};
+            VkWriteDescriptorSet desc[1]{};
 
-                VkDescriptorImageInfo textureInfo{};
-                textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-                textureInfo.imageView = noTexture.view;
-                textureInfo.sampler = sampler.handle;
+            VkDescriptorImageInfo textureInfo{};
+            textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            textureInfo.imageView = noTexture.view;
+            textureInfo.sampler = sampler.handle;
 
-                desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-                desc[0].dstSet = noTextureDst;
-                desc[0].dstBinding = 0;
-                desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-                desc[0].descriptorCount = 1;
-                desc[0].pImageInfo = &textureInfo;
+            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[0].dstSet = noTextureDst;
+            desc[0].dstBinding = 0;
+            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[0].descriptorCount = 1;
+            desc[0].pImageInfo = &textureInfo;
 
-                constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
-                vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
-            }
+            constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
+            vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
         }
-    }
-
-    void RenderManager::draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix) {
-
     }
 
     void RenderManager::nextFrame() {
@@ -132,10 +133,13 @@ namespace Kiki {
 
             // pipeline = rutils::createPipeline(window, pipelineLayout.handle);
             // alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
-            rutils::create_all_pipelines(window, pipelineLayouts);
+            rutils::createAllPipelines(window, pipelineLayouts);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
+            gbuffers = rutils::createAllGBufferImages(window, allocator);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
+
             recreateSwapchain = false;
         }
 
@@ -223,10 +227,12 @@ namespace Kiki {
             pipelineLayouts,
             colorTarget,
             depthBuffer,
+            gbuffers,
             window.swapchainExtent,
             sceneUBO.buffer,
             sceneUniforms,
             sceneDescriptors,
+            deferredLightingDescriptors,
             noTextureDst
         );
 
@@ -540,13 +546,40 @@ namespace Kiki {
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
-		aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
-		aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
-		aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
+        aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
+        aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
+        aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
     }
 
     void RenderManager::setCamera(Camera& c) {
         camera = c;
+    }
+
+    void RenderManager::setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info) {
+        info.Instance = window.instance;
+        info.PhysicalDevice = window.physicalDevice;
+        info.Device = window.device;
+        info.QueueFamily = window.presentFamilyIndex;
+        info.Queue = window.presentQueue;
+        info.PipelineCache = nullptr;
+        info.DescriptorPool = descriptorPool.handle;
+        info.MinImageCount = 2;
+        info.ImageCount = 2;
+        info.Allocator = nullptr;
+        info.UseDynamicRendering = true;
+        info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
+        info.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+        info.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &window.swapchainFormat;
+        info.PipelineInfoMain.RenderPass = nullptr;
+        info.PipelineInfoMain.Subpass = 0;
+        info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+        info.CheckVkResultFn = [](VkResult err) {
+            if (err == 0)
+                return;
+            spdlog::error("DebugInterface Vulkan Error: {}", rutils::toString(err));
+            if (err < 0) 
+                abort();
+        };
     }
 
     void RenderManager::shutdown() {
@@ -555,6 +588,9 @@ namespace Kiki {
         SceneManager::get().shutdown();
         noTextureDst = {};
         noTexture = {};
+
+        gbuffers = {};
+        depthBuffer = {};
 
         tempTextureCmdPool = {};
 

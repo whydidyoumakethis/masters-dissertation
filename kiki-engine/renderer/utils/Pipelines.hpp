@@ -28,7 +28,7 @@ namespace rutils {
         PipelineLayout deferredPipelineLayout;
     };
 
-    Pipelines create_all_pipelines(
+    Pipelines createAllPipelines(
         VulkanWindow const& window,
         PipelineLayouts const& pipelineLayouts
     );

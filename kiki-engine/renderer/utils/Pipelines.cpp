@@ -7,7 +7,7 @@
 #include <print>
 
 namespace rutils {
-    Pipelines create_all_pipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
+    Pipelines createAllPipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
         Pipelines pipelines;
 
         pipelines.pbr = createPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
@@ -429,7 +429,7 @@ namespace rutils {
         samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
         // define blend state
-        VkPipelineColorBlendAttachmentState blendStates[3]{};
+        VkPipelineColorBlendAttachmentState blendStates[4]{};
         blendStates[0].blendEnable = VK_FALSE;
         blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
@@ -439,10 +439,13 @@ namespace rutils {
         blendStates[2].blendEnable = VK_FALSE;
         blendStates[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+        blendStates[3].blendEnable = VK_FALSE;
+        blendStates[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
         VkPipelineColorBlendStateCreateInfo blendInfo{};
         blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         blendInfo.logicOpEnable = VK_FALSE;
-        blendInfo.attachmentCount = 3;
+        blendInfo.attachmentCount = 4;
         blendInfo.pAttachments = blendStates;
 
         VkPipelineDepthStencilStateCreateInfo depthInfo{};
@@ -458,8 +461,8 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[3] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM};
-        renderingInfo.colorAttachmentCount = 3;
+        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+        renderingInfo.colorAttachmentCount = 4;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
@@ -549,7 +552,7 @@ namespace rutils {
 
         // define blend state
         // we define one blend state per colour attachment
-        VkPipelineColorBlendAttachmentState blendStates[3]{};
+        VkPipelineColorBlendAttachmentState blendStates[4]{};
         blendStates[0].blendEnable = VK_FALSE;
         blendStates[0].colorBlendOp = VK_BLEND_OP_ADD;
         blendStates[0].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -568,10 +571,16 @@ namespace rutils {
         blendStates[2].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         blendStates[2].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+        blendStates[3].blendEnable = VK_FALSE;
+        blendStates[3].colorBlendOp = VK_BLEND_OP_ADD;
+        blendStates[3].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
+        blendStates[3].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
+        blendStates[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
         VkPipelineColorBlendStateCreateInfo blendInfo{};
         blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         blendInfo.logicOpEnable = VK_FALSE;
-        blendInfo.attachmentCount = 3;
+        blendInfo.attachmentCount = 4;
         blendInfo.pAttachments = blendStates;
 
         VkPipelineDepthStencilStateCreateInfo depthInfo{};
@@ -587,8 +596,8 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[3] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM};
-        renderingInfo.colorAttachmentCount = 3;
+        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+        renderingInfo.colorAttachmentCount = 4;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
@@ -707,7 +716,7 @@ namespace rutils {
         VkFormat const colorFormats[] = {aWindow.swapchainFormat};
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachmentFormats = colorFormats;
-        renderingInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
         // create pipeline
         VkGraphicsPipelineCreateInfo pipeInfo{};
