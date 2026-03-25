@@ -145,6 +145,43 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(assimp)
 
+# ImGui
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY "https://github.com/ocornut/imgui.git"
+    GIT_TAG "6c754ed2cb483488cf728a0d80f0152cbcb5eeb8"
+)
+
+FetchContent_GetProperties(imgui)
+if(NOT imgui_POPULATED)
+    FetchContent_Populate(imgui)
+
+    # Define which source files to compile
+    add_library(imgui STATIC
+        ${imgui_SOURCE_DIR}/imgui.cpp
+        ${imgui_SOURCE_DIR}/imgui_draw.cpp
+        ${imgui_SOURCE_DIR}/imgui_tables.cpp
+        ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+        ${imgui_SOURCE_DIR}/imgui_demo.cpp
+        # Include the specific backends your engine uses
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+        ${imgui_SOURCE_DIR}/backends/imgui_impl_vulkan.cpp
+    )
+
+    # Set the include directories so #include <imgui.h> works everywhere
+    target_include_directories(imgui PUBLIC 
+        ${imgui_SOURCE_DIR} 
+        ${imgui_SOURCE_DIR}/backends
+    )
+
+    # Link backends to their respective requirements
+    # 'volk' and 'glfw' must be defined before this point
+    target_link_libraries(imgui PUBLIC volk glfw)
+    
+    # If using volk (Vulkan Loader), ImGui needs this definition
+    target_compile_definitions(imgui PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+endif()
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
@@ -158,6 +195,7 @@ target_link_libraries(KikiDeps INTERFACE
     fastgltf::fastgltf
     assimp::assimp
     Jolt
+    imgui
 )
 
 target_include_directories(KikiDeps INTERFACE 
