@@ -31,6 +31,8 @@ struct Mtexture {
 	stbi_uc* roughness = nullptr;
 	int width = 0;
 	int height = 0;
+	int roughWidth = 0;
+	int roughHeight = 0;
 	int channels = 0;
 	std::string name;
 	bool hasTransparency() const {
@@ -65,6 +67,8 @@ struct Mtexture {
 		roughness(other.roughness),
 		width(other.width),
 		height(other.height),
+		roughWidth(other.roughWidth),
+		roughHeight(other.roughHeight),
 		channels(other.channels),
 		name(std::move(other.name))
 	{
@@ -84,6 +88,8 @@ struct Mtexture {
 			roughness = other.roughness;
 			width = other.width;
 			height = other.height;
+			roughWidth = other.roughWidth;
+			roughHeight = other.roughHeight;
 			channels = other.channels;
 			name = std::move(other.name);
 
@@ -247,9 +253,9 @@ namespace Kiki {
 				if (roughName.length > 0) {
 					int j = std::stoi(roughName.C_Str() + 1);
 					const aiTexture* aiTexture = scene->mTextures[j];
-					texture.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.width, &texture.height, &texture.channels, 4);
+					texture.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
 				} else {
-					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.width, &texture.height, &texture.channels, 4);
+					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.roughWidth, &texture.roughWidth, &texture.channels, 4);
 				}
 				out.textures.push_back(std::move(texture));
 			}

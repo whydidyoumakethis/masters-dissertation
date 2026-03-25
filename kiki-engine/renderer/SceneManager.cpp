@@ -85,19 +85,19 @@ namespace Kiki {
     }
 
 
-    void SceneManager::loadScene(Mscene scene) {
+    void SceneManager::loadScene(const Mscene& scene) {
         // TEMP SOLUTION
 
         for (int i = 0; i < scene.meshes.size(); i++) {
            auto model = World::Get().CreateEntity();
             auto& registry = World::Get().Registry();
             Mmesh mesh = scene.meshes[i];
-            Mtexture& texture = scene.textures[mesh.matIndex];
+            const Mtexture& texture = scene.textures[mesh.matIndex];
             registry.emplace<TransformComponent>(model);
             registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
             if (texture.hastexture) {
                 materials.emplace_back(RenderManager::get().allocateMaterial(texture));
-				int id = mesh.matIndex;
+				int id = materials.size() - 1;
                 registry.emplace<MaterialComponent>(model, id);
             }
             registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
