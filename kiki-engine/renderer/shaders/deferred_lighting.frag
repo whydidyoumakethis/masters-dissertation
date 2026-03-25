@@ -24,6 +24,24 @@ layout(set = 1, binding = 4) uniform sampler2D gDepth;
 
 layout(location = 0) out vec4 oColor;
 
+vec3 reconstructWorldPos(vec2 uv) {
+    float depth = texture(gDepth, uv).r;
+
+    // texture coords to normalised device coords
+    vec3 ndc;
+    ndc.x = (uv.x * 2.f) - 1.f;
+    ndc.y = (uv.y * 2.f) - 1.f;
+
+    // use depth for Z
+    ndc.z = (depth * 2.f) - 1.f;
+
+    // transform to world space
+    vec4 worldPos = inverse(uScene.projCam) * vec4(ndc, 1.f);
+
+    return worldPos.xyz / worldPos.w;
+}
+
+
 void main()
 {
     float depth = texture(gDepth, v2fTexCoord).r;
@@ -35,7 +53,7 @@ void main()
         return;
     }
 
-    vec3 worldSpace = texture(gWorldPos, v2fTexCoord).rgb;
+    vec3 worldSpace = reconstructWorldPos(v2fTexCoord);
 
     // Beckman roughness = roughness^2
     // get roughness and metalness from g-buffers
