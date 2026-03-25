@@ -7,7 +7,7 @@
 namespace Kiki {
     class DebugCamera : public Camera {
         private:
-        float speed = 50.f;
+        float speed = 1.f;
         float speedUp = 5.0f;
         float slowDown = 0.05f;
         float sensitivity = 0.75f;
