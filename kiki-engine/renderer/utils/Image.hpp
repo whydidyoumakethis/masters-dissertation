@@ -34,6 +34,7 @@ namespace rutils {
 		rutils::Image textureColour;
 		rutils::Image normals;
 		rutils::Image roughnessMetalness;
+		rutils::Image worldPos;
 	};
 
 	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&);

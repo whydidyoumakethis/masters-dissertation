@@ -142,8 +142,19 @@ namespace rutils {
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		);
 
+		rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
+			// before
+			VK_PIPELINE_STAGE_2_NONE,
+			VK_ACCESS_2_NONE,
+			VK_IMAGE_LAYOUT_UNDEFINED,
+			// after
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		);
+
 		// begin rendering
-		VkRenderingAttachmentInfo gBufferAttachments[3]{};
+		VkRenderingAttachmentInfo gBufferAttachments[4]{};
 
 		// texture colour
 		gBufferAttachments[0].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
@@ -178,6 +189,17 @@ namespace rutils {
 		gBufferAttachments[2].clearValue.color.float32[2] = 0.f;
 		gBufferAttachments[2].clearValue.color.float32[3] = 0.f;
 
+        // world pos
+		gBufferAttachments[3].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+		gBufferAttachments[3].imageView = gbuffers.worldPos.view;
+		gBufferAttachments[3].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+		gBufferAttachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+		gBufferAttachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+		gBufferAttachments[3].clearValue.color.float32[0] = 0.f;
+		gBufferAttachments[3].clearValue.color.float32[1] = 0.f;
+		gBufferAttachments[3].clearValue.color.float32[2] = 0.f;
+		gBufferAttachments[3].clearValue.color.float32[3] = 0.f;
+
         VkRenderingAttachmentInfo depthAttach{};
         depthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
         depthAttach.imageView = aDepthAttach.view;
@@ -192,7 +214,7 @@ namespace rutils {
         renderInfo.renderArea.offset = VkOffset2D{ 0, 0 };
         renderInfo.renderArea.extent = aImageExtent;
 
-        renderInfo.colorAttachmentCount = 3;
+        renderInfo.colorAttachmentCount = 4;
         renderInfo.pColorAttachments = gBufferAttachments;
         renderInfo.pDepthAttachment = &depthAttach;
 
@@ -316,6 +338,17 @@ namespace rutils {
 		);
 	
 		rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
+			// before
+			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+			// after
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		);
+
+        rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
 			// before
 			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
 			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

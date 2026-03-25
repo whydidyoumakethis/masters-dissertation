@@ -19,39 +19,23 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
 layout(set = 1, binding = 0) uniform sampler2D gTexColour;
 layout(set = 1, binding = 1) uniform sampler2D gNormal;
 layout(set = 1, binding = 2) uniform sampler2D gRoughnessMetalness;
-layout(set = 1, binding = 3) uniform sampler2D gDepth;
+layout(set = 1, binding = 3) uniform sampler2D gWorldPos;
+layout(set = 1, binding = 4) uniform sampler2D gDepth;
 
 layout(location = 0) out vec4 oColor;
-
-vec3 reconstructWorldPos(vec2 uv) {
-    float depth = texture(gDepth, uv).r;
-
-    // texture coords to normalised device coords
-    vec3 ndc;
-    ndc.x = (uv.x * 2.f) - 1.f;
-    ndc.y = (uv.y * 2.f) - 1.f;
-
-    // use depth for Z
-    ndc.z = (depth * 2.f) - 1.f;
-
-    // transform to world space
-    vec4 worldPos = inverse(uScene.projCam) * vec4(ndc, 1.f);
-
-    return worldPos.xyz / worldPos.w;
-}
 
 void main()
 {
     float depth = texture(gDepth, v2fTexCoord).r;
 
     // sky colour for pixels at depth limit
-    if (depth >= 1.0) {
+    if (depth >= 1.f) {
         vec3 skyColour = vec3(0.1f, 0.1f, 0.1f);
         oColor = vec4(skyColour, 1.f);
         return;
     }
 
-    vec3 worldSpace = reconstructWorldPos(v2fTexCoord);
+    vec3 worldSpace = texture(gWorldPos, v2fTexCoord).rgb;
 
     // Beckman roughness = roughness^2
     // get roughness and metalness from g-buffers
@@ -75,12 +59,11 @@ void main()
     vec3 lightDirection = normalize(lightPos - worldSpace);
 
     // half vector from the light and view directions
-    vec3 halfVector = normalize(lightDirection + viewDirection + vec3(1e-4));
+    vec3 halfVector = normalize(lightDirection + viewDirection);
 
     float nDotLPos = max(dot(normal, lightDirection), 0.f);
 
     vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
-
     vec3 lighting =  brdfResult * lightColour * nDotLPos;
 
     vec3 finalColour = emissive + ambient(sceneAmbient, baseColour) + lighting;

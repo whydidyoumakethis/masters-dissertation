@@ -545,7 +545,7 @@ namespace Kiki {
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
-        aSceneUniforms.lightPos = glm::vec4(0.f, -10.f, 0.f, 0.f);
+        aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
         aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
         aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
     }

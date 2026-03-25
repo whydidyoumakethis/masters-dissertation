@@ -56,7 +56,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[4]{};
+        VkDescriptorSetLayoutBinding bindings[5]{};
 
         // base colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -76,11 +76,17 @@ namespace rutils {
         bindings[2].descriptorCount = 1;
         bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-        // depth buffer
+        // world pos
         bindings[3].binding = 3;
         bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[3].descriptorCount = 1;
         bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // depth buffer
+        bindings[4].binding = 4;
+        bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[4].descriptorCount = 1;
+        bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -135,7 +141,7 @@ namespace rutils {
     }
 
     void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors) {
-        VkWriteDescriptorSet desc[4]{};
+        VkWriteDescriptorSet desc[5]{};
 
         VkDescriptorImageInfo texColourInfo{};
         texColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -151,6 +157,11 @@ namespace rutils {
         roughnessMetalnessInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         roughnessMetalnessInfo.imageView = gbuffers.roughnessMetalness.view;
         roughnessMetalnessInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo worldPosInfo{};
+        worldPosInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        worldPosInfo.imageView = gbuffers.worldPos.view;
+        worldPosInfo.sampler = sampler.handle;
 
         VkDescriptorImageInfo depthInfo{};
         depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -183,8 +194,15 @@ namespace rutils {
         desc[3].dstBinding = 3;
         desc[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         desc[3].descriptorCount = 1;
-        desc[3].pImageInfo = &depthInfo;
+        desc[3].pImageInfo = &worldPosInfo;
 
-        vkUpdateDescriptorSets(window.device, 4, desc, 0, nullptr);
+        desc[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[4].dstSet = deferredLightingDescriptors;
+        desc[4].dstBinding = 4;
+        desc[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[4].descriptorCount = 1;
+        desc[4].pImageInfo = &depthInfo;
+
+        vkUpdateDescriptorSets(window.device, 5, desc, 0, nullptr);
     }
 }

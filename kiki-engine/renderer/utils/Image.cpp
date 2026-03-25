@@ -425,6 +425,7 @@ namespace rutils {
         gbuffers.textureColour = createGBufferImage(window, allocator, VK_FORMAT_R8G8B8A8_UNORM);
         gbuffers.normals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
         gbuffers.roughnessMetalness = createGBufferImage(window, allocator, VK_FORMAT_R8G8_UNORM);
+        gbuffers.worldPos = createGBufferImage(window, allocator, VK_FORMAT_R8G8B8A8_UNORM);
 
         return gbuffers;
     }
