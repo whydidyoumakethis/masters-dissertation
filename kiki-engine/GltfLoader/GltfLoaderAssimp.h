@@ -46,6 +46,12 @@ struct Mtexture {
 	}
 };
 
+struct scene {
+	std::vector<Mmesh> meshes;
+	std::vector<Mtexture> textures;
+	glm::mat4 worldTransform;
+};
+
 namespace Kiki {
 	class GltfLoaderAssimp {
 	public:
@@ -106,7 +112,7 @@ namespace Kiki {
 				const aiTexture* texture = scene->mTextures[i];
 				out.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(texture->pcData), texture->mWidth, &out.width, &out.height, &out.channels, 4);
 			} else {
-				out.rawDataPtr = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").c_str(), &out.width, &out.height, &out.channels, 4);
+				out.rawDataPtr = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &out.width, &out.height, &out.channels, 4);
 			}
 
 			if (roughName.length > 0) {
@@ -114,7 +120,7 @@ namespace Kiki {
 				const aiTexture* rough = scene->mTextures[j];
 				out.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(rough->pcData), rough->mWidth, &out.width, &out.height, &out.channels, 4);
 			} else {
-				out.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").c_str(), &out.width, &out.height, &out.channels, 4);
+				out.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &out.width, &out.height, &out.channels, 4);
 			}
 			
 			// if (texture->mHeight == 0) {
