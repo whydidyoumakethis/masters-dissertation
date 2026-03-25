@@ -309,6 +309,11 @@ namespace rutils {
         //     vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
         // }
 
+#       ifndef NDEBUG
+        ImGui::Render();
+        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
+#       endif
+
         // End rendering
         vkCmdEndRendering(aCmdBuff);
 

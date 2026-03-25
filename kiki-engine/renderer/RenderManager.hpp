@@ -20,7 +20,7 @@
 #include <string.h>
 #include <cstring>
 
-
+#include <imgui_impl_vulkan.h>
 
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -103,6 +103,8 @@ namespace Kiki {
         VkDevice& getDevice() { return window.device; };
         GLFWwindow* getWindow() { return window.window; };
         bool isInitialised() { return initialised; };
+
+        void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
 
         struct SceneUniform {
             glm::mat4 camera;

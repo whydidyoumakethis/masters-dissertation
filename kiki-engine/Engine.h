@@ -8,6 +8,7 @@
 #include "Components/TransparencyComponent.hpp"
 
 #include "../debugging/DebugCamera.hpp"
+#include "debugging/DebugInterface.hpp"
 
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
@@ -42,6 +43,11 @@ namespace Kiki {
 			DebugCamera cam;
 			RenderManager::get().setCamera(cam);
 
+#			ifndef NDEBUG
+			DebugInterface& debugInterface = Kiki::DebugInterface::get();
+			debugInterface.initialise();
+#			endif
+
 			auto previousClock = std::chrono::steady_clock::now();
 
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
@@ -51,6 +57,9 @@ namespace Kiki {
 				previousClock = now;
 				// TODO: MessageCenter::Flush();
 				cam.update(dt);
+#				ifndef NDEBUG
+				debugInterface.update(dt);
+#				endif
 				glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyDown(GLFW_KEY_ESCAPE));
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
