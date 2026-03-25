@@ -4,6 +4,7 @@
 
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
 #include <Jolt/Physics/Collision/CastResult.h>
@@ -59,11 +60,11 @@ namespace Kiki {
 
                 //---------------------Hard - coded ray cases----------------------
                 // Simulation: A 20-meter-long ray is fired vertically downwards from the position of the sphere.
-                auto hit = this->Raycast(transform.position, glm::vec3(0, -1, 0), 20.0f, rb.bodyID);
-                if (hit.hasHit) {
+                //auto hit = this->Raycast(transform.position, glm::vec3(0, -1, 0), 20.0f, rb.bodyID);
+                //if (hit.hasHit) {
                     // Real-time height of the printed ball above the ground
-                    spdlog::info("Ball is {:.2f} meters above Entity {}", hit.distance, (uint32_t)hit.entity);
-                }
+                    //spdlog::info("Ball is {:.2f} meters above Entity {}", hit.distance, (uint32_t)hit.entity);
+                //}
             }
         }
     }
@@ -98,7 +99,15 @@ namespace Kiki {
         auto& transform = reg.get<TransformComponent>(entity);
 
         JPH::ShapeRefC shape;
-        if (auto* box = reg.try_get<BoxColliderComponent>(entity)) {
+        
+        if (auto* meshColl = reg.try_get<MeshColliderComponent>(entity)) {
+            shape = meshColl->shape;
+            spdlog::info("Entity {} using pre-computed MeshCollider.", (uint32_t)entity);
+        }
+        else if (auto* capsule = reg.try_get<CapsuleColliderComponent>(entity)) {
+            shape = new JPH::CapsuleShape(capsule->radius, capsule->height);
+		}
+        else if (auto* box = reg.try_get<BoxColliderComponent>(entity)) {
             shape = new JPH::BoxShape(ToJPH(box->halfExtents));
         }
         else if (auto* sphere = reg.try_get<SphereColliderComponent>(entity)) {

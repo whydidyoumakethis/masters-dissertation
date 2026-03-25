@@ -4,6 +4,8 @@
 #include <Jolt/Physics/Body/BodyID.h>
 #include <Jolt/Physics/Body/MotionType.h>
 #include <glm/glm.hpp>
+#include <Jolt/Physics/Collision/Shape/Shape.h> 
+#include <Jolt/Core/Reference.h>   
 
 namespace Kiki {
 
@@ -37,6 +39,13 @@ namespace Kiki {
     struct BoxColliderComponent {
         glm::vec3 halfExtents = { 0.5f, 0.5f, 0.5f };
     };
-    //......
-    //Other shapes of colliders may also be needed, such as capsules.
+
+    struct MeshColliderComponent {
+        JPH::Ref<JPH::Shape> shape;
+    };
+    
+    struct CapsuleColliderComponent {
+        float radius = 0.5f;
+        float height = 1.0f;
+	};
 }
