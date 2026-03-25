@@ -21,7 +21,7 @@ namespace Kiki {
         void shutdown();
 
         void loadModel(const std::string modelName, int index = 0);
-        void loadScene(const std::string sceneName);
+        void loadScene(Mscene scene);
 
         private:
         SceneManager() = default;

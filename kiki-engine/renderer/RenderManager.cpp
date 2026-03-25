@@ -484,7 +484,7 @@ namespace Kiki {
         return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
-    Material RenderManager::allocateMaterial(Mtexture textureData) {
+    Material RenderManager::allocateMaterial(const Mtexture& textureData) {
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
         rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
 

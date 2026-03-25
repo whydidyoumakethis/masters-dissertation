@@ -95,8 +95,8 @@ namespace rutils {
         std::memcpy(sptr, imageData, sizeInBytes);
         vmaUnmapMemory(aAllocator.allocator, staging.allocation);
 
-        // Free image data
-        stbi_image_free(imageData);
+        //// Free image data
+        //stbi_image_free(imageData);
 
         // Create image
         Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, VK_FORMAT_R8G8B8A8_SRGB, aContext, 
