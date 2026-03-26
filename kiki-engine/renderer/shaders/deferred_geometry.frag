@@ -12,6 +12,7 @@ layout(set = 1, binding = 1) uniform sampler2D uTexRoughnessMetalness;
 layout(location = 0) out vec4 gTexColour;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec2 gRoughnessMetalness;
+layout(location = 3) out vec4 gWorldPos;
 
 void main()
 {
@@ -24,4 +25,5 @@ void main()
     gTexColour = vec4(baseColour, 1.f);
     gNormal = vec4((normalize(normal) * 0.5f) + 0.5, 1.f);
     gRoughnessMetalness = vec2(roughness, metalness);
+    gWorldPos = vec4(v2fWorldSpace.rgb, 1.f);
 }

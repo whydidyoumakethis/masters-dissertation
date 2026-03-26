@@ -12,7 +12,9 @@ target_sources(kiki
  "ECS/GameObject.h" "ECS/System.h" "Engine.h"
       
       GltfLoader/GltfLoader.h
-      GltfLoader/GltfLoaderAssimp.h)
+      GltfLoader/GltfLoaderAssimp.h
+      MessageCenter.h
+)
 
 add_dependencies(kiki shaders)
 

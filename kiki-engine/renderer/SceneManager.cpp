@@ -3,6 +3,11 @@
 #include <volk.h>
 #include <glm/gtx/matrix_decompose.hpp> 
 
+// 在 SceneManager.cpp 顶部添加
+#include "physics/PhysicsComponents.hpp" // 包含 RigidBodyComponent
+#include "physics/PhysicsUtils.hpp"      // 包含我们刚写的 CreateTriangleMesh
+#include "physics/PhysicsSystem.hpp"     // 如果你需要直接调用系统初始化
+
 namespace Kiki {
     SceneManager& SceneManager::get() {
         static SceneManager instance;
@@ -71,6 +76,19 @@ namespace Kiki {
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, mesh.matIndex);
         registry.emplace<TransformComponent>(model);
         registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
+
+        auto staticShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+        if (staticShape) {
+            registry.emplace<MeshColliderComponent>(model, staticShape);
+			//now assume all models are static...
+            registry.emplace<RigidBodyComponent>(
+                model,
+                JPH::EMotionType::Static,
+                0, 
+                0.0f, 
+                0.5f 
+            );
+        }
 
         if (texture.hastexture) {
             materials.emplace_back(RenderManager::get().allocateMaterial(texture));
