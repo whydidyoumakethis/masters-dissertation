@@ -55,6 +55,12 @@ namespace Kiki {
                 transform.position = ToGLM(pos);
                 transform.rotation = ToGLM(rot);
 
+                glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
+                glm::mat4 rotation = glm::mat4_cast(transform.rotation); 
+                glm::mat4 scale = glm::scale(glm::mat4(1.0f), transform.scale);
+
+                transform.worldMatrix = translation * rotation * scale;
+
                 spdlog::info("Entity ID: {} | Pos: X={:.2f}, Y={:.2f}, Z={:.2f}",
                     (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
 

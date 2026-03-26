@@ -62,15 +62,15 @@ namespace Kiki {
         meshes.clear();
     }
 
-    void SceneManager::loadModel(const std::string modelName, PhysicsType type) {
+    void SceneManager::loadModel(const std::string path, const std::string name, PhysicsType type) {
         auto model = World::Get().CreateEntity();
         auto& registry = World::Get().Registry();
 
-        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName);
-        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName);
+        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / path);
+        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / path);
         registry.emplace<TransformComponent>(model);
         registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
-
+        registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
         JPH::Ref<JPH::Shape> colliderShape;
         JPH::EMotionType joltMotionType;
         uint16_t joltLayer;
@@ -99,7 +99,7 @@ namespace Kiki {
             registry.emplace<MeshColliderComponent>(model, colliderShape);
             registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
 
-            spdlog::info("Model {} loaded as {}", modelName,
+            spdlog::info("Model {} loaded as {}", path,
                 type == PhysicsType::Static ? "Static" : (type == PhysicsType::Dynamic ? "Dynamic" : "Kinematic"));
         }
 
