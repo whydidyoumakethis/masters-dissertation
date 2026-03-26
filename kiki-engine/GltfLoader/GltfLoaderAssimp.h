@@ -18,6 +18,7 @@ struct Mmesh {
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
 	int matIndex;
+
 };
 
 struct RGBA {
@@ -100,9 +101,16 @@ struct Mtexture {
 	}
 };
 
+struct MmeshInstance {
+	int meshIndex;
+	glm::mat4 transform;
+
+};
+
 struct Mscene {
 	std::vector<Mmesh> meshes;
 	std::vector<Mtexture> textures;
+	std::vector<MmeshInstance> instances;
 	glm::mat4 worldTransform;
 };
 
@@ -197,6 +205,35 @@ namespace Kiki {
 		}
 		
 
+		static glm::mat4 toglmMat4(const aiMatrix4x4& t) {
+			return glm::mat4(
+				t.a1, t.b1, t.c1, t.d1,
+				t.a2, t.b2, t.c2, t.d2,
+				t.a3, t.b3, t.c3, t.d3,
+				t.a4, t.b4, t.c4, t.d4
+			);
+		}
+
+		static void collectNodeInstances(
+			aiNode* node,
+			const glm::mat4& parentTransform,
+			Mscene& out)
+		{
+			glm::mat4 localTransform = toglmMat4(node->mTransformation);
+			glm::mat4 worldTransform = parentTransform * localTransform;
+
+			for (unsigned int i = 0; i < node->mNumMeshes; i++) {
+				MmeshInstance instance;
+				instance.meshIndex = node->mMeshes[i];
+				instance.transform = worldTransform;
+				out.instances.push_back(instance);
+			}
+
+			for (unsigned int i = 0; i < node->mNumChildren; i++) {
+				collectNodeInstances(node->mChildren[i], worldTransform, out);
+			}
+		}
+
 		static Mscene loadScene(const std::filesystem::path& path){
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
@@ -205,12 +242,9 @@ namespace Kiki {
 			}
 			Mscene out{};
 			auto& t = scene->mRootNode->mTransformation;
-			out.worldTransform = glm::mat4(
-				t.a1, t.b1, t.c1, t.d1,
-				t.a2, t.b2, t.c2, t.d2,
-				t.a3, t.b3, t.c3, t.d3,
-				t.a4, t.b4, t.c4, t.d4
-			);
+			out.worldTransform = toglmMat4(t);
+
+			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
 
 			for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
 				Mmesh mesh;
@@ -255,10 +289,12 @@ namespace Kiki {
 					const aiTexture* aiTexture = scene->mTextures[j];
 					texture.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
 				} else {
-					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.roughWidth, &texture.roughWidth, &texture.channels, 4);
+					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
 				}
 				out.textures.push_back(std::move(texture));
 			}
+
+
 			return out;
 		}
 

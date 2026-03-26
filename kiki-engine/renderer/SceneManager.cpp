@@ -1,6 +1,7 @@
 #include "SceneManager.hpp"
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <volk.h>
+#include <glm/gtx/matrix_decompose.hpp> 
 
 namespace Kiki {
     SceneManager& SceneManager::get() {
@@ -88,12 +89,18 @@ namespace Kiki {
     void SceneManager::loadScene(const Mscene& scene) {
         // TEMP SOLUTION
 
-        for (int i = 0; i < scene.meshes.size(); i++) {
+        for (int i = 0; i < scene.instances.size(); i++) {
            auto model = World::Get().CreateEntity();
             auto& registry = World::Get().Registry();
-            Mmesh mesh = scene.meshes[i];
+			const auto& instance = scene.instances[i];
+            const Mmesh& mesh = scene.meshes[instance.meshIndex];
             const Mtexture& texture = scene.textures[mesh.matIndex];
-            registry.emplace<TransformComponent>(model);
+            auto& transform = registry.emplace<TransformComponent>(model);
+            glm::vec3 skew;
+            glm::vec4 perspective;
+			glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
+            transform.rotation = glm::conjugate(transform.rotation);
+
             registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
             if (texture.hastexture) {
                 materials.emplace_back(RenderManager::get().allocateMaterial(texture));
