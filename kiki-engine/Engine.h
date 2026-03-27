@@ -9,7 +9,7 @@
 
 #include "../debugging/DebugCamera.hpp"
 #include "debugging/DebugInterface.hpp"
-
+#include "MessageCenter.h"
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
 
@@ -55,7 +55,7 @@ namespace Kiki {
 				auto const now = std::chrono::steady_clock::now();
 				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
 				previousClock = now;
-				// TODO: MessageCenter::Flush();
+				MessageCenter::Flush();
 				cam.update(dt);
 #				ifndef NDEBUG
 				debugInterface.update(dt);
