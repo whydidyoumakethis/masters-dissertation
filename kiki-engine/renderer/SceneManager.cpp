@@ -124,6 +124,9 @@ namespace Kiki {
                 materials.emplace_back(RenderManager::get().allocateMaterial(texture));
 				int id = materials.size() - 1;
                 registry.emplace<MaterialComponent>(model, id);
+				if (texture.mode == alphaMode::MASK) {
+                    registry.emplace<TransparencyComponent>(model); // yeah idk what else to do other then just have this added
+                }
             }
             registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
             Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
