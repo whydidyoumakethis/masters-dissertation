@@ -62,7 +62,7 @@ namespace Kiki {
         meshes.clear();
     }
 
-    void SceneManager::loadModel(const std::string path, const std::string name, PhysicsType type) {
+    entt::entity SceneManager::loadModel(const std::string path, const std::string name, PhysicsType type) {
         auto model = World::Get().CreateEntity();
         auto& registry = World::Get().Registry();
 
@@ -112,6 +112,7 @@ namespace Kiki {
 
         Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+		return model;
     }
 
     void SceneManager::shutdown() {

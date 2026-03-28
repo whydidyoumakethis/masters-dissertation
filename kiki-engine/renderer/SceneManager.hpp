@@ -27,7 +27,7 @@ namespace Kiki {
         void clearLevel();
         void shutdown();
 
-        void loadModel(const std::string path, const std::string name = "Object", PhysicsType type = PhysicsType::Static);
+        entt::entity loadModel(const std::string path, const std::string name = "Object", PhysicsType type = PhysicsType::Static);
 
         private:
         SceneManager() = default;
