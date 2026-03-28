@@ -35,10 +35,13 @@ namespace Kiki {
         auto view = reg.view<TransformComponent, RigidBodyComponent>();
 
         for (auto [entity, transform, rb] : view.each()) {
-            if (rb.motionType == JPH::EMotionType::Dynamic) {
-                bodyInterface.SetPositionAndRotation(
-                    rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
-                );
+            if (transform.dirty) {
+                JPH::RVec3 jPos = bodyInterface.GetPosition(rb.bodyID);
+                if (glm::distance(transform.position, ToGLM(jPos)) > 0.01f) {
+                    bodyInterface.SetPositionAndRotation(
+                        rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
+                    );
+                }
             }
         }
 
@@ -48,28 +51,23 @@ namespace Kiki {
         //write back the results to ECS
         for (auto [entity, transform, rb] : view.each()) {
             if (rb.motionType == JPH::EMotionType::Dynamic) {
-                JPH::RVec3 pos; JPH::Quat rot;
-                bodyInterface.GetPositionAndRotation(rb.bodyID, pos, rot);
+                bool isActive = bodyInterface.IsActive(rb.bodyID);
 
-                transform.position = ToGLM(pos);
-                transform.rotation = ToGLM(rot);
-				transform.dirty = true; // Mark dirty to update world matrix in TransformSystem
-                //glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
-                //glm::mat4 rotation = glm::mat4_cast(transform.rotation); 
-                //glm::mat4 scale = glm::scale(glm::mat4(1.0f), transform.scale);
+                if (!isActive) {
+                    static bool loggedSleep = false;
+                    if (!loggedSleep) {
+                        spdlog::warn("=== [PHYSICS DEACTIVATED] Entity {} is now SLEEPING. ===", (uint32_t)entity);
+                        loggedSleep = true;
+                    }
+                }
 
-                //transform.worldMatrix = translation * rotation * scale;
-
-                //spdlog::info("Entity ID: {} | Pos: X={:.2f}, Y={:.2f}, Z={:.2f}",
-                //    (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
-
-                //---------------------Hard - coded ray cases----------------------
-                // Simulation: A 20-meter-long ray is fired vertically downwards from the position of the sphere.
-                //auto hit = this->Raycast(transform.position, glm::vec3(0, -1, 0), 20.0f, rb.bodyID);
-                //if (hit.hasHit) {
-                    // Real-time height of the printed ball above the ground
-                    //spdlog::info("Ball is {:.2f} meters above Entity {}", hit.distance, (uint32_t)hit.entity);
-                //}
+                if (isActive) {
+                    JPH::RVec3 pos; JPH::Quat rot;
+                    bodyInterface.GetPositionAndRotation(rb.bodyID, pos, rot);
+                    transform.position = ToGLM(pos);
+                    transform.rotation = ToGLM(rot);
+                    transform.dirty = true;
+                }
             }
         }
     }

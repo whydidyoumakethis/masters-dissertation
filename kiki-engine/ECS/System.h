@@ -15,12 +15,12 @@ public:
 
 	// control the execution order of systems
     enum class Phase {
+        Physics,
         PreUpdate,
         Update,
         PostUpdate,
         Render,
-        Input,
-        Physics
+        Input
     };
 
     virtual Phase GetPhase() const { return Phase::Update; }

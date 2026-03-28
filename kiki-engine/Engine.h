@@ -19,10 +19,11 @@ namespace Kiki {
 	class Engine {
 	public:
 		void Init() {
+			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 			_scheduler.RegisterSystem<TransformSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
-			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
+			
 		}
 
 		// for game layer to register systems
