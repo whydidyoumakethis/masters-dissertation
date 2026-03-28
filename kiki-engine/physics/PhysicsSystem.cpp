@@ -35,11 +35,10 @@ namespace Kiki {
         auto view = reg.view<TransformComponent, RigidBodyComponent>();
 
         for (auto [entity, transform, rb] : view.each()) {
-            if (rb.motionType == JPH::EMotionType::Kinematic || transform.dirty) {
+            if (rb.motionType == JPH::EMotionType::Dynamic) {
                 bodyInterface.SetPositionAndRotation(
                     rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
                 );
-                transform.dirty = false;
             }
         }
 
@@ -54,15 +53,15 @@ namespace Kiki {
 
                 transform.position = ToGLM(pos);
                 transform.rotation = ToGLM(rot);
+				transform.dirty = true; // Mark dirty to update world matrix in TransformSystem
+                //glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
+                //glm::mat4 rotation = glm::mat4_cast(transform.rotation); 
+                //glm::mat4 scale = glm::scale(glm::mat4(1.0f), transform.scale);
 
-                glm::mat4 translation = glm::translate(glm::mat4(1.0f), transform.position);
-                glm::mat4 rotation = glm::mat4_cast(transform.rotation); 
-                glm::mat4 scale = glm::scale(glm::mat4(1.0f), transform.scale);
+                //transform.worldMatrix = translation * rotation * scale;
 
-                transform.worldMatrix = translation * rotation * scale;
-
-                spdlog::info("Entity ID: {} | Pos: X={:.2f}, Y={:.2f}, Z={:.2f}",
-                    (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
+                //spdlog::info("Entity ID: {} | Pos: X={:.2f}, Y={:.2f}, Z={:.2f}",
+                //    (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
 
                 //---------------------Hard - coded ray cases----------------------
                 // Simulation: A 20-meter-long ray is fired vertically downwards from the position of the sphere.

@@ -7,5 +7,4 @@ target_sources(kiki
       MeshComponent.hpp
       TransparencyComponent.hpp
       ColourComponent.hpp
-      ThirdPersonCameraComponent.hpp
 )

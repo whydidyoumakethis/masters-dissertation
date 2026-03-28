@@ -6,7 +6,7 @@
 #include "RenderManager.hpp"
 #include "WindowInfo.hpp"
 #include "InputManager.hpp"
-
+#include <spdlog/spdlog.h>
 #include <iostream>
 
 class System {
@@ -86,6 +86,7 @@ public:
 
             transform.worldMatrix = translation * rotation * scale;
             transform.dirty = false;
+			spdlog::info("location of entity {}: x={}, y={}, z={}", (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
         }
     }
 };
