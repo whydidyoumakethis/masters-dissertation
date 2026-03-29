@@ -7,16 +7,21 @@ public:
     Phase GetPhase() const override { return Phase::Update; }
 
     void OnUpdate(float dt) override {
-        auto objects = World::Get().Query<TransformComponent, CharacterComponent,ImpulseComponent>();
+        auto objects = World::Get().Query<TransformComponent, CharacterComponent,PhysicalAttributesComponent>();
 		for (auto [entity, transform, character,ip] : objects.each()) {
             float cameraYaw = GetCameraYaw(entity);
 			HandleMovement(transform, character, cameraYaw, dt);
 			HandleJump(entity, transform, character, ip, dt);
+			HandleRotation(transform, character, dt);
+            UpdateState(character,ip);
         }
         auto& inputManager = Kiki::InputManager::get();
     }
     void OnStart() override {
-        
+        auto objects = World::Get().Query< CharacterComponent, PhysicalAttributesComponent>();
+        for (auto [entity, character, ip] : objects.each()) {
+			ip.isGroundedNeedsUpdate = true;
+        }
     }
     void OnStop() override {
        
@@ -80,14 +85,57 @@ private:
 		Entity entity,
         TransformComponent& transform,
         CharacterComponent& character,
-		ImpulseComponent& ip,
+        PhysicalAttributesComponent& ip,
         float dt)
     {
         if (inputManager.isKeyDown(GLFW_KEY_SPACE)
-            //&& PhysicsSystem::isGrounded(entity,0.2f)
+			&& character.state != CharacterState::Jumping
             ) {
 			ip.impulse.y += character.jumpForce;
             character.state = CharacterState::Jumping;
+        }
+    }
+	// smoothly rotate character to face movement direction
+    void HandleRotation(TransformComponent& transform,
+        CharacterComponent& character,
+        float dt)
+    {
+		// keep current facing direction if not moving
+        if (glm::length(glm::vec2(character.velocity.x,
+            character.velocity.z)) < 0.001f)
+            return;
+
+		// interpolate facingYaw towards targetYaw
+        float diff = character.targetYaw - character.facingYaw;
+
+		// handle angle wrap-around (e.g. from 350 to 10 degrees should rotate 20 degrees, not -340)
+        if (diff > 180.0f)  diff -= 360.0f;
+        if (diff < -180.0f) diff += 360.0f;
+
+        character.facingYaw += diff * character.rotateSpeed * dt;
+
+		// update transform rotation to match facing direction
+        transform.rotation = glm::angleAxis(
+            glm::radians(character.facingYaw),
+            glm::vec3(0, 1, 0)
+        );
+        transform.dirty = true;
+    }
+    void UpdateState(CharacterComponent& character, PhysicalAttributesComponent& pa) {
+        bool isMoving = glm::length(glm::vec2(
+            character.velocity.x, character.velocity.z)) > 0.1f;
+
+        if (!pa.isGrounded) {
+            //character.state = character.velocity.y > 0
+            //    ? CharacterState::Jumping
+            //    : CharacterState::Falling;
+			character.state = CharacterState::Jumping;
+        }
+        else if (isMoving) {
+            character.state = CharacterState::Walking;
+        }
+        else {
+            character.state = CharacterState::Idle;
         }
     }
 };

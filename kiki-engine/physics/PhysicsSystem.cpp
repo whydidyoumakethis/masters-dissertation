@@ -32,7 +32,7 @@ namespace Kiki {
     void PhysicsSystem::OnUpdate(float dt) {
         auto& reg = World::Get().Registry();
         auto& bodyInterface = _manager.GetBodyInterface();
-        auto view = reg.view<TransformComponent, RigidBodyComponent,ImpulseComponent>();
+        auto view = reg.view<TransformComponent, RigidBodyComponent, PhysicalAttributesComponent>();
 
         for (auto [entity, transform, rb,ip] : view.each()) {
             if (transform.dirty) {
@@ -72,6 +72,9 @@ namespace Kiki {
                     transform.rotation = ToGLM(rot);
                     transform.dirty = true;
                 }
+            }
+            if (ip.isGroundedNeedsUpdate) {
+				UpdateIsGrounded(entity);
             }
         }
     }
@@ -196,7 +199,7 @@ namespace Kiki {
         return result;
     }
 
-    bool PhysicsSystem::isGrounded(entt::entity entity, float maxDistance) {
+    void PhysicsSystem::UpdateIsGrounded(entt::entity entity, float maxDistance) {
         auto& reg = World::Get().Registry();
         if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
 			auto box = mcc->shape.GetPtr()->GetLocalBounds();
@@ -206,9 +209,10 @@ namespace Kiki {
                 glm::vec3(0, -1, 0),
                 -bottom + maxDistance,
                 reg.get<RigidBodyComponent>(entity).bodyID);
-			return result.hasHit;
+			if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
+                ip->isGrounded = result.hasHit;
+            }
         }
-        return false;
     }
 
 } // namespace Kiki

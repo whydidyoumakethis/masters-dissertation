@@ -33,6 +33,9 @@ public:
 
 class SystemScheduler {
 public:
+
+	// where OnStart is called immediately
+	// order of execution is determined by the phase returned by GetPhase() and the order of registration (stable sort)
     template<typename T, typename... Args>
     T* RegisterSystem(Args&&... args) {
         auto sys = std::make_unique<T>(std::forward<Args>(args)...);

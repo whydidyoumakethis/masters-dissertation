@@ -48,7 +48,9 @@ namespace Kiki {
         float radius = 0.5f;
         float height = 1.0f;
 	};
-    struct ImpulseComponent {
+    struct PhysicalAttributesComponent {
         glm::vec3 impulse = { 0.0f, 0.0f, 0.0f };
+		bool isGrounded = false;
+        bool isGroundedNeedsUpdate = false;
 	};
 }

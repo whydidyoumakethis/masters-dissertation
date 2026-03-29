@@ -5,8 +5,8 @@ enum class CharacterState {
     Walking,
     Running,
     Jumping,
-    Falling,
-    Landing,
+//    Falling,
+//    Landing,
 };
 struct CharacterComponent {
     float walkSpeed = 3.0f;
@@ -17,8 +17,6 @@ struct CharacterComponent {
 
     CharacterState state = CharacterState::Idle;
     glm::vec3      velocity = { 0, 0, 0 };
-    bool           isGrounded = false;
-    bool           wantsToJump = false;
 
 
 	float          facingYaw = 0.0f;   // current facing direction
