@@ -33,7 +33,7 @@ namespace Kiki {
 
         // PhysicsSystem.hpp
         RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID = JPH::BodyID());
-
+		bool isGrounded(entt::entity entity, float maxDistance = 0.1f);
     private:
 
         void OnRigidBodyCreated(entt::registry& reg, entt::entity entity);

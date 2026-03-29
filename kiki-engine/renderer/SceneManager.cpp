@@ -98,7 +98,7 @@ namespace Kiki {
         if (colliderShape) {
             registry.emplace<MeshColliderComponent>(model, colliderShape);
             registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
-
+			registry.emplace<ImpulseComponent>(model);
             spdlog::info("Model {} loaded as {}", path,
                 type == PhysicsType::Static ? "Static" : (type == PhysicsType::Dynamic ? "Dynamic" : "Kinematic"));
         }

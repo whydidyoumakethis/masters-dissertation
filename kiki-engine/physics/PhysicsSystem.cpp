@@ -32,9 +32,9 @@ namespace Kiki {
     void PhysicsSystem::OnUpdate(float dt) {
         auto& reg = World::Get().Registry();
         auto& bodyInterface = _manager.GetBodyInterface();
-        auto view = reg.view<TransformComponent, RigidBodyComponent>();
+        auto view = reg.view<TransformComponent, RigidBodyComponent,ImpulseComponent>();
 
-        for (auto [entity, transform, rb] : view.each()) {
+        for (auto [entity, transform, rb,ip] : view.each()) {
             if (transform.dirty) {
                 JPH::RVec3 jPos = bodyInterface.GetPosition(rb.bodyID);
                 if (glm::distance(transform.position, ToGLM(jPos)) > 0.01f) {
@@ -43,13 +43,17 @@ namespace Kiki {
                     );
                 }
             }
+            if (ip.impulse != glm::vec3(0) ) {
+                bodyInterface.AddImpulse(rb.bodyID, ToJPH(ip.impulse));
+				ip.impulse = glm::vec3(0);
+            }
         }
 
         // Pure physics simulation
         _manager.Update(dt);
 
         //write back the results to ECS
-        for (auto [entity, transform, rb] : view.each()) {
+        for (auto [entity, transform, rb,ip] : view.each()) {
             if (rb.motionType == JPH::EMotionType::Dynamic) {
                 bool isActive = bodyInterface.IsActive(rb.bodyID);
 
@@ -77,25 +81,25 @@ namespace Kiki {
         spdlog::info("PhysicsSystem shut down.");
     }
 
-    void PhysicsSystem::AddImpulse(entt::entity entity, const glm::vec3& impulse) {
-        auto& reg = World::Get().Registry();
-        if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
-            if (!rb->bodyID.IsInvalid()) {
-                _manager.GetBodyInterface().AddImpulse(rb->bodyID, ToJPH(impulse));
-                spdlog::info("impulse!!!");
-            }
-        }
-    }
+    //void PhysicsSystem::AddImpulse(entt::entity entity, const glm::vec3& impulse) {
+    //    auto& reg = World::Get().Registry();
+    //    if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
+    //        if (!rb->bodyID.IsInvalid()) {
+    //            _manager.GetBodyInterface().AddImpulse(rb->bodyID, ToJPH(impulse));
+    //            spdlog::info("impulse!!!");
+    //        }
+    //    }
+    //}
 
-    void PhysicsSystem::AddForce(entt::entity entity, const glm::vec3& force) {
-        auto& reg = World::Get().Registry();
-        if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
-            if (!rb->bodyID.IsInvalid()) {
-                _manager.GetBodyInterface().AddForce(rb->bodyID, ToJPH(force));
-                spdlog::info("force!!!");
-            }
-        }
-    }
+    //void PhysicsSystem::AddForce(entt::entity entity, const glm::vec3& force) {
+    //    auto& reg = World::Get().Registry();
+    //    if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
+    //        if (!rb->bodyID.IsInvalid()) {
+    //            _manager.GetBodyInterface().AddForce(rb->bodyID, ToJPH(force));
+    //            spdlog::info("force!!!");
+    //        }
+    //    }
+    //}
 
     void PhysicsSystem::OnRigidBodyCreated(entt::registry& reg, entt::entity entity) {
         auto& rb = reg.get<RigidBodyComponent>(entity);
@@ -190,6 +194,21 @@ namespace Kiki {
         }
 
         return result;
+    }
+
+    bool PhysicsSystem::isGrounded(entt::entity entity, float maxDistance) {
+        auto& reg = World::Get().Registry();
+        if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
+			auto box = mcc->shape.GetPtr()->GetLocalBounds();
+            float bottom = box.mMin.GetY();
+            auto result = Raycast(
+                reg.get<TransformComponent>(entity).position,
+                glm::vec3(0, -1, 0),
+                -bottom + maxDistance,
+                reg.get<RigidBodyComponent>(entity).bodyID);
+			return result.hasHit;
+        }
+        return false;
     }
 
 } // namespace Kiki
