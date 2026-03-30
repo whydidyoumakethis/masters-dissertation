@@ -139,7 +139,7 @@ namespace Kiki {
         settings.mFriction = rb.friction;
         settings.mRestitution = rb.restitution;
         settings.mIsSensor = rb.isSensor;
-
+        settings.mMassPropertiesOverride = settings.GetShape()->GetMassProperties(); // default mass multiplier
         auto& bi = _manager.GetBodyInterface();
         JPH::Body* body = bi.CreateBody(settings);
         bi.AddBody(body->GetID(), JPH::EActivation::Activate);

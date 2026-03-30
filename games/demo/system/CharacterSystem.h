@@ -60,7 +60,8 @@ private:
 			// inputdir transform from character space to camera space
 			// cameraYaw decides which direction is "forward" for the character
             float rad = glm::radians(cameraYaw);
-            glm::vec3 forward = { sin(rad), 0, cos(rad) };
+            //glm::vec3 forward = { sin(rad), 0, cos(rad) };
+            glm::vec3 forward = {-sin(rad), 0, -cos(rad) };
             glm::vec3 right = { cos(rad), 0, -sin(rad) };
 
             glm::vec3 moveDir = forward * inputDir.y + right * inputDir.x;
@@ -69,15 +70,16 @@ private:
             character.velocity.z = moveDir.z * speed;
 
 			// record target facing direction (character faces movement direction)
-            character.targetYaw = glm::degrees(atan2(moveDir.x, moveDir.z));
+            //character.targetYaw = glm::degrees(atan2(moveDir.x, moveDir.z));
+            character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
         }
         else {
 			// TODO: apply friction to slow down instead of stopping immediately
 			// or just connect with physics system
             character.velocity.x = 0.0f;
             character.velocity.z = 0.0f;
+            return;
         }
-
         transform.position += character.velocity * dt;
         transform.dirty = true;
     }
