@@ -187,6 +187,10 @@ namespace Kiki {
             --frameIndex;
             frameIndex %= commandBuffers.size();
 
+#           ifndef NDEBUG
+            ImGui::EndFrame();
+#           endif
+
             return;
         }
 
@@ -488,6 +492,11 @@ namespace Kiki {
         }
 
         return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
+    }
+
+    void RenderManager::recreatePipelines() {
+        vkDeviceWaitIdle(window.device);
+        pipelines = rutils::createAllPipelines(window, pipelineLayouts);
     }
 
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {

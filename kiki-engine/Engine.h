@@ -65,6 +65,7 @@ namespace Kiki {
 				World::Get().FlushDestroy();
 			}
 
+			debugInterface.shutdown();
 			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
 		}
 	void Quit() {

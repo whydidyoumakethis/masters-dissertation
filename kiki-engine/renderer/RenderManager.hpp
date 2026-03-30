@@ -106,6 +106,7 @@ namespace Kiki {
         bool isInitialised() { return initialised; };
 
         void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
+        void recreatePipelines();
 
         struct SceneUniform {
             glm::mat4 camera;

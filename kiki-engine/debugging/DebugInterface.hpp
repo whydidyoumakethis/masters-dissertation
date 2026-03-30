@@ -17,6 +17,8 @@ namespace Kiki {
         DebugInterface& operator=(const DebugInterface&) = delete;
 
         bool initialised = false;
+
+        bool entityViewer;
     };
 }
 
