@@ -19,10 +19,6 @@ int main(int argc, char** argv) {
 			transform.dirty = true;
 			world.Registry().emplace<CharacterComponent>(e);
         }
-		if (tag.tag == "camera"_hs) {
-			auto& cam = world.Registry().emplace<ThirdPersonCameraComponent>(e);
-			cam.followTarget = cube;
-		}
     }
 	sceneManager.loadModel("road.glb");
 
