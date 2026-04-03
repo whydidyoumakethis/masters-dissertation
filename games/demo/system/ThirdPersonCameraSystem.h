@@ -41,7 +41,8 @@ private:
 	{
 		float mousedX, mousedY;
 		inputManager.getMouseDeltaPosition(mousedX, mousedY);
-		if (mousedX < 0.001f && mousedY < 0.001f) return;
+		if (mousedX < 0.001f && mousedX > -0.001f && 
+			mousedY < 0.001f && mousedY > -0.001f) return;
 
 		cam.yaw -= mousedX * cam.rotateSensitivity;
 		spdlog::info("mousedX = {}", mousedX);
