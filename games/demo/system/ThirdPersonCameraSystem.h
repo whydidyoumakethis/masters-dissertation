@@ -28,7 +28,7 @@ public:
 			}
 		}
 	}
-	void HandleCameraRotation(ThirdPersonCameraComponent& cam)
+	void HandleCameraRotation(ThirdPersonCameraComponent& cam, TransformComponent& trans)
 	{
 		float mousedX, mousedY;
 		inputManager.getMouseDeltaPosition(mousedX, mousedY);
@@ -37,6 +37,8 @@ public:
 		cam.yaw += mousedX * cam.rotateSensitivity;
 		cam.pitch += mousedY * cam.rotateSensitivity;
 		cam.pitch = glm::clamp(cam.pitch, cam.minPitch, cam.maxPitch);
+		glm::quat rotation = glm::quat(glm::radians(glm::vec3(cam.pitch, cam.yaw, 0.0f)));
+		trans.rotation = rotation;
 	}
 private:
 	InputManager& inputManager = Kiki::InputManager::get();

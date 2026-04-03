@@ -15,9 +15,10 @@ public:
 
 	// control the execution order of systems
     enum class Phase {
-        Physics,
+        
         PreUpdate,
         Update,
+        Physics,
         PostUpdate,
         Render,
         Input
@@ -76,7 +77,7 @@ private:
 
 class TransformSystem : public System {
 public:
-    Phase GetPhase() const override { return Phase::PreUpdate; }
+    Phase GetPhase() const override { return Phase::PostUpdate; }
 
     void OnUpdate(float dt) override {
         auto view = World::Get().Query<TransformComponent>();

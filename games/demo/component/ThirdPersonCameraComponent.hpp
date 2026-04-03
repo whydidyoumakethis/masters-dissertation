@@ -12,7 +12,7 @@ struct ThirdPersonCameraComponent {
 	float   smoothSpeed = 8.0f;    // smoothing speed for camera movement
 
 	// rotation parameters
-    float   yaw = 0.0f;
+	float   yaw = 0.0f; // horizontal angle around the target (in degrees)
 	float   pitch = 15.0f;   // default pitch angle (looking slightly down at the target)
     float   minPitch = -20.0f;
     float   maxPitch = 70.0f;
