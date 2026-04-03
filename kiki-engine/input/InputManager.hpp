@@ -35,7 +35,7 @@ namespace Kiki {
         GamepadState gamepad;
 
         float deadzone = 0.15f;
-
+		bool isCursorDisabled = false;
         InputManager() = default;
         ~InputManager() = default;
         InputManager(const InputManager&) = delete;
@@ -100,6 +100,7 @@ namespace Kiki {
         // Enable/disable cursor for the window
         void disableCursor();
         void enableCursor();
+		bool isCursorDisabledFunc() const { return isCursorDisabled; }
     };
 }
 

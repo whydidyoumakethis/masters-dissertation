@@ -14,6 +14,10 @@ class ThirdPersonCameraSystem : public System {
 public:
 	Phase GetPhase()    const override { return Phase::Update; }
 	void OnUpdate(float dt) override {
+		if (inputManager.isMouseButtonJustDown(GLFW_MOUSE_BUTTON_LEFT) && !inputManager.isCursorDisabledFunc()) {
+			inputManager.disableCursor();
+			//spdlog::info("Right mouse button down, cursor disabled");
+		}
 		auto objects = World::Get().Query<TransformComponent, ThirdPersonCameraComponent, CameraComponent>();
 		for (auto [entity, transform, tpscam,cam] : objects.each()) {
 			HandleCameraRotation( tpscam,transform);
@@ -35,17 +39,17 @@ public:
 private:
 	InputManager& inputManager = Kiki::InputManager::get();
 	ThirdPersonCamera camera;
-	float lastMouseX = 0.0f;
-	float lastMouseY = 0.0f;
+	bool isDisablingCursor = false;
 	void HandleCameraRotation(ThirdPersonCameraComponent& cam, TransformComponent& trans)
 	{
-		float mousedX, mousedY;
-		inputManager.getMouseDeltaPosition(mousedX, mousedY);
+		float mousedX = 0.0f, mousedY = 0.0f;
+		if (inputManager.isCursorDisabledFunc()) {
+			inputManager.getMouseDeltaPosition(mousedX, mousedY);
+		}
 		if (mousedX < 0.001f && mousedX > -0.001f && 
 			mousedY < 0.001f && mousedY > -0.001f) return;
 
 		cam.yaw -= mousedX * cam.rotateSensitivity;
-		spdlog::info("mousedX = {}", mousedX);
 		cam.pitch += mousedY * cam.rotateSensitivity;
 		cam.pitch = glm::clamp(cam.pitch, cam.minPitch, cam.maxPitch);
 		//glm::quat rotation = glm::quat(glm::radians(glm::vec3(cam.pitch, cam.yaw, 0.0f)));

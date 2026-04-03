@@ -24,7 +24,9 @@ int main(int argc, char** argv) {
 	sceneManager.loadModel("road.glb");
 
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
+	// use wasd to move the character, shift to speed up, space to jump.
 	engine.RegisterSystem<CharacterSystem>();
+	// use left click to disable cursor and control camera, esc to quit.
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
     engine.Run();
 

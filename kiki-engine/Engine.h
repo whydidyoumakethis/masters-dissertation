@@ -61,7 +61,7 @@ namespace Kiki {
 #				ifndef NDEBUG
 				debugInterface.update(dt);
 #				endif
-				glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyDown(GLFW_KEY_ESCAPE));
+				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
