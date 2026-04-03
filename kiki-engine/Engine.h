@@ -41,8 +41,8 @@ namespace Kiki {
 			_running = true;
 
 			// Temp addition for debug cam
-			DebugCamera cam;
-			RenderManager::get().setCamera(cam);
+			//DebugCamera cam;
+			//RenderManager::get().setCamera(cam);
 
 #			ifndef NDEBUG
 			DebugInterface& debugInterface = Kiki::DebugInterface::get();

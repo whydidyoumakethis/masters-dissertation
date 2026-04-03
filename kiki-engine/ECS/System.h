@@ -90,7 +90,7 @@ public:
 
             transform.worldMatrix = translation * rotation * scale;
             transform.dirty = false;
-			spdlog::info("location of entity {}: x={}, y={}, z={}", (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
+			//spdlog::info("location of entity {}: x={}, y={}, z={}", (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
         }
     }
 };

@@ -29,6 +29,10 @@ public:
 	auto Query() {
 		return _registry.view<Components...>();
 	}
+	template<typename... Components>
+	auto GetComponent(Entity e) {
+		return _registry.try_get<Components...>(e);
+	}
 private:
 	World() = default;
 	entt::registry _registry;

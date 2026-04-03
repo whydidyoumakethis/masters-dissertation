@@ -1,6 +1,7 @@
 #include <kiki.h>
 #include "component/CharacterComponent.h"
 #include "system/CharacterSystem.h"
+#include "system/ThirdPersonCameraSystem.h"
 int main(int argc, char** argv) {
    
 
@@ -24,6 +25,7 @@ int main(int argc, char** argv) {
 
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
 	engine.RegisterSystem<CharacterSystem>();
+	engine.RegisterSystem<ThirdPersonCameraSystem>();
     engine.Run();
 
 }
