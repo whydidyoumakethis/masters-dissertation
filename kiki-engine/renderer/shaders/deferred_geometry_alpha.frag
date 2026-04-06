@@ -8,7 +8,6 @@ layout(location = 2) in vec3 v2fWorldSpace;
 
 layout(set = 1, binding = 0) uniform sampler2D uTexColor;
 layout(set = 1, binding = 1) uniform sampler2D uTexRoughnessMetalness;
-layout(set = 1, binding = 2) uniform sampler2D uTexAlphaMask;
 
 layout(location = 0) out vec4 gTexColour;
 layout(location = 1) out vec4 gNormal;
@@ -17,7 +16,7 @@ layout(location = 3) out vec4 gWorldPos;
 
 void main()
 {
-    float alpha = texture(uTexAlphaMask, v2fTexCoord).a;
+    float alpha = texture(uTexColor, v2fTexCoord).a;
 
     if (alpha < 0.5) {
         discard;
