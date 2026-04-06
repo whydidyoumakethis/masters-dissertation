@@ -13,7 +13,7 @@ namespace rutils {
         pipelines.pbr = createPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.pbr_alpha = createAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.deferred_geometry = createDeferredGeometryPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
-        // pipelines.deferred_geometry_alpha = createDeferredGeometryAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
+        pipelines.deferred_geometry_alpha = createDeferredGeometryAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.deferred_lighting = createDeferredLightingPipeline(window, pipelineLayouts.deferredPipelineLayout.handle);
 
         return pipelines;

@@ -270,45 +270,45 @@ namespace rutils {
             }
         }
 
-        // vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry_alpha.handle);
-        // vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry_alpha.handle);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
 
-        // // TODO: sort transparent objects
+        // TODO: sort transparent objects
 
-        // for (auto e : transparent) {
-        //     Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
-        //     TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
-        //     TransformComponent const& transform = registry.get<TransformComponent>(e);
+        for (auto e : transparent) {
+            Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
+            TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
+            TransformComponent const& transform = registry.get<TransformComponent>(e);
 
-        //     if (registry.all_of<MaterialComponent>(e)) {
-        //         Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
-        //         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
-        //     } else {
-        //         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
-        //     }
+            if (registry.all_of<MaterialComponent>(e)) {
+                Kiki::Material const& material = Kiki::SceneManager::get().getMaterial(registry.get<MaterialComponent>(e).id);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
+            } else {
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
+            }
 
-        //     glm::vec3 colour;
+            glm::vec3 colour;
 
-        //     if (registry.all_of<ColourComponent>(e)) {
-        //         colour = registry.get<ColourComponent>(e).colour;
-        //     } else {
-        //         colour = glm::vec3(0.3f, 0.3f, 0.3f);
-        //     }
+            if (registry.all_of<ColourComponent>(e)) {
+                colour = registry.get<ColourComponent>(e).colour;
+            } else {
+                colour = glm::vec3(0.3f, 0.3f, 0.3f);
+            }
 
-        //     ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
+            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
 
-        //     // Bind vertex input
-        //     VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-        //     VkDeviceSize offsets[3]{};
+            // Bind vertex input
+            VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
+            VkDeviceSize offsets[3]{};
 
-        //     vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
-        //     vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+            vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
+            vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-        //     vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
-        //     // Draw mesh
-        //     vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
-        // }
+            // Draw mesh
+            vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+        }
 
         // End rendering
         vkCmdEndRendering(aCmdBuff);
