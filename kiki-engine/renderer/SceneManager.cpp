@@ -68,40 +68,40 @@ namespace Kiki {
         meshes.clear();
     }
 
-    void SceneManager::loadModel(const std::string modelName, int index) {
-        auto model = World::Get().CreateEntity();
-        auto& registry = World::Get().Registry();
+   // void SceneManager::loadModel(const std::string modelName, int index) {
+   //     auto model = World::Get().CreateEntity();
+   //     auto& registry = World::Get().Registry();
 
-        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, index);
-        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, mesh.matIndex);
-        registry.emplace<TransformComponent>(model);
-        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
+   //     Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, index);
+   //     Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, mesh.matIndex);
+   //     registry.emplace<TransformComponent>(model);
+   //     registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
 
-        auto staticShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
-        if (staticShape) {
-            registry.emplace<MeshColliderComponent>(model, staticShape);
-			//now assume all models are static...
-            registry.emplace<RigidBodyComponent>(
-                model,
-                JPH::EMotionType::Static,
-                0, 
-                0.0f, 
-                0.5f 
-            );
-        }
+   //     auto staticShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+   //     if (staticShape) {
+   //         registry.emplace<MeshColliderComponent>(model, staticShape);
+			////now assume all models are static...
+   //         registry.emplace<RigidBodyComponent>(
+   //             model,
+   //             JPH::EMotionType::Static,
+   //             0, 
+   //             0.0f, 
+   //             0.5f 
+   //         );
+   //     }
 
-        if (texture.hastexture) {
-            materials.emplace_back(RenderManager::get().allocateMaterial(texture));
-            int id = materials.size() - 1;
+   //     if (texture.hastexture) {
+   //         materials.emplace_back(RenderManager::get().allocateMaterial(texture));
+   //         int id = materials.size() - 1;
 
-            registry.emplace<MaterialComponent>(model, id);
-        }
+   //         registry.emplace<MaterialComponent>(model, id);
+   //     }
 
-        registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
+   //     registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
 
-        Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
-        Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
-    }
+   //     Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+   //     Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+   // }
 
 
     void SceneManager::loadScene(const Mscene& scene) {
