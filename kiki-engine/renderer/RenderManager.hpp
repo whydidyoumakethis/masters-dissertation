@@ -3,6 +3,7 @@
 
 #include "../Components/MaterialComponent.hpp"
 #include "../Components/MeshComponent.hpp"
+#include "../Components/TransparencyComponent.hpp"
 #include "utils/VulkanWindow.hpp"
 #include "utils/VulkanWrapper.hpp"
 #include "utils/Synchronisation.hpp"

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <stb_image.h>
 #include <Components/ColourComponent.hpp>
+#include <assimp/GltfMaterial.h>
 
 #define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
 
@@ -18,10 +19,16 @@ struct Mmesh {
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
 	int matIndex;
+
 };
 
 struct RGBA {
 	uint8_t r, g, b, a;
+};
+enum class alphaMode {
+	OPAQUE,
+	MASK,
+	BLEND
 };
 struct Mtexture {
 	bool hastexture = true;
@@ -35,17 +42,9 @@ struct Mtexture {
 	int roughHeight = 0;
 	int channels = 0;
 	std::string name;
-	bool hasTransparency() const {
-		if (channels < 4) {
-			return false;
-		}
-		for (size_t i = 0; i < data.size(); i ++) {
-			if (data[i].a < 255) {
-				return true;
-			}
-		}
-		return false;
-	}
+	alphaMode mode = alphaMode::OPAQUE;
+	float alphaCutoff = 0;
+
 
 	~Mtexture() {
 		if (rawDataPtr) {
@@ -63,14 +62,18 @@ struct Mtexture {
 
 	Mtexture(Mtexture&& other) noexcept
 		: hastexture(other.hastexture),
+		data(std::move(other.data)),
+		rawData(std::move(other.rawData)),
 		rawDataPtr(other.rawDataPtr),
 		roughness(other.roughness),
 		width(other.width),
 		height(other.height),
+		channels(other.channels),
 		roughWidth(other.roughWidth),
 		roughHeight(other.roughHeight),
-		channels(other.channels),
-		name(std::move(other.name))
+		name(std::move(other.name)),
+		mode(other.mode),
+		alphaCutoff(other.alphaCutoff)
 	{
 		other.rawDataPtr = nullptr;
 		other.roughness = nullptr;
@@ -84,14 +87,18 @@ struct Mtexture {
 			if (roughness) stbi_image_free(roughness);
 
 			hastexture = other.hastexture;
+			data = std::move(other.data);
+			rawData = std::move(other.rawData);
 			rawDataPtr = other.rawDataPtr;
 			roughness = other.roughness;
 			width = other.width;
 			height = other.height;
+			channels = other.channels;
 			roughWidth = other.roughWidth;
 			roughHeight = other.roughHeight;
-			channels = other.channels;
 			name = std::move(other.name);
+			mode = other.mode;
+			alphaCutoff = other.alphaCutoff;
 
 			other.rawDataPtr = nullptr;
 			other.roughness = nullptr;
@@ -100,102 +107,138 @@ struct Mtexture {
 	}
 };
 
+struct MmeshInstance {
+	int meshIndex;
+	glm::mat4 transform;
+
+};
+
 struct Mscene {
 	std::vector<Mmesh> meshes;
 	std::vector<Mtexture> textures;
+	std::vector<MmeshInstance> instances;
 	glm::mat4 worldTransform;
 };
 
 namespace Kiki {
 	class GltfLoaderAssimp {
 	public:
-		static Mmesh loadMesh(const std::filesystem::path& path, int index) {
-			Assimp::Importer importer;
-			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
-			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-				throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
-			}
+		//static Mmesh loadMesh(const std::filesystem::path& path, int index) {
+		//	Assimp::Importer importer;
+		//	const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
+		//	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+		//		throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
+		//	}
 
-			Mmesh out{};
-			aiMesh* mesh = scene->mMeshes[index]; // For simplicity, we only load the first mesh
-			out.vertices.reserve(mesh->mNumVertices);
-			out.normals.reserve(mesh->mNumVertices);
-			out.uvs.reserve(mesh->mNumVertices);
-			out.matIndex = mesh->mMaterialIndex;
-			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
-				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
-				if (mesh->HasNormals()) {
-					out.normals.emplace_back(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
-				}
-				if (mesh->HasTextureCoords(0)) {
-					out.uvs.emplace_back(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
-				}
-			}
-			for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
-				aiFace face = mesh->mFaces[i];
-				for (unsigned int j = 0; j < face.mNumIndices; j++) {
-					out.indices.push_back(face.mIndices[j]);
-				}
-			}
-			return out;
+		//	Mmesh out{};
+		//	aiMesh* mesh = scene->mMeshes[index]; // For simplicity, we only load the first mesh
+		//	out.vertices.reserve(mesh->mNumVertices);
+		//	out.normals.reserve(mesh->mNumVertices);
+		//	out.uvs.reserve(mesh->mNumVertices);
+		//	out.matIndex = mesh->mMaterialIndex;
+		//	for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
+		//		out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
+		//		if (mesh->HasNormals()) {
+		//			out.normals.emplace_back(mesh->mNormals[i].x, mesh->mNormals[i].y, mesh->mNormals[i].z);
+		//		}
+		//		if (mesh->HasTextureCoords(0)) {
+		//			out.uvs.emplace_back(mesh->mTextureCoords[0][i].x, mesh->mTextureCoords[0][i].y);
+		//		}
+		//	}
+		//	for (unsigned int i = 0; i < mesh->mNumFaces; i++) {
+		//		aiFace face = mesh->mFaces[i];
+		//		for (unsigned int j = 0; j < face.mNumIndices; j++) {
+		//			out.indices.push_back(face.mIndices[j]);
+		//		}
+		//	}
+		//	return out;
+		//}
+
+		//static Mtexture loadTexture(const std::filesystem::path& path, int index) {
+		//	Assimp::Importer importer;
+		//	const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
+		//	if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+		//		throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
+		//	}
+		//	if (scene->HasTextures() == false) return Mtexture(false);
+
+		//	const aiMaterial* mat = scene->mMaterials[index];
+		//	aiString textureName;// = scene->mTextures[0]; // For simplicity, we only load the first texture
+		//	aiString roughName;// = scene->mTextures[1]; // For simplicity, we only load the first texture
+		//	mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
+		//	mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
+
+		//	std::cout << textureName.C_Str() << "~" << roughName.C_Str() << std::endl;
+
+		//	
+		//	stbi_set_flip_vertically_on_load(1);
+		//	Mtexture out{};
+		//	//out.name = texture->mFilename.C_Str();
+		//	//out.data.reserve(texture->mWidth * texture->mHeight);
+		//	if (textureName.length > 0) {
+		//		int i = std::stoi(textureName.C_Str() + 1);
+		//		const aiTexture* texture = scene->mTextures[i];
+		//		out.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(texture->pcData), texture->mWidth, &out.width, &out.height, &out.channels, 4);
+		//	} else {
+		//		out.rawDataPtr = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &out.width, &out.height, &out.channels, 4);
+		//	}
+
+		//	if (roughName.length > 0) {
+		//		int j = std::stoi(roughName.C_Str() + 1);
+		//		const aiTexture* rough = scene->mTextures[j];
+		//		out.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(rough->pcData), rough->mWidth, &out.width, &out.height, &out.channels, 4);
+
+		//	} else {
+		//		out.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &out.width, &out.height, &out.channels, 4);
+		//	}
+		//	
+		//	// if (texture->mHeight == 0) {
+		//	// 	// Compressed texture
+		//	// 	const uint8_t* raw = reinterpret_cast<const uint8_t*>(texture->pcData);
+		//	// 	out.rawData.assign(raw, raw + texture->mWidth);
+		//	// 	out.width = 0;
+		//	// 	out.height = 0;
+		//	// 	return out;
+		//	// }
+		//	// for (unsigned int i = 0; i < texture->mWidth * texture->mHeight; i++) {
+		//	// 	aiTexel texel = texture->pcData[i];
+		//	// 	out.data.emplace_back(texel.r, texel.g, texel.b, texel.a);
+		//	// }
+		//	// out.width = texture->mWidth;
+		//	// out.height = texture->mHeight;
+		//	// out.channels = 4; // Assimp always loads textures as RGBA
+		//	return out;
+		//}
+		//
+
+		static glm::mat4 toglmMat4(const aiMatrix4x4& t) {
+			return glm::mat4(
+				t.a1, t.b1, t.c1, t.d1,
+				t.a2, t.b2, t.c2, t.d2,
+				t.a3, t.b3, t.c3, t.d3,
+				t.a4, t.b4, t.c4, t.d4
+			);
 		}
 
-		static Mtexture loadTexture(const std::filesystem::path& path, int index) {
-			Assimp::Importer importer;
-			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
-			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
-				throw std::runtime_error("Failed to load glTF file: " + path.string() + " with error: " + importer.GetErrorString());
-			}
-			if (scene->HasTextures() == false) return Mtexture(false);
+		static void collectNodeInstances(
+			aiNode* node,
+			const glm::mat4& parentTransform,
+			Mscene& out)
+		{
+			glm::mat4 localTransform = toglmMat4(node->mTransformation);
+			glm::mat4 worldTransform = parentTransform * localTransform;
 
-			const aiMaterial* mat = scene->mMaterials[index];
-			aiString textureName;// = scene->mTextures[0]; // For simplicity, we only load the first texture
-			aiString roughName;// = scene->mTextures[1]; // For simplicity, we only load the first texture
-			mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
-			mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
-
-			std::cout << textureName.C_Str() << "~" << roughName.C_Str() << std::endl;
-
-			
-			stbi_set_flip_vertically_on_load(1);
-			Mtexture out{};
-			//out.name = texture->mFilename.C_Str();
-			//out.data.reserve(texture->mWidth * texture->mHeight);
-			if (textureName.length > 0) {
-				int i = std::stoi(textureName.C_Str() + 1);
-				const aiTexture* texture = scene->mTextures[i];
-				out.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(texture->pcData), texture->mWidth, &out.width, &out.height, &out.channels, 4);
-			} else {
-				out.rawDataPtr = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &out.width, &out.height, &out.channels, 4);
+			for (unsigned int i = 0; i < node->mNumMeshes; i++) {
+				MmeshInstance instance;
+				instance.meshIndex = node->mMeshes[i];
+				instance.transform = worldTransform;
+				out.instances.push_back(instance);
 			}
 
-			if (roughName.length > 0) {
-				int j = std::stoi(roughName.C_Str() + 1);
-				const aiTexture* rough = scene->mTextures[j];
-				out.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(rough->pcData), rough->mWidth, &out.width, &out.height, &out.channels, 4);
-
-			} else {
-				out.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &out.width, &out.height, &out.channels, 4);
+			for (unsigned int i = 0; i < node->mNumChildren; i++) {
+				collectNodeInstances(node->mChildren[i], worldTransform, out);
 			}
-			
-			// if (texture->mHeight == 0) {
-			// 	// Compressed texture
-			// 	const uint8_t* raw = reinterpret_cast<const uint8_t*>(texture->pcData);
-			// 	out.rawData.assign(raw, raw + texture->mWidth);
-			// 	out.width = 0;
-			// 	out.height = 0;
-			// 	return out;
-			// }
-			// for (unsigned int i = 0; i < texture->mWidth * texture->mHeight; i++) {
-			// 	aiTexel texel = texture->pcData[i];
-			// 	out.data.emplace_back(texel.r, texel.g, texel.b, texel.a);
-			// }
-			// out.width = texture->mWidth;
-			// out.height = texture->mHeight;
-			// out.channels = 4; // Assimp always loads textures as RGBA
-			return out;
 		}
-		
 
 		static Mscene loadScene(const std::filesystem::path& path){
 			Assimp::Importer importer;
@@ -205,12 +248,9 @@ namespace Kiki {
 			}
 			Mscene out{};
 			auto& t = scene->mRootNode->mTransformation;
-			out.worldTransform = glm::mat4(
-				t.a1, t.b1, t.c1, t.d1,
-				t.a2, t.b2, t.c2, t.d2,
-				t.a3, t.b3, t.c3, t.d3,
-				t.a4, t.b4, t.c4, t.d4
-			);
+			out.worldTransform = toglmMat4(t);
+
+			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
 
 			for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
 				Mmesh mesh;
@@ -239,6 +279,7 @@ namespace Kiki {
 			for (unsigned int i = 0; i < scene->mNumMaterials; i++) {
 				Mtexture texture;
 				const aiMaterial* mat = scene->mMaterials[i];
+				
 				aiString textureName;
 				aiString roughName;
 				mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
@@ -255,10 +296,32 @@ namespace Kiki {
 					const aiTexture* aiTexture = scene->mTextures[j];
 					texture.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
 				} else {
-					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.roughWidth, &texture.roughWidth, &texture.channels, 4);
+					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
 				}
+
+				aiString alphaMode;
+				if (mat->Get(AI_MATKEY_GLTF_ALPHAMODE, alphaMode) == AI_SUCCESS) {
+					std::string mode = alphaMode.C_Str();
+					if (mode == "BLEND") {
+						texture.mode = alphaMode::BLEND;
+					}
+					else if (mode == "MASK") {
+						texture.mode = alphaMode::MASK;
+						float cutoff = 0.5f;
+						if (mat->Get(AI_MATKEY_GLTF_ALPHACUTOFF, cutoff) == AI_SUCCESS) {
+							texture.alphaCutoff = cutoff;
+						}
+					}
+					else {
+						texture.mode = alphaMode::OPAQUE;
+					}
+				}
+
+
 				out.textures.push_back(std::move(texture));
 			}
+
+
 			return out;
 		}
 
@@ -292,7 +355,10 @@ namespace Kiki {
 			std::cout << "Width: " << texture.width << std::endl;
 			std::cout << "Height: " << texture.height << std::endl;
 			std::cout << "Channels: " << texture.channels << std::endl;
-			std::cout << "Has Transparency: " << (texture.hasTransparency() ? "Yes" : "No") << std::endl;
+			//std::cout << "Has Transparency: " << (texture.hasTransparency() ? "Yes" : "No") << std::endl;
+			std::cout << "Alpha Mode: " << (texture.mode == alphaMode::BLEND ? "BLEND" : (texture.mode == alphaMode::MASK ? "MASK" : "OPAQUE")) << std::endl;
+			std::cout << "Alpha Cutoff: " << texture.alphaCutoff << std::endl;
+
 		}
 	};
 }

@@ -223,6 +223,7 @@ namespace rutils {
         // Begin drawing with our graphics pipeline
         vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry.handle );
 
+
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
 
         auto& world = World::Get();
