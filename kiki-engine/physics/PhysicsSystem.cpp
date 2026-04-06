@@ -1,15 +1,12 @@
 #include "physics/PhysicsSystem.hpp"
-#include "physics/PhysicsComponents.hpp"
-#include "physics/PhysicsUtils.hpp"
+
 
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
-#include <Jolt/Physics/Collision/CastResult.h>
-#include <Jolt/Physics/Collision/RayCast.h>
-#include <Jolt/Physics/Body/BodyFilter.h>
+
 
 #include "ECS/World.h"
 #include <spdlog/spdlog.h>
@@ -25,6 +22,8 @@ namespace Kiki {
         //Bind EnTT signal
         reg.on_construct<RigidBodyComponent>().connect<&PhysicsSystem::OnRigidBodyCreated>(this);
         reg.on_destroy<RigidBodyComponent>().connect<&PhysicsSystem::OnRigidBodyDestroyed>(this);
+
+        reg.ctx().emplace<PhysicsService>(_manager);
 
         spdlog::info("PhysicsSystem started and signals connected.");
     }
@@ -157,54 +156,55 @@ namespace Kiki {
         }
     }
 
-    RaycastHit PhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID) {
-        RaycastHit result;
+    //RaycastHit PhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID) {
+    //    RaycastHit result;
 
-        JPH::RRayCast ray;
-        ray.mOrigin = ToJPHR(origin);
-        ray.mDirection = ToJPH(direction * maxDistance);
+    //    JPH::RRayCast ray;
+    //    ray.mOrigin = ToJPHR(origin);
+    //    ray.mDirection = ToJPH(direction * maxDistance);
 
-        JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
+    //    JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
 
-        JPH::RayCastResult joltResult;
+    //    JPH::RayCastResult joltResult;
 
-        bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
-            ray,
-            joltResult,
-            {},
-            {},
-            bodyFilter
-        );
+    //    bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
+    //        ray,
+    //        joltResult,
+    //        {},
+    //        {},
+    //        bodyFilter
+    //    );
 
-        if (hit) {
-            result.hasHit = true;
-            result.distance = joltResult.mFraction * maxDistance;
-            result.position = origin + direction * result.distance;
+    //    if (hit) {
+    //        result.hasHit = true;
+    //        result.distance = joltResult.mFraction * maxDistance;
+    //        result.position = origin + direction * result.distance;
 
-            auto& reg = World::Get().Registry();
-            auto view = reg.view<RigidBodyComponent>();
-            for (auto [ent, rb] : view.each()) {
-                if (rb.bodyID == joltResult.mBodyID) {
-                    result.entity = ent;
+    //        auto& reg = World::Get().Registry();
+    //        auto view = reg.view<RigidBodyComponent>();
+    //        for (auto [ent, rb] : view.each()) {
+    //            if (rb.bodyID == joltResult.mBodyID) {
+    //                result.entity = ent;
 
-                    JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
-                    if (lock.Succeeded()) {
-                        result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
-                    }
-                    break;
-                }
-            }
-        }
+    //                JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
+    //                if (lock.Succeeded()) {
+    //                    result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
+    //                }
+    //                break;
+    //            }
+    //        }
+    //    }
 
-        return result;
-    }
+    //    return result;
+    //}
 
     void PhysicsSystem::UpdateIsGrounded(entt::entity entity, float maxDistance) {
         auto& reg = World::Get().Registry();
         if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
 			auto box = mcc->shape.GetPtr()->GetLocalBounds();
             float bottom = box.mMin.GetY();
-            auto result = Raycast(
+			auto physic = reg.ctx().get<PhysicsService>();
+            auto result = physic.Raycast(
                 reg.get<TransformComponent>(entity).position,
                 glm::vec3(0, -1, 0),
                 -bottom + maxDistance,

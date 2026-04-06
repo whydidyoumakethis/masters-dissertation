@@ -51,6 +51,8 @@ public:
         return ptr;
     }
 
+    // do not use GetSystem, it increases coupling between systems and breaks the ECS architecture
+	// if you need a tool function, try to package it as a service. Check PhysicsService in PhysicsSystem.hpp for an example
     template<typename T>
     T* GetSystem() {
         for (auto& system : _systems) {
