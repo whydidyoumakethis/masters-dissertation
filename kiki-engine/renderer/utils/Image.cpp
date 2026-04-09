@@ -285,33 +285,24 @@ namespace rutils {
         return ret;
 	}
 
-    Image loadCubemapTexture(std::array<stbi_uc*, 6> faces, uint32_t width, uint32_t height, VulkanWindow const& context, VkCommandPool commandPool, Allocator const& allocator) {
-        std::cout << "started loading cubemap texture" << std::endl;
-        
+    Image loadCubemapTexture(std::array<stbi_uc*, 6> faces, uint32_t width, uint32_t height, VulkanWindow const& context, VkCommandPool commandPool, Allocator const& allocator) {        
         // Create staging buffer and copy image data to it
         uint32_t const faceSizeInBytes = width * height * 4;
         uint32_t const totalSizeInBytes = width * height * 24; // total size is 4 channels * 6 images * width per image * height per image
 
         auto staging = createBuffer(allocator, totalSizeInBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
-        std::cout << "created buffer" << std::endl;
-
         void* sptr = nullptr;
         if (auto const res = vmaMapMemory(allocator.allocator, staging.allocation, &sptr); res != VK_SUCCESS) {
             throw Kiki::FatalError("Mapping memory for writing\n" "vmaMapMemory() returned {}", toString(res));
         }
 
-        std::cout << "starting memcpys" << std::endl;
         for (int i = 0; i < 6; i++) {
-            std::cout << i << std::endl;
             std::memcpy((char *)sptr + (faceSizeInBytes * i), faces[i], faceSizeInBytes);
         }
-        std::cout << "did memcpys" << std::endl;
 
         vmaUnmapMemory(allocator.allocator, staging.allocation);
 
-        // Create image
-        std::cout << "calling createImageTexture" << std::endl;
-        
+        // Create image        
         Image ret = createImageTexture(
             allocator,
             width,
@@ -324,12 +315,8 @@ namespace rutils {
             VK_IMAGE_VIEW_TYPE_CUBE
         );
         
-        std::cout << "finished calling createImageTexture" << std::endl;
-
         // Create command buffer for data upload and begin recording
-        std::cout << "calling allocCommandBuffer" << std::endl;
         VkCommandBuffer cbuff = allocCommandBuffer(context, commandPool);
-        std::cout << "finished calling allocCommandBuffer" << std::endl;
 
         VkCommandBufferBeginInfo beginInfo{};
         beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;

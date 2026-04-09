@@ -741,6 +741,25 @@ namespace Kiki {
         };
     }
 
+    void RenderManager::setCustomSkybox(
+        std::filesystem::path right,
+        std::filesystem::path left,
+        std::filesystem::path up,
+        std::filesystem::path down,
+        std::filesystem::path front,
+        std::filesystem::path back
+    ) {
+        skybox.paths.right = right;
+        skybox.paths.left = left;
+        skybox.paths.top = up;
+        skybox.paths.bottom = down;
+        skybox.paths.front = front;
+        skybox.paths.back = back;
+
+        createSkybox(skybox.paths);
+        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+    }
+
     void RenderManager::createSkybox(const rutils::CubemapPaths& paths) {
         skybox.descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, cubemapLayout.handle);
 

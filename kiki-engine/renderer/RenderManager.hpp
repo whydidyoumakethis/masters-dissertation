@@ -105,7 +105,15 @@ namespace Kiki {
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});
         Material allocateMaterial(const Mtexture& materialData);
-        void createSkybox(const rutils::CubemapPaths& paths);
+
+        void setCustomSkybox(
+            std::filesystem::path right,
+            std::filesystem::path left,
+            std::filesystem::path up,
+            std::filesystem::path down,
+            std::filesystem::path front,
+            std::filesystem::path back
+        );
 
         void nextFrame();
         void shutdown();
@@ -138,6 +146,8 @@ namespace Kiki {
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
+        void createSkybox(const rutils::CubemapPaths& paths);
+
     };
 }
 
