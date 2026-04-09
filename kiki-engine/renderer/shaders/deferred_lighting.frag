@@ -21,6 +21,7 @@ layout(set = 1, binding = 1) uniform sampler2D gNormal;
 layout(set = 1, binding = 2) uniform sampler2D gRoughnessMetalness;
 layout(set = 1, binding = 3) uniform sampler2D gWorldPos;
 layout(set = 1, binding = 4) uniform sampler2D gDepth;
+layout(set = 1, binding = 5) uniform samplerCube skybox;
 
 layout(location = 0) out vec4 oColor;
 
@@ -48,8 +49,13 @@ void main()
 
     // sky colour for pixels at depth limit
     if (depth >= 1.f) {
-        vec3 skyColour = vec3(0.1f, 0.1f, 0.1f);
-        oColor = vec4(skyColour, 1.f);
+        vec2 ndc = (v2fTexCoord * 2.f) - 1.f;
+
+        vec4 clip = vec4(ndc, 1.f, 1.f);
+        vec4 view = inverse(uScene.projection) * clip;
+        vec3 viewDir = normalize((inverse(uScene.camera) * vec4(view.xyz, 0.f)).xyz);
+
+        oColor = texture(skybox, viewDir);
         return;
     }
 

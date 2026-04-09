@@ -54,6 +54,7 @@ namespace Kiki {
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
+            tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
 
             descriptorPool = rutils::createDescriptorPool(window);
 
@@ -61,8 +62,10 @@ namespace Kiki {
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
+            createSkybox(skybox.paths);
+
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
-            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
 
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
@@ -92,8 +95,6 @@ namespace Kiki {
                 renderFinished.emplace_back(rutils::createSemaphore(window.device));
             }
 
-            tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
-
             // Create null texture
             stbi_set_flip_vertically_on_load(1);
 
@@ -121,9 +122,6 @@ namespace Kiki {
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
-
-            createSkybox(skybox.paths);
-            std::cout << "created skybox" << std::endl;
         }
     }
 
@@ -143,7 +141,7 @@ namespace Kiki {
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
             gbuffers = rutils::createAllGBufferImages(window, allocator);
-            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
 
             recreateSwapchain = false;
         }
@@ -768,9 +766,6 @@ namespace Kiki {
         imageInfo.imageView = skybox.cubemap.view;
         imageInfo.sampler = skybox.sampler.handle;
 
-        std::cout << "4" << std::endl;
-
-
         VkWriteDescriptorSet desc{};
         desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc.dstSet = skybox.descriptorSet;
@@ -780,9 +775,6 @@ namespace Kiki {
         desc.pImageInfo = &imageInfo;
 
         vkUpdateDescriptorSets(window.device, 1, &desc, 0, nullptr);
-
-        std::cout << "5" << std::endl;
-
 
         std::vector<float> skyboxVertices = {
             -1, -1, -1,
@@ -804,11 +796,7 @@ namespace Kiki {
             3, 2, 6, 6, 7, 3 // top
         };
 
-        std::cout << "6" << std::endl;
-
         skybox.mesh = allocateSkyboxMesh(skyboxVertices, skyboxIndices);
-        std::cout << "finished creating skybox" << std::endl;
-
     }
 
     void RenderManager::shutdown() {

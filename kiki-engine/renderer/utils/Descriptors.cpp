@@ -76,7 +76,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[5]{};
+        VkDescriptorSetLayoutBinding bindings[6]{};
 
         // base colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -107,6 +107,11 @@ namespace rutils {
         bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[4].descriptorCount = 1;
         bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        bindings[5].binding = 5;
+        bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[5].descriptorCount = 1;
+        bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -160,8 +165,8 @@ namespace rutils {
         return dset;
     }
 
-    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors) {
-        VkWriteDescriptorSet desc[5]{};
+    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler) {
+        VkWriteDescriptorSet desc[6]{};
 
         VkDescriptorImageInfo texColourInfo{};
         texColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -182,6 +187,11 @@ namespace rutils {
         worldPosInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         worldPosInfo.imageView = gbuffers.worldPos.view;
         worldPosInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo skyboxInfo{};
+        skyboxInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        skyboxInfo.imageView = skyboxCubemap.view;
+        skyboxInfo.sampler = cubemapSampler.handle;
 
         VkDescriptorImageInfo depthInfo{};
         depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
@@ -223,6 +233,13 @@ namespace rutils {
         desc[4].descriptorCount = 1;
         desc[4].pImageInfo = &depthInfo;
 
-        vkUpdateDescriptorSets(window.device, 5, desc, 0, nullptr);
+        desc[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[5].dstSet = deferredLightingDescriptors;
+        desc[5].dstBinding = 5;
+        desc[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[5].descriptorCount = 1;
+        desc[5].pImageInfo = &skyboxInfo;
+
+        vkUpdateDescriptorSets(window.device, 6, desc, 0, nullptr);
     }
 }

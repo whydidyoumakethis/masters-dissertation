@@ -21,7 +21,6 @@ namespace rutils {
         rutils::Pipeline deferred_geometry;
         rutils::Pipeline deferred_geometry_alpha;
         rutils::Pipeline deferred_lighting;
-        rutils::Pipeline skybox;
     };
 
     struct PipelineLayouts {
@@ -38,7 +37,6 @@ namespace rutils {
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
-    Pipeline createSkyboxPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
     Pipeline createDeferredGeometryPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
