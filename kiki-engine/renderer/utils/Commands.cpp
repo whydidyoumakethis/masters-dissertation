@@ -49,8 +49,7 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture) {
-
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -411,6 +410,26 @@ namespace rutils {
 
 		vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
 		vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+        // draw skybox
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.skybox.handle);
+        VkDescriptorSet skyboxSets[] = {
+            aSceneDescriptors,
+            skybox.descriptorSet
+        };
+
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.skyboxPipelineLayout.handle, 0, 2, skyboxSets, 0, nullptr);
+
+        // draw cube
+        // Bind vertex input
+        VkBuffer buffers[1] = {skybox.mesh.positions.buffer};
+        VkDeviceSize offsets[1] = {0};
+
+        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, buffers, offsets);
+        vkCmdBindIndexBuffer(aCmdBuff, skybox.mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+        // Draw mesh
+        vkCmdDrawIndexed(aCmdBuff, skybox.mesh.indexCount, 1, 0, 0, 0);
 
 #       ifndef NDEBUG
         ImGui::Render();

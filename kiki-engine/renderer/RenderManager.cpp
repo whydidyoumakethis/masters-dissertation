@@ -34,6 +34,8 @@ namespace Kiki {
             sceneLayout = rutils::createSceneDescriptorLayout(window);
             materialLayout = rutils::createMaterialDescriptorLayout(window);
             gBufferLayout = rutils::createGBufferDescriptorLayout(window);
+            cubemapLayout = rutils::createCubemapDescriptorLayout(window);
+            
             allocator = rutils::createAllocator(window);
 
             sampler = rutils::createSampler(window);
@@ -48,6 +50,8 @@ namespace Kiki {
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
+            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
+
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
 
@@ -117,6 +121,9 @@ namespace Kiki {
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
+
+            createSkybox(skybox.paths);
+            std::cout << "created skybox" << std::endl;
         }
     }
 
@@ -131,8 +138,6 @@ namespace Kiki {
             // Recreate resources
             rutils::recreateSwapchain(window);
 
-            // pipeline = rutils::createPipeline(window, pipelineLayout.handle);
-            // alphaPipeline = rutils::createAlphaPipeline(window, pipelineLayout.handle);
             rutils::createAllPipelines(window, pipelineLayouts);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
@@ -237,7 +242,8 @@ namespace Kiki {
             sceneUniforms,
             sceneDescriptors,
             deferredLightingDescriptors,
-            noTextureDst
+            noTextureDst,
+            skybox
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -494,6 +500,152 @@ namespace Kiki {
         return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
     }
 
+    Mesh RenderManager::allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices) {
+        int posSize = positions.size() * sizeof(float);
+        int indSize = indices.size() * sizeof (std::uint32_t);
+
+        // Create on GPU vertex buffer
+        rutils::Buffer vertexPosGPU = rutils::createBuffer(
+            allocator,
+            posSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create on GPU index buffer
+        rutils::Buffer indexGPU = rutils::createBuffer(
+            allocator,
+            indSize,
+            VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
+        // Create staging buffers
+        rutils::Buffer posStaging = rutils::createBuffer(
+            allocator,
+            posSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer indStaging = rutils::createBuffer(
+            allocator,
+            indSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        void* posPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, posStaging.allocation, &posPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(posPtr, positions.data(), posSize);
+        vmaUnmapMemory(allocator.allocator, posStaging.allocation);
+
+        void* indPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, indStaging.allocation, &indPtr); VK_SUCCESS != res) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(indPtr, indices.data(), indSize);
+        vmaUnmapMemory(allocator.allocator, indStaging.allocation);
+
+        // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
+        // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
+        // transfers, let these take place in the background while performing other tasks.
+        rutils::Fence uploadComplete = rutils::createFence(window.device);
+
+        // Queue data uploads from staging buffers to the final buffers.
+        // This uses a separate command pool for simplicity.
+        rutils::CommandPool uploadPool = rutils::createCommandPool(window);
+        VkCommandBuffer uploadCmd = rutils::allocCommandBuffer(window, uploadPool.handle);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0;
+        beginInfo.pInheritanceInfo = nullptr;
+
+        if (auto const res = vkBeginCommandBuffer(uploadCmd, &beginInfo); VK_SUCCESS != res) {
+            throw FatalError( "Beginning command buffer recording\n"
+                "vkBeginCommandBuffer() returned {}", rutils::toString(res)
+            );
+        }
+
+        VkBufferCopy pcopy{};
+        pcopy.size = posSize;
+
+        vkCmdCopyBuffer(uploadCmd, posStaging.buffer, vertexPosGPU.buffer, 1, &pcopy);
+
+        rutils::bufferBarrier(uploadCmd, vertexPosGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* After */
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+            VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
+        VkBufferCopy icopy{};
+        icopy.size = indSize;
+
+        vkCmdCopyBuffer(uploadCmd, indStaging.buffer, indexGPU.buffer, 1, &icopy);
+
+        rutils::bufferBarrier(uploadCmd, indexGPU.buffer,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* After */
+            VK_PIPELINE_STAGE_2_INDEX_INPUT_BIT,
+            VK_ACCESS_2_INDEX_READ_BIT
+        );
+    
+        if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
+            throw FatalError( "Ending command buffer recording\n"
+                "vkEndCommandBuffer() returned {}", rutils::toString(res)
+            );
+        }
+
+        // Submit transfer commands
+        VkCommandBufferSubmitInfo submit[1]{};
+        submit[0].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        submit[0].commandBuffer = uploadCmd;
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = submit;
+
+        if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+            throw FatalError( "Unable to submit command buffer to queue\n"
+                "vkQueueSubmit2() returned {}", rutils::toString(res)
+            );
+        }
+
+        // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
+        // buffers, command pool, ...)
+        //
+        // The code doesn’t destory the resources implicitly – the resources are destroyed by the destructors of the
+        // labutils wrappers for the various objects once we leave the function’s scope.
+        if (auto const res = vkWaitForFences(window.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
+            throw FatalError( "Waiting for upload to complete\n"
+                "vkWaitForFences() returned {}", rutils::toString(res)
+            );
+        }
+
+        Mesh mesh;
+        mesh.positions = std::move(vertexPosGPU);
+        mesh.indices = std::move(indexGPU);
+        mesh.indexCount = indices.size();
+        mesh.vertexCount = positions.size() / 3;
+
+        return mesh;
+    }
+
     void RenderManager::recreatePipelines() {
         vkDeviceWaitIdle(window.device);
         pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -589,6 +741,74 @@ namespace Kiki {
             if (err < 0) 
                 abort();
         };
+    }
+
+    void RenderManager::createSkybox(const rutils::CubemapPaths& paths) {
+        skybox.descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, cubemapLayout.handle);
+
+        std::array<stbi_uc*, 6> faces;
+        int w, h, c;
+        stbi_set_flip_vertically_on_load(false);
+        faces[0] = stbi_load(paths.right.string().c_str(), &w, &h, &c, 4);
+        faces[1] = stbi_load(paths.left.string().c_str(), &w, &h, &c, 4);
+        faces[2] = stbi_load(paths.top.string().c_str(), &w, &h, &c, 4);
+        faces[3] = stbi_load(paths.bottom.string().c_str(), &w, &h, &c, 4);
+        faces[4] = stbi_load(paths.front.string().c_str(), &w, &h, &c, 4);
+        faces[5] = stbi_load(paths.back.string().c_str(), &w, &h, &c, 4);
+
+        skybox.cubemap = rutils::loadCubemapTexture(faces, w, h, window, tempTextureCmdPool.handle, allocator);
+        skybox.sampler = rutils::createSampler(window, true);
+
+        for (auto* face : faces) {
+            stbi_image_free(face);
+        }
+
+        VkDescriptorImageInfo imageInfo{};
+        imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        imageInfo.imageView = skybox.cubemap.view;
+        imageInfo.sampler = skybox.sampler.handle;
+
+        std::cout << "4" << std::endl;
+
+
+        VkWriteDescriptorSet desc{};
+        desc.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc.dstSet = skybox.descriptorSet;
+        desc.dstBinding = 0;
+        desc.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc.descriptorCount = 1;
+        desc.pImageInfo = &imageInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, &desc, 0, nullptr);
+
+        std::cout << "5" << std::endl;
+
+
+        std::vector<float> skyboxVertices = {
+            -1, -1, -1,
+             1, -1, -1,
+             1,  1, -1,
+            -1,  1, -1,
+            -1, -1,  1,
+             1, -1,  1,
+             1,  1,  1,
+            -1,  1,  1,
+        };
+
+        std::vector<uint32_t> skyboxIndices = {
+            0, 1, 2, 2, 3, 0, // back
+            5, 4, 7, 7, 6, 5, // front
+            4, 0, 3, 3, 7, 4, // left
+            1, 5, 6, 6, 2, 1, // right
+            4, 5, 1, 1, 0, 4, // bottom
+            3, 2, 6, 6, 7, 3 // top
+        };
+
+        std::cout << "6" << std::endl;
+
+        skybox.mesh = allocateSkyboxMesh(skyboxVertices, skyboxIndices);
+        std::cout << "finished creating skybox" << std::endl;
+
     }
 
     void RenderManager::shutdown() {

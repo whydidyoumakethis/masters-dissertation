@@ -26,7 +26,8 @@ namespace rutils {
 		Kiki::RenderManager::SceneUniform const&,
 		VkDescriptorSet aSceneDescriptors,
 		VkDescriptorSet deferredLightingDescriptors,
-		VkDescriptorSet noTexture
+		VkDescriptorSet noTexture,
+		Kiki::Skybox const& skybox
 	);
 
 	void submitCommands(

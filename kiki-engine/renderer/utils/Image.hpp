@@ -37,11 +37,40 @@ namespace rutils {
 		rutils::Image worldPos;
 	};
 
+	struct CubemapPaths {
+        std::filesystem::path right = std::filesystem::path(PROJECT_ASSETS_PATH) / "default_sky_right.png";
+        std::filesystem::path left = std::filesystem::path(PROJECT_ASSETS_PATH) / "default_sky_left.png";
+        std::filesystem::path top = std::filesystem::path(PROJECT_ASSETS_PATH) / "default_sky_up.png";
+        std::filesystem::path bottom = std::filesystem::path(PROJECT_ASSETS_PATH) / "default_sky_down.png";
+        std::filesystem::path front = std::filesystem::path(PROJECT_ASSETS_PATH) / "default_sky_front.png";
+        std::filesystem::path back = std::filesystem::path(PROJECT_ASSETS_PATH) / "default_sky_back.png";
+    };
+
+
 	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&);
 
-	Image createImageTexture(Allocator const&, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat, VulkanWindow const& window, VkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT);
+	Image createImageTexture(
+		Allocator const&,
+		std::uint32_t aWidth,
+		std::uint32_t aHeight,
+		VkFormat,
+		VulkanWindow const& window,
+		VkImageUsageFlags = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT,
+		uint32_t layers = 1,
+		VkImageCreateFlags flags = 0,
+		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D
+	);
 
-    Sampler createSampler(VulkanWindow const&);
+    Sampler createSampler(VulkanWindow const&, bool isCubemapSampler = false);
+
+	Image loadCubemapTexture(
+		std::array<stbi_uc*, 6> faces,
+		uint32_t width,
+		uint32_t height,
+		VulkanWindow const& context,
+		VkCommandPool commandPool,
+		Allocator const& allocator
+	);
 
 	std::uint32_t computeMipLevelCount(std::uint32_t aWidth, std::uint32_t aHeight);
 

@@ -43,6 +43,14 @@ namespace Kiki {
         VkDescriptorSet descriptorSet;
     };
 
+    struct Skybox {
+        rutils::Image cubemap;
+        rutils::Sampler sampler;
+        VkDescriptorSet descriptorSet;
+        Mesh mesh;
+        rutils::CubemapPaths paths;
+    };
+
     class RenderManager {
         private:
         RenderManager() = default;
@@ -55,9 +63,6 @@ namespace Kiki {
 
         rutils::VulkanWindow window;
 
-        // rutils::PipelineLayout pipelineLayout;
-        // rutils::Pipeline pipeline;
-        // rutils::Pipeline alphaPipeline;
         rutils::PipelineLayouts pipelineLayouts;
 
         rutils::Pipelines pipelines;
@@ -77,6 +82,7 @@ namespace Kiki {
 
         rutils::DescriptorSetLayout sceneLayout;
         rutils::DescriptorSetLayout materialLayout;
+        rutils::DescriptorSetLayout cubemapLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
 
@@ -87,16 +93,20 @@ namespace Kiki {
         rutils::Image noTexture;
         VkDescriptorSet noTextureDst;
 
+        Skybox skybox;
+
         Camera camera; // default cam
 
         public:
         static RenderManager& get();
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
+        Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});
         Material allocateMaterial(const Mtexture& materialData);
-        
+        void createSkybox(const rutils::CubemapPaths& paths);
+
         void nextFrame();
         void shutdown();
 

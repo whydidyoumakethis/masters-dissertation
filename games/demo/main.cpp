@@ -4,7 +4,7 @@ int main(int argc, char** argv) {
 	Kiki::Engine engine;
 	engine.Init();
 
-	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb");
+	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "3_cubes.glb");
 	Kiki::SceneManager::get().loadScene(std::move(scene));
 
     engine.Run();
