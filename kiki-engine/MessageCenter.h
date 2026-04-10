@@ -39,7 +39,7 @@ private:
     friend class MessageCenter;
 };
 
-
+//for ui and game audio
 class MessageCenter {
 public:
     static MessageCenter& Get() {

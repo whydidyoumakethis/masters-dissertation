@@ -2,6 +2,7 @@
 #include "component/CharacterComponent.h"
 #include "system/CharacterSystem.h"
 #include "system/ThirdPersonCameraSystem.h"
+#include "system/GoalTriggerSystem.h"
 int main(int argc, char** argv) {
    
 
@@ -28,6 +29,7 @@ int main(int argc, char** argv) {
 	engine.RegisterSystem<CharacterSystem>();
 	// use left click to disable cursor and control camera, esc to quit.
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
+	engine.RegisterSystem<GoalTriggerSystem>();
     engine.Run();
 
 }

@@ -13,8 +13,8 @@ namespace Kiki {
         entt::entity e2 = (entt::entity)inBody2.GetUserData();
 
         //A simple log test
-        spdlog::warn("[Collision] Entity {} hit Entity {}!", (uint32_t)e1, (uint32_t)e2);
-
+        //spdlog::warn("[Collision] Entity {} hit Entity {}!", (uint32_t)e1, (uint32_t)e2);
+		ms::Publish(CollisionEvent{ e1, e2 });
     }
 
     void PhysicsContactListener::OnContactPersisted(const JPH::Body&, const JPH::Body&, const JPH::ContactManifold&, JPH::ContactSettings&) {}
