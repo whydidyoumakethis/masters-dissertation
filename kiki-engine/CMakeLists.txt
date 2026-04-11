@@ -30,7 +30,6 @@ add_subdirectory(Components)
 
 add_subdirectory(debugging)
 
-add_subdirectory(Animation)
 
 target_link_libraries(kiki
   PUBLIC
