@@ -50,13 +50,13 @@ public:
 	// suscribe a free function or static member function
     template<typename TEvent, auto Fn>
     static void Subscribe() {
-        Get()._dispatcher.sink<TEvent>().connect<Fn>();
+        Get()._dispatcher.sink<TEvent>().template connect<Fn>();
     }
 
 	// suscribe a member function
     template<typename TEvent, auto MemberFn, typename T>
     static void Subscribe(T* instance) {
-        Get()._dispatcher.sink<TEvent>().connect<MemberFn>(instance);
+        Get()._dispatcher.sink<TEvent>().template connect<MemberFn>(instance);
     }
 
 	// suscribe a lambda or any callable object, return a handle that automatically unsubscribes when destroyed
@@ -71,12 +71,12 @@ public:
 
     template<typename TEvent, auto Fn>
     static void Unsubscribe() {
-        Get()._dispatcher.sink<TEvent>().disconnect<Fn>();
+        Get()._dispatcher.sink<TEvent>().template disconnect<Fn>();
     }
 
     template<typename TEvent, auto MemberFn, typename T>
     static void Unsubscribe(T* instance) {
-        Get()._dispatcher.sink<TEvent>().disconnect<MemberFn>(instance);
+        Get()._dispatcher.sink<TEvent>().template disconnect<MemberFn>(instance);
     }
 
     template<typename TEvent>
