@@ -15,11 +15,11 @@ namespace Kiki {
         return instance;
     }
 
-    // int SceneManager::createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
-    //     materials.emplace_back(RenderManager::get().allocateMaterial(imageData, baseWidthi, baseHeighti));
+     int SceneManager::createMaterial(Mtexture& texture) {
+         materials.emplace_back(RenderManager::get().allocateMaterial(texture));
 
-    //     return materials.size() - 1;
-    // }
+         return materials.size() - 1;
+     }
 
     Material const& SceneManager::getMaterial(int id) {
         return materials[id];
@@ -73,10 +73,10 @@ namespace Kiki {
         auto model = World::Get().CreateEntity();
         auto& registry = World::Get().Registry();
 
-        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / path);
-        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / path);
+        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / path, 0);
+        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / path, 0);
         registry.emplace<TransformComponent>(model);
-        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
         registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
         JPH::Ref<JPH::Shape> colliderShape;
         JPH::EMotionType joltMotionType;
@@ -111,8 +111,10 @@ namespace Kiki {
         }
 
         if (texture.hastexture) {
+
+     
             registry.emplace<MaterialComponent>(model,
-                    createMaterial(texture.rawDataPtr, texture.width, texture.height));
+                    createMaterial(texture));
         }
 
         registry.emplace<ColourComponent>(model, glm::vec3(1, 0, 0));

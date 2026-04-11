@@ -24,20 +24,7 @@ set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
 set(TARGET_SAMPLES OFF CACHE INTERNAL "")
 set(TARGET_HELLO_WORLD OFF CACHE INTERNAL "")
 
-# Disable ozz-animation's samples, howtos, tests, and data to speed up build
-set(ozz_build_samples OFF CACHE INTERNAL "")
-set(ozz_build_howtos OFF CACHE INTERNAL "")
-set(ozz_build_tests OFF CACHE INTERNAL "")
-set(ozz_build_data OFF CACHE INTERNAL "")
 
-# --- Dependencies ---
-
-# ozz-animation
-FetchContent_Declare(
-    ozz_animation
-    GIT_REPOSITORY "https://github.com/guillaumeblanc/ozz-animation.git"
-    GIT_TAG        "0.16.0"
-)
 
 # Jolt Physics
 FetchContent_Declare(
@@ -97,7 +84,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(
-    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog fastgltf ozz_animation
+    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog fastgltf
 )
 
 # --- Shader Compilation ---
@@ -209,8 +196,6 @@ target_link_libraries(KikiDeps INTERFACE
     assimp::assimp
     Jolt
     imgui
-    ozz_animation
-    ozz_base
 )
 
 target_include_directories(KikiDeps INTERFACE 
