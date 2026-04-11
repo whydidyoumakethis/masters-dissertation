@@ -18,7 +18,7 @@ namespace Kiki {
         public:
         static SceneManager& get();
 
-        // int createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti);
+        int createMaterial(Mtexture& texture);
         Material const& getMaterial(int id);
 
         int createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords);
