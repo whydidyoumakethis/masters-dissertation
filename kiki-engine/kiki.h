@@ -8,3 +8,5 @@
 #include "physics/PhysicsManager.hpp"
 #include "physics/PhysicsComponents.hpp"
 #include "physics/PhysicsSystem.hpp"
+using namespace entt::literals;
+using namespace Kiki;

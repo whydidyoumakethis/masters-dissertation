@@ -1,14 +1,12 @@
 #include "physics/PhysicsSystem.hpp"
-#include "physics/PhysicsComponents.hpp"
-#include "physics/PhysicsUtils.hpp"
+
 
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
+#include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 
-#include <Jolt/Physics/Collision/CastResult.h>
-#include <Jolt/Physics/Collision/RayCast.h>
-#include <Jolt/Physics/Body/BodyFilter.h>
+
 
 #include "ECS/World.h"
 #include <spdlog/spdlog.h>
@@ -25,20 +23,28 @@ namespace Kiki {
         reg.on_construct<RigidBodyComponent>().connect<&PhysicsSystem::OnRigidBodyCreated>(this);
         reg.on_destroy<RigidBodyComponent>().connect<&PhysicsSystem::OnRigidBodyDestroyed>(this);
 
+        reg.ctx().emplace<PhysicsService>(_manager);
+
         spdlog::info("PhysicsSystem started and signals connected.");
     }
 
     void PhysicsSystem::OnUpdate(float dt) {
         auto& reg = World::Get().Registry();
         auto& bodyInterface = _manager.GetBodyInterface();
-        auto view = reg.view<TransformComponent, RigidBodyComponent>();
+        auto view = reg.view<TransformComponent, RigidBodyComponent, PhysicalAttributesComponent>();
 
-        for (auto [entity, transform, rb] : view.each()) {
-            if (rb.motionType == JPH::EMotionType::Kinematic || transform.dirty) {
-                bodyInterface.SetPositionAndRotation(
-                    rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
-                );
-                transform.dirty = false;
+        for (auto [entity, transform, rb,ip] : view.each()) {
+            if (transform.dirty) {
+                JPH::RVec3 jPos = bodyInterface.GetPosition(rb.bodyID);
+                if (glm::distance(transform.position, ToGLM(jPos)) > 0.01f) {
+                    bodyInterface.SetPositionAndRotation(
+                        rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
+                    );
+                }
+            }
+            if (ip.impulse != glm::vec3(0) ) {
+                bodyInterface.AddImpulse(rb.bodyID, ToJPH(ip.impulse));
+				ip.impulse = glm::vec3(0);
             }
         }
 
@@ -46,24 +52,28 @@ namespace Kiki {
         _manager.Update(dt);
 
         //write back the results to ECS
-        for (auto [entity, transform, rb] : view.each()) {
+        for (auto [entity, transform, rb,ip] : view.each()) {
             if (rb.motionType == JPH::EMotionType::Dynamic) {
-                JPH::RVec3 pos; JPH::Quat rot;
-                bodyInterface.GetPositionAndRotation(rb.bodyID, pos, rot);
+                bool isActive = bodyInterface.IsActive(rb.bodyID);
 
-                transform.position = ToGLM(pos);
-                transform.rotation = ToGLM(rot);
+                if (!isActive) {
+                    static bool loggedSleep = false;
+                    if (!loggedSleep) {
+                        spdlog::warn("=== [PHYSICS DEACTIVATED] Entity {} is now SLEEPING. ===", (uint32_t)entity);
+                        loggedSleep = true;
+                    }
+                }
 
-                spdlog::info("Entity ID: {} | Pos: X={:.2f}, Y={:.2f}, Z={:.2f}",
-                    (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
-
-                //---------------------Hard - coded ray cases----------------------
-                // Simulation: A 20-meter-long ray is fired vertically downwards from the position of the sphere.
-                //auto hit = this->Raycast(transform.position, glm::vec3(0, -1, 0), 20.0f, rb.bodyID);
-                //if (hit.hasHit) {
-                    // Real-time height of the printed ball above the ground
-                    //spdlog::info("Ball is {:.2f} meters above Entity {}", hit.distance, (uint32_t)hit.entity);
-                //}
+                if (isActive) {
+                    JPH::RVec3 pos; JPH::Quat rot;
+                    bodyInterface.GetPositionAndRotation(rb.bodyID, pos, rot);
+                    transform.position = ToGLM(pos);
+                    transform.rotation = ToGLM(rot);
+                    transform.dirty = true;
+                }
+            }
+            if (ip.isGroundedNeedsUpdate) {
+				UpdateIsGrounded(entity);
             }
         }
     }
@@ -73,25 +83,25 @@ namespace Kiki {
         spdlog::info("PhysicsSystem shut down.");
     }
 
-    void PhysicsSystem::AddImpulse(entt::entity entity, const glm::vec3& impulse) {
-        auto& reg = World::Get().Registry();
-        if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
-            if (!rb->bodyID.IsInvalid()) {
-                _manager.GetBodyInterface().AddImpulse(rb->bodyID, ToJPH(impulse));
-                spdlog::info("impulse!!!");
-            }
-        }
-    }
+    //void PhysicsSystem::AddImpulse(entt::entity entity, const glm::vec3& impulse) {
+    //    auto& reg = World::Get().Registry();
+    //    if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
+    //        if (!rb->bodyID.IsInvalid()) {
+    //            _manager.GetBodyInterface().AddImpulse(rb->bodyID, ToJPH(impulse));
+    //            spdlog::info("impulse!!!");
+    //        }
+    //    }
+    //}
 
-    void PhysicsSystem::AddForce(entt::entity entity, const glm::vec3& force) {
-        auto& reg = World::Get().Registry();
-        if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
-            if (!rb->bodyID.IsInvalid()) {
-                _manager.GetBodyInterface().AddForce(rb->bodyID, ToJPH(force));
-                spdlog::info("force!!!");
-            }
-        }
-    }
+    //void PhysicsSystem::AddForce(entt::entity entity, const glm::vec3& force) {
+    //    auto& reg = World::Get().Registry();
+    //    if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
+    //        if (!rb->bodyID.IsInvalid()) {
+    //            _manager.GetBodyInterface().AddForce(rb->bodyID, ToJPH(force));
+    //            spdlog::info("force!!!");
+    //        }
+    //    }
+    //}
 
     void PhysicsSystem::OnRigidBodyCreated(entt::registry& reg, entt::entity entity) {
         auto& rb = reg.get<RigidBodyComponent>(entity);
@@ -103,6 +113,9 @@ namespace Kiki {
             shape = meshColl->shape;
             spdlog::info("Entity {} using pre-computed MeshCollider.", (uint32_t)entity);
         }
+        else if (auto* capsule = reg.try_get<CapsuleColliderComponent>(entity)) {
+            shape = new JPH::CapsuleShape(capsule->radius, capsule->height);
+		}
         else if (auto* box = reg.try_get<BoxColliderComponent>(entity)) {
             shape = new JPH::BoxShape(ToJPH(box->halfExtents));
         }
@@ -125,7 +138,7 @@ namespace Kiki {
         settings.mFriction = rb.friction;
         settings.mRestitution = rb.restitution;
         settings.mIsSensor = rb.isSensor;
-
+        settings.mMassPropertiesOverride = settings.GetShape()->GetMassProperties(); // default mass multiplier
         auto& bi = _manager.GetBodyInterface();
         JPH::Body* body = bi.CreateBody(settings);
         bi.AddBody(body->GetID(), JPH::EActivation::Activate);
@@ -143,46 +156,63 @@ namespace Kiki {
         }
     }
 
-    RaycastHit PhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID) {
-        RaycastHit result;
+    //RaycastHit PhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID) {
+    //    RaycastHit result;
 
-        JPH::RRayCast ray;
-        ray.mOrigin = ToJPHR(origin);
-        ray.mDirection = ToJPH(direction * maxDistance);
+    //    JPH::RRayCast ray;
+    //    ray.mOrigin = ToJPHR(origin);
+    //    ray.mDirection = ToJPH(direction * maxDistance);
 
-        JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
+    //    JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
 
-        JPH::RayCastResult joltResult;
+    //    JPH::RayCastResult joltResult;
 
-        bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
-            ray,
-            joltResult,
-            {},
-            {},
-            bodyFilter
-        );
+    //    bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
+    //        ray,
+    //        joltResult,
+    //        {},
+    //        {},
+    //        bodyFilter
+    //    );
 
-        if (hit) {
-            result.hasHit = true;
-            result.distance = joltResult.mFraction * maxDistance;
-            result.position = origin + direction * result.distance;
+    //    if (hit) {
+    //        result.hasHit = true;
+    //        result.distance = joltResult.mFraction * maxDistance;
+    //        result.position = origin + direction * result.distance;
 
-            auto& reg = World::Get().Registry();
-            auto view = reg.view<RigidBodyComponent>();
-            for (auto [ent, rb] : view.each()) {
-                if (rb.bodyID == joltResult.mBodyID) {
-                    result.entity = ent;
+    //        auto& reg = World::Get().Registry();
+    //        auto view = reg.view<RigidBodyComponent>();
+    //        for (auto [ent, rb] : view.each()) {
+    //            if (rb.bodyID == joltResult.mBodyID) {
+    //                result.entity = ent;
 
-                    JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
-                    if (lock.Succeeded()) {
-                        result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
-                    }
-                    break;
-                }
+    //                JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
+    //                if (lock.Succeeded()) {
+    //                    result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
+    //                }
+    //                break;
+    //            }
+    //        }
+    //    }
+
+    //    return result;
+    //}
+
+    void PhysicsSystem::UpdateIsGrounded(entt::entity entity, float maxDistance) {
+        auto& reg = World::Get().Registry();
+        if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
+			auto box = mcc->shape.GetPtr()->GetLocalBounds();
+            float bottom = box.mMin.GetY();
+			auto physic = reg.ctx().get<PhysicsService>();
+            auto result = physic.Raycast(
+                reg.get<TransformComponent>(entity).position,
+                glm::vec3(0, -1, 0),
+                -bottom + maxDistance,
+                reg.get<RigidBodyComponent>(entity).bodyID);
+			if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
+                ip->isGrounded = result.hasHit;
             }
         }
-
-        return result;
     }
 
 } // namespace Kiki

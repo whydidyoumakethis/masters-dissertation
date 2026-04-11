@@ -43,6 +43,14 @@ namespace Kiki {
     struct MeshColliderComponent {
         JPH::Ref<JPH::Shape> shape;
     };
-    //......
-    //Other shapes of colliders may also be needed, such as capsules.
+    
+    struct CapsuleColliderComponent {
+        float radius = 0.5f;
+        float height = 1.0f;
+	};
+    struct PhysicalAttributesComponent {
+        glm::vec3 impulse = { 0.0f, 0.0f, 0.0f };
+		bool isGrounded = false;
+        bool isGroundedNeedsUpdate = false;
+	};
 }

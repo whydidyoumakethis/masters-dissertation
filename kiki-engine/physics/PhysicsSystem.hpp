@@ -4,7 +4,11 @@
 #include "physics/PhysicsManager.hpp"
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
-
+#include <Jolt/Physics/Collision/CastResult.h>
+#include <Jolt/Physics/Collision/RayCast.h>
+#include <Jolt/Physics/Body/BodyFilter.h>
+#include "physics/PhysicsUtils.hpp"
+#include "physics/PhysicsComponents.hpp"
 namespace Kiki {
 
     struct RaycastHit {
@@ -14,7 +18,54 @@ namespace Kiki {
         glm::vec3 normal{ 0.0f };
         float distance = 0.0f;
     };
+    struct PhysicsService {
+        PhysicsService(PhysicsManager& physicsManager)
+            : _manager(physicsManager) {}
+        PhysicsManager& _manager;
+        RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID = JPH::BodyID(), bool needNormal = false) {
+            RaycastHit result;
 
+            JPH::RRayCast ray;
+            ray.mOrigin = ToJPHR(origin);
+            ray.mDirection = ToJPH(direction * maxDistance);
+
+            JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
+
+            JPH::RayCastResult joltResult;
+
+            bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
+                ray,
+                joltResult,
+                {},
+                {},
+                bodyFilter
+            );
+
+            if (hit) {
+                result.hasHit = true;
+                result.distance = joltResult.mFraction * maxDistance;
+                result.position = origin + direction * result.distance;
+                if (needNormal) {
+                    auto& reg = World::Get().Registry();
+                    auto view = reg.view<RigidBodyComponent>();
+                    for (auto [ent, rb] : view.each()) {
+                        if (rb.bodyID == joltResult.mBodyID) {
+                            result.entity = ent;
+
+                            JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
+                            if (lock.Succeeded()) {
+                                result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
+                            }
+                            break;
+                        }
+                    }
+                }
+                
+            }
+
+            return result;
+        }
+    };
     class PhysicsSystem : public System {
     public:
         PhysicsSystem() = default;
@@ -32,8 +83,8 @@ namespace Kiki {
         void AddForce(entt::entity entity, const glm::vec3& force);
 
         // PhysicsSystem.hpp
-        RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID = JPH::BodyID());
-
+        //RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID = JPH::BodyID());
+        void UpdateIsGrounded(entt::entity entity, float maxDistance = 0.1f);
     private:
 
         void OnRigidBodyCreated(entt::registry& reg, entt::entity entity);

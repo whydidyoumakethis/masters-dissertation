@@ -6,7 +6,7 @@
 #include "RenderManager.hpp"
 #include "WindowInfo.hpp"
 #include "InputManager.hpp"
-
+#include <spdlog/spdlog.h>
 #include <iostream>
 
 class System {
@@ -15,12 +15,13 @@ public:
 
 	// control the execution order of systems
     enum class Phase {
+        
         PreUpdate,
         Update,
+        Physics,
         PostUpdate,
         Render,
-        Input,
-        Physics
+        Input
     };
 
     virtual Phase GetPhase() const { return Phase::Update; }
@@ -33,6 +34,9 @@ public:
 
 class SystemScheduler {
 public:
+
+	// where OnStart is called immediately
+	// order of execution is determined by the phase returned by GetPhase() and the order of registration (stable sort)
     template<typename T, typename... Args>
     T* RegisterSystem(Args&&... args) {
         auto sys = std::make_unique<T>(std::forward<Args>(args)...);
@@ -47,6 +51,8 @@ public:
         return ptr;
     }
 
+    // do not use GetSystem, it increases coupling between systems and breaks the ECS architecture
+	// if you need a tool function, try to package it as a service. Check PhysicsService in PhysicsSystem.hpp for an example
     template<typename T>
     T* GetSystem() {
         for (auto& system : _systems) {
@@ -73,7 +79,7 @@ private:
 
 class TransformSystem : public System {
 public:
-    Phase GetPhase() const override { return Phase::PreUpdate; }
+    Phase GetPhase() const override { return Phase::PostUpdate; }
 
     void OnUpdate(float dt) override {
         auto view = World::Get().Query<TransformComponent>();
@@ -86,6 +92,7 @@ public:
 
             transform.worldMatrix = translation * rotation * scale;
             transform.dirty = false;
+			//spdlog::info("location of entity {}: x={}, y={}, z={}", (uint32_t)entity, transform.position.x, transform.position.y, transform.position.z);
         }
     }
 };

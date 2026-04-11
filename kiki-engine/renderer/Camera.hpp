@@ -3,7 +3,7 @@
 
 #include "../ECS/World.h"
 #include "../ECS/GameObject.h"
-
+#include "../Components/CameraComponent.h"
 #include <entt/entt.hpp>
 
 namespace Kiki {
@@ -16,7 +16,8 @@ namespace Kiki {
 
             auto& registry = World::Get().Registry();
             registry.emplace<TransformComponent>(camera);
-
+            registry.emplace<TagComponent>(camera, entt::hashed_string("camera"), "camera");
+			registry.emplace<CameraComponent>(camera);
             registry.get<TransformComponent>(camera).position = glm::vec3( 0.f, 0.3f, 1.f);
             registry.get<TransformComponent>(camera).dirty = true;
         }

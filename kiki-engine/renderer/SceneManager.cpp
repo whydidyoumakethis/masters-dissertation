@@ -3,10 +3,11 @@
 #include <volk.h>
 #include <glm/gtx/matrix_decompose.hpp> 
 
-// 在 SceneManager.cpp 顶部添加
-#include "physics/PhysicsComponents.hpp" // 包含 RigidBodyComponent
-#include "physics/PhysicsUtils.hpp"      // 包含我们刚写的 CreateTriangleMesh
-#include "physics/PhysicsSystem.hpp"     // 如果你需要直接调用系统初始化
+#include "physics/PhysicsComponents.hpp" 
+#include "physics/PhysicsUtils.hpp"   
+#include "physics/PhysicsSystem.hpp" 
+
+#include <spdlog/spdlog.h>
 
 namespace Kiki {
     SceneManager& SceneManager::get() {
@@ -68,6 +69,58 @@ namespace Kiki {
         meshes.clear();
     }
 
+    entt::entity SceneManager::loadModel(const std::string path, const std::string name, PhysicsType type) {
+        auto model = World::Get().CreateEntity();
+        auto& registry = World::Get().Registry();
+
+        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / path);
+        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / path);
+        registry.emplace<TransformComponent>(model);
+        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.uvs));
+        registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
+        JPH::Ref<JPH::Shape> colliderShape;
+        JPH::EMotionType joltMotionType;
+        uint16_t joltLayer;
+
+        switch (type) {
+        case PhysicsType::Static:
+            colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+            joltMotionType = JPH::EMotionType::Static;
+            joltLayer = 0; // NON_MOVING
+            break;
+
+        case PhysicsType::Dynamic:
+            colliderShape = CreateConvexHull(mesh.vertices);
+            joltMotionType = JPH::EMotionType::Dynamic;
+            joltLayer = 1; // MOVING
+            break;
+
+        case PhysicsType::Kinematic:
+            colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+            joltMotionType = JPH::EMotionType::Kinematic;
+            joltLayer = 0;
+            break;
+        }
+
+        if (colliderShape) {
+            registry.emplace<MeshColliderComponent>(model, colliderShape);
+            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+			registry.emplace<PhysicalAttributesComponent>(model);
+            spdlog::info("Model {} loaded as {}", path,
+                type == PhysicsType::Static ? "Static" : (type == PhysicsType::Dynamic ? "Dynamic" : "Kinematic"));
+        }
+
+        if (texture.hastexture) {
+            registry.emplace<MaterialComponent>(model,
+                    createMaterial(texture.rawDataPtr, texture.width, texture.height));
+        }
+
+        registry.emplace<ColourComponent>(model, glm::vec3(1, 0, 0));
+
+        Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+        Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+		return model;
+    }
    // void SceneManager::loadModel(const std::string modelName, int index) {
    //     auto model = World::Get().CreateEntity();
    //     auto& registry = World::Get().Registry();

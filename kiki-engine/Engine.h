@@ -9,7 +9,7 @@
 
 #include "../debugging/DebugCamera.hpp"
 #include "debugging/DebugInterface.hpp"
-
+#include "MessageCenter.h"
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
 
@@ -19,10 +19,11 @@ namespace Kiki {
 	class Engine {
 	public:
 		void Init() {
+			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 			_scheduler.RegisterSystem<TransformSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
-			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
+			
 		}
 
 		// for game layer to register systems
@@ -40,8 +41,8 @@ namespace Kiki {
 			_running = true;
 
 			// Temp addition for debug cam
-			DebugCamera cam;
-			RenderManager::get().setCamera(cam);
+			//DebugCamera cam;
+			//RenderManager::get().setCamera(cam);
 
 #			ifndef NDEBUG
 			DebugInterface& debugInterface = Kiki::DebugInterface::get();
@@ -55,12 +56,12 @@ namespace Kiki {
 				auto const now = std::chrono::steady_clock::now();
 				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
 				previousClock = now;
-				// TODO: MessageCenter::Flush();
-				cam.update(dt);
+				MessageCenter::Flush();
+				//cam.update(dt);
 #				ifndef NDEBUG
 				debugInterface.update(dt);
 #				endif
-				glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyDown(GLFW_KEY_ESCAPE));
+				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}

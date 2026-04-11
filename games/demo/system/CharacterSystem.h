@@ -1,0 +1,143 @@
+#pragma once
+#include <kiki.h>
+#include "../component/CharacterComponent.h"
+#include "../component/ThirdPersonCameraComponent.hpp"
+class CharacterSystem : public System {
+public:
+    Phase GetPhase() const override { return Phase::Update; }
+
+    void OnUpdate(float dt) override {
+        auto objects = World::Get().Query<TransformComponent, CharacterComponent,PhysicalAttributesComponent>();
+		for (auto [entity, transform, character,ip] : objects.each()) {
+            float cameraYaw = GetCameraYaw(entity);
+			HandleMovement(transform, character, cameraYaw, dt);
+			HandleJump(entity, transform, character, ip, dt);
+			HandleRotation(transform, character, dt);
+            UpdateState(character,ip);
+        }
+        auto& inputManager = Kiki::InputManager::get();
+    }
+    void OnStart() override {
+        auto objects = World::Get().Query< CharacterComponent, PhysicalAttributesComponent>();
+        for (auto [entity, character, ip] : objects.each()) {
+			ip.isGroundedNeedsUpdate = true;
+        }
+    }
+    void OnStop() override {
+       
+    }
+private:
+    InputManager& inputManager = Kiki::InputManager::get();
+    float GetCameraYaw(Entity targetEntity) {
+        float yaw = 0.0f;
+        auto camView = World::Get().Query<ThirdPersonCameraComponent>();
+        for (auto [e, cam] : camView.each()) {
+            if (cam.followTarget == targetEntity) {
+                yaw = cam.yaw;
+                break;
+            }
+        }
+        return yaw;
+    }
+    void HandleMovement(
+        TransformComponent& transform,
+        CharacterComponent& character,
+        float cameraYaw, float dt)
+    {
+        glm::vec2 inputDir = { 0, 0 };
+        if (inputManager.isKeyDown(GLFW_KEY_W)) inputDir.y += 1.0f;
+        if (inputManager.isKeyDown(GLFW_KEY_S)) inputDir.y -= 1.0f;
+        if (inputManager.isKeyDown(GLFW_KEY_A)) inputDir.x -= 1.0f;
+        if (inputManager.isKeyDown(GLFW_KEY_D)) inputDir.x += 1.0f;
+
+        bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT);
+        float speed = isRunning ? character.runSpeed : character.walkSpeed;
+
+        if (glm::length(inputDir) > 0.001f) {
+			// normalize to prevent faster diagonal movement
+            inputDir = glm::normalize(inputDir);
+
+			// inputdir transform from character space to camera space
+			// cameraYaw decides which direction is "forward" for the character
+            float rad = glm::radians(cameraYaw);
+            //glm::vec3 forward = { sin(rad), 0, cos(rad) };
+            glm::vec3 forward = {-sin(rad), 0, -cos(rad) };
+            glm::vec3 right = { cos(rad), 0, -sin(rad) };
+
+            glm::vec3 moveDir = forward * inputDir.y + right * inputDir.x;
+
+            character.velocity.x = moveDir.x * speed;
+            character.velocity.z = moveDir.z * speed;
+
+			// record target facing direction (character faces movement direction)
+            //character.targetYaw = glm::degrees(atan2(moveDir.x, moveDir.z));
+            character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
+        }
+        else {
+			// TODO: apply friction to slow down instead of stopping immediately
+			// or just connect with physics system
+            character.velocity.x = 0.0f;
+            character.velocity.z = 0.0f;
+            return;
+        }
+        transform.position += character.velocity * dt;
+        transform.dirty = true;
+    }
+    void HandleJump(
+		Entity entity,
+        TransformComponent& transform,
+        CharacterComponent& character,
+        PhysicalAttributesComponent& ip,
+        float dt)
+    {
+        if (inputManager.isKeyDown(GLFW_KEY_SPACE)
+			&& character.state != CharacterState::Jumping
+            ) {
+			ip.impulse.y += character.jumpForce;
+            character.state = CharacterState::Jumping;
+        }
+    }
+	// smoothly rotate character to face movement direction
+    void HandleRotation(TransformComponent& transform,
+        CharacterComponent& character,
+        float dt)
+    {
+		// keep current facing direction if not moving
+        if (glm::length(glm::vec2(character.velocity.x,
+            character.velocity.z)) < 0.001f)
+            return;
+
+		// interpolate facingYaw towards targetYaw
+        float diff = character.targetYaw - character.facingYaw;
+
+		// handle angle wrap-around (e.g. from 350 to 10 degrees should rotate 20 degrees, not -340)
+        if (diff > 180.0f)  diff -= 360.0f;
+        if (diff < -180.0f) diff += 360.0f;
+
+        character.facingYaw += diff * character.rotateSpeed * dt;
+
+		// update transform rotation to match facing direction
+        transform.rotation = glm::angleAxis(
+            glm::radians(character.facingYaw),
+            glm::vec3(0, 1, 0)
+        );
+        transform.dirty = true;
+    }
+    void UpdateState(CharacterComponent& character, PhysicalAttributesComponent& pa) {
+        bool isMoving = glm::length(glm::vec2(
+            character.velocity.x, character.velocity.z)) > 0.1f;
+
+        if (!pa.isGrounded) {
+            //character.state = character.velocity.y > 0
+            //    ? CharacterState::Jumping
+            //    : CharacterState::Falling;
+			character.state = CharacterState::Jumping;
+        }
+        else if (isMoving) {
+            character.state = CharacterState::Walking;
+        }
+        else {
+            character.state = CharacterState::Idle;
+        }
+    }
+};

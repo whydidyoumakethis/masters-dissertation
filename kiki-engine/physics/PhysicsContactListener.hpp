@@ -2,9 +2,14 @@
 #include <Jolt/Jolt.h>
 #include <Jolt/Physics/Collision/ContactListener.h>
 #include <entt/entt.hpp>
+#include "../MessageCenter.h"
+using ms = MessageCenter;
 
 namespace Kiki {
-
+    struct CollisionEvent {
+        entt::entity entity1;
+        entt::entity entity2;
+    };
     class PhysicsContactListener : public JPH::ContactListener {
     public:
         // Triggered when two rigid bodies begin to come into contact

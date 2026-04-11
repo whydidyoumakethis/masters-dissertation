@@ -1,6 +1,4 @@
 #pragma once
-// engine/MessageCenter.h
-#pragma once
 #include <entt/entt.hpp>
 #include <functional>
 #include <memory>
@@ -41,7 +39,7 @@ private:
     friend class MessageCenter;
 };
 
-
+//for ui and game audio
 class MessageCenter {
 public:
     static MessageCenter& Get() {

@@ -177,9 +177,11 @@ namespace Kiki {
 
     void InputManager::disableCursor() {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+		isCursorDisabled = true;
     }
 
     void InputManager::enableCursor() {
         glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        isCursorDisabled = false;
     }
 }

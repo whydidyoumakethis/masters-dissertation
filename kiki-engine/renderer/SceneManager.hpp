@@ -7,6 +7,13 @@
 #include <filesystem>
 
 namespace Kiki {
+
+    enum class PhysicsType {
+        Static, 
+        Dynamic, 
+        Kinematic
+    };
+
     class SceneManager {
         public:
         static SceneManager& get();
@@ -20,7 +27,8 @@ namespace Kiki {
         void clearLevel();
         void shutdown();
 
-        void loadModel(const std::string modelName, int index = 0);
+        entt::entity loadModel(const std::string path, const std::string name = "Object", PhysicsType type = PhysicsType::Static);
+
         void loadScene(const Mscene& scene);
 
         private:

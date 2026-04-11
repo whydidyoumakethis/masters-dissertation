@@ -690,12 +690,12 @@ namespace Kiki {
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
         float const aspect = aFramebufferWidth / float(aFramebufferHeight);
-
+		auto camSetting = World::Get().Registry().get<CameraComponent>(camera.camera);
         aSceneUniforms.projection = glm::perspectiveRH_ZO(
-            glm::radians(60.0f), // fov
+            glm::radians(camSetting.fov), // fov
             aspect,
-            0.1f, // near
-            2000.0f // far
+            camSetting.nearPlane, // near
+            camSetting.farPlane // far
         );
 
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
