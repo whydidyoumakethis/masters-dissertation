@@ -6,6 +6,8 @@
 #include <spdlog/spdlog.h>
 #include <renderer/RenderManager.hpp>
 
+#include "windows/EntityViewer.hpp"
+
 
 namespace Kiki {
     DebugInterface& DebugInterface::get() {
@@ -50,7 +52,33 @@ namespace Kiki {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
-        ImGui::ShowDemoWindow();
+        ImGuiIO& io = ImGui::GetIO();
+
+
+        ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
+        ImGui::Begin("kiki debugger");
+
+        if (ImGui::Button(entityViewer ? "Close Entity Viewer":"Open Entity Viewer")) 
+            entityViewer = !entityViewer;
+
+        if (ImGui::CollapsingHeader("Performance")) {
+            ImGui::Text("FPS: %.1f", io.Framerate);
+            ImGui::Text("Frametime: %.3fms", io.DeltaTime * 1000.0f);
+        }
+
+        if (ImGui::CollapsingHeader("Render Settings")) {
+            if (ImGui::Button("Reload Shaders")) {
+                RenderManager::get().recreatePipelines();
+            }
+        }
+
+        ImGui::End();
+
+        if (entityViewer)
+            debug::EntityViewer::draw(&entityViewer);
+
+
+        // ImGui::ShowDemoWindow();
     }
 
     void DebugInterface::shutdown() {

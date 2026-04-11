@@ -3,6 +3,7 @@
 
 #include "../Components/MaterialComponent.hpp"
 #include "../Components/MeshComponent.hpp"
+#include "../Components/TransparencyComponent.hpp"
 #include "utils/VulkanWindow.hpp"
 #include "utils/VulkanWrapper.hpp"
 #include "utils/Synchronisation.hpp"
@@ -11,6 +12,8 @@
 #include "utils/Image.hpp"
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
+#include "utils/Pipelines.hpp"
+#include "GltfLoader/GltfLoaderAssimp.h"
 
 
 #include <glm/glm.hpp>
@@ -28,6 +31,7 @@ namespace Kiki {
     struct Mesh {
         rutils::Buffer positions;
         rutils::Buffer texCoords;
+        rutils::Buffer normals;
         rutils::Buffer indices;
         std::uint32_t vertexCount;
         std::uint32_t indexCount;
@@ -35,9 +39,17 @@ namespace Kiki {
 
     struct Material {
         rutils::Image texture;
+        rutils::Image roughnessMetalness;
         VkDescriptorSet descriptorSet;
     };
 
+    struct Skybox {
+        rutils::Image cubemap;
+        rutils::Sampler sampler;
+        VkDescriptorSet descriptorSet;
+        Mesh mesh;
+        rutils::CubemapPaths paths;
+    };
 
     class RenderManager {
         private:
@@ -51,9 +63,13 @@ namespace Kiki {
 
         rutils::VulkanWindow window;
 
-        rutils::PipelineLayout pipelineLayout;
-        rutils::Pipeline pipeline;
-        rutils::Pipeline alphaPipeline;
+        rutils::PipelineLayouts pipelineLayouts;
+
+        rutils::Pipelines pipelines;
+        rutils::DescriptorSetLayout gBufferLayout;
+        
+        rutils::GBuffers gbuffers;
+
         rutils::CommandPool commandPool;
 
         rutils::Buffer sceneUBO;
@@ -63,8 +79,12 @@ namespace Kiki {
         std::vector<rutils::Fence> frameDone;
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
         rutils::DescriptorPool descriptorPool;
-        rutils::DescriptorSetLayout objectLayout;
+
+        rutils::DescriptorSetLayout sceneLayout;
+        rutils::DescriptorSetLayout materialLayout;
+        rutils::DescriptorSetLayout cubemapLayout;
         VkDescriptorSet sceneDescriptors;
+        VkDescriptorSet deferredLightingDescriptors;
 
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
@@ -73,16 +93,28 @@ namespace Kiki {
         rutils::Image noTexture;
         VkDescriptorSet noTextureDst;
 
+        Skybox skybox;
+
         Camera camera; // default cam
 
         public:
         static RenderManager& get();
-        void initialise(WindowInfo info = Kiki::WindowInfo{});
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> texCoords);
-        Material allocateMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti);
-        
-        void draw(MeshComponent meshComponent, MaterialComponent materialComponent, glm::mat4 transformMatrix);
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
+        Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
+
+        void initialise(WindowInfo info = Kiki::WindowInfo{});
+        Material allocateMaterial(const Mtexture& materialData);
+
+        void setCustomSkybox(
+            std::filesystem::path right,
+            std::filesystem::path left,
+            std::filesystem::path up,
+            std::filesystem::path down,
+            std::filesystem::path front,
+            std::filesystem::path back
+        );
+
         void nextFrame();
         void shutdown();
 
@@ -93,11 +125,15 @@ namespace Kiki {
         bool isInitialised() { return initialised; };
 
         void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
+        void recreatePipelines();
 
         struct SceneUniform {
             glm::mat4 camera;
             glm::mat4 projection;
             glm::mat4 projCam;
+            glm::vec4 lightPos;
+            glm::vec4 lightColour;
+            glm::vec4 cameraPos;
         };
 
         rutils::CommandPool tempTextureCmdPool;
@@ -110,6 +146,8 @@ namespace Kiki {
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
+        void createSkybox(const rutils::CubemapPaths& paths);
+
     };
 }
 

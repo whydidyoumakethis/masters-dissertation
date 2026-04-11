@@ -16,16 +16,18 @@ namespace rutils {
 
     void recordCommands(
 		VkCommandBuffer,
-		VkPipeline,
-		VkPipeline,
+		Pipelines const&,
+		PipelineLayouts const&,
 		ImageAndView const&,
 		Image const& aDepthAttach,
+		GBuffers& gbuffers,
 		VkExtent2D const&,
 		VkBuffer aSceneUBO,
 		Kiki::RenderManager::SceneUniform const&,
-		VkPipelineLayout,
 		VkDescriptorSet aSceneDescriptors,
-		VkDescriptorSet noTexture
+		VkDescriptorSet deferredLightingDescriptors,
+		VkDescriptorSet noTexture,
+		Kiki::Skybox const& skybox
 	);
 
 	void submitCommands(

@@ -1,6 +1,7 @@
 #include "SceneManager.hpp"
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <volk.h>
+#include <glm/gtx/matrix_decompose.hpp> 
 
 #include "physics/PhysicsComponents.hpp" 
 #include "physics/PhysicsUtils.hpp"   
@@ -14,18 +15,18 @@ namespace Kiki {
         return instance;
     }
 
-    int SceneManager::createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
-        materials.emplace_back(RenderManager::get().allocateMaterial(imageData, baseWidthi, baseHeighti));
+    // int SceneManager::createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti) {
+    //     materials.emplace_back(RenderManager::get().allocateMaterial(imageData, baseWidthi, baseHeighti));
 
-        return materials.size() - 1;
-    }
+    //     return materials.size() - 1;
+    // }
 
     Material const& SceneManager::getMaterial(int id) {
         return materials[id];
     }
 
-    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec2> const& texCoords) {
-        std::vector<float> p, t;
+    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords) {
+        std::vector<float> p, t, n;
 
         for (glm::vec3 pos : positions) {
             p.emplace_back(pos.x);
@@ -38,7 +39,13 @@ namespace Kiki {
             t.emplace_back(texCoord.y);
         }
 
-        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, t));
+        for (glm::vec3 norm : normals) {
+            n.emplace_back(norm.x);
+            n.emplace_back(norm.y);
+            n.emplace_back(norm.z);
+        }
+
+        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t));
 
         return meshes.size() - 1;
     }
@@ -113,6 +120,72 @@ namespace Kiki {
         Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 		return model;
+    }
+   // void SceneManager::loadModel(const std::string modelName, int index) {
+   //     auto model = World::Get().CreateEntity();
+   //     auto& registry = World::Get().Registry();
+
+   //     Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, index);
+   //     Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, mesh.matIndex);
+   //     registry.emplace<TransformComponent>(model);
+   //     registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
+
+   //     auto staticShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+   //     if (staticShape) {
+   //         registry.emplace<MeshColliderComponent>(model, staticShape);
+			////now assume all models are static...
+   //         registry.emplace<RigidBodyComponent>(
+   //             model,
+   //             JPH::EMotionType::Static,
+   //             0, 
+   //             0.0f, 
+   //             0.5f 
+   //         );
+   //     }
+
+   //     if (texture.hastexture) {
+   //         materials.emplace_back(RenderManager::get().allocateMaterial(texture));
+   //         int id = materials.size() - 1;
+
+   //         registry.emplace<MaterialComponent>(model, id);
+   //     }
+
+   //     registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
+
+   //     Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+   //     Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+   // }
+
+
+    void SceneManager::loadScene(const Mscene& scene) {
+        // TEMP SOLUTION
+
+        for (int i = 0; i < scene.instances.size(); i++) {
+           auto model = World::Get().CreateEntity();
+            auto& registry = World::Get().Registry();
+			const auto& instance = scene.instances[i];
+            const Mmesh& mesh = scene.meshes[instance.meshIndex];
+            const Mtexture& texture = scene.textures[mesh.matIndex];
+            auto& transform = registry.emplace<TransformComponent>(model);
+            glm::vec3 skew;
+            glm::vec4 perspective;
+			glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
+            transform.rotation = glm::conjugate(transform.rotation);
+            transform.scale = {1, 1, 1}; // TODO: this is a temp fix, will probably cause issues
+
+            registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
+            if (texture.hastexture) {
+                materials.emplace_back(RenderManager::get().allocateMaterial(texture));
+				int id = materials.size() - 1;
+                registry.emplace<MaterialComponent>(model, id);
+				if (texture.mode == alphaMode::MASK) {
+                    registry.emplace<TransparencyComponent>(model); // yeah idk what else to do other then just have this added
+                }
+            }
+            registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
+            Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+        }
     }
 
     void SceneManager::shutdown() {

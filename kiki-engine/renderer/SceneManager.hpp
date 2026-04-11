@@ -18,16 +18,18 @@ namespace Kiki {
         public:
         static SceneManager& get();
 
-        int createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti);
+        // int createMaterial(stbi_uc* imageData, int baseWidthi, int baseHeighti);
         Material const& getMaterial(int id);
 
-        int createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec2> const& texCoords);
+        int createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords);
         Mesh& getMesh(int id);
 
         void clearLevel();
         void shutdown();
 
         entt::entity loadModel(const std::string path, const std::string name = "Object", PhysicsType type = PhysicsType::Static);
+
+        void loadScene(const Mscene& scene);
 
         private:
         SceneManager() = default;

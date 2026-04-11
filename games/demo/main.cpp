@@ -1,14 +1,15 @@
 #include <kiki.h>
+
 #include "component/CharacterComponent.h"
 #include "system/CharacterSystem.h"
 #include "system/ThirdPersonCameraSystem.h"
 #include "system/GoalTriggerSystem.h"
-int main(int argc, char** argv) {
-   
 
-	Engine engine;
+int main(int argc, char** argv) {
+	Kiki::Engine engine;
 	engine.Init();
-	auto& world = World::Get();
+  
+  	auto& world = World::Get();
 	auto& sceneManager = Kiki::SceneManager::get();
     auto cube = sceneManager.loadModel("test_cube_tex.glb", "Cube", PhysicsType::Dynamic);
     auto objects = world.Query<TransformComponent,TagComponent>();
@@ -30,6 +31,21 @@ int main(int argc, char** argv) {
 	// use left click to disable cursor and control camera, esc to quit.
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
 	engine.RegisterSystem<GoalTriggerSystem>();
-    engine.Run();
+  
+  
 
+	//Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb");
+	Kiki::SceneManager::get().loadScene(std::move(scene));
+
+	// example of setting a custom skybox
+	Kiki::RenderManager::get().setCustomSkybox(
+		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_right.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_left.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_up.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_down.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_front.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_back.png"
+	);
+
+    engine.Run();
 }

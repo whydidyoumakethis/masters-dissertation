@@ -3,14 +3,19 @@
 
 #include "VulkanWrapper.hpp"
 #include "VulkanWindow.hpp"
+#include "Image.hpp"
 
 #include <cstdint>
 
 namespace rutils {
     DescriptorSetLayout createSceneDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createObjectDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createMaterialDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createCubemapDescriptorLayout(VulkanWindow const& window);
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors = 2048, std::uint32_t aMaxSets = 1024);
     VkDescriptorSet allocDescSet(VulkanWindow const& window, VkDescriptorPool aPool, VkDescriptorSetLayout aSetLayout);
+    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler);
 }
 
 #endif
