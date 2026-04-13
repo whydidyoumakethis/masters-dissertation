@@ -12,6 +12,7 @@
 #include "MessageCenter.h"
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
+#include "debugging/DebugSystem.hpp"
 
 #include <chrono>
 
@@ -23,7 +24,7 @@ namespace Kiki {
 			_scheduler.RegisterSystem<TransformSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
-			
+			_scheduler.RegisterSystem<Kiki::DebugSystem>();
 		}
 
 		// for game layer to register systems
@@ -40,14 +41,14 @@ namespace Kiki {
 		void Run() {
 			_running = true;
 
-			// Temp addition for debug cam
-			DebugCamera cam;
-			//RenderManager::get().setCamera(cam);
+// 			// Temp addition for debug cam
+// 			DebugCamera cam;
+// 			//RenderManager::get().setCamera(cam);
 
-#			ifndef NDEBUG
-			DebugInterface& debugInterface = Kiki::DebugInterface::get();
-			debugInterface.initialise();
-#			endif
+// #			ifndef NDEBUG
+// 			DebugInterface& debugInterface = Kiki::DebugInterface::get();
+// 			debugInterface.initialise();
+// #			endif
 
 			auto previousClock = std::chrono::steady_clock::now();
 
@@ -57,16 +58,16 @@ namespace Kiki {
 				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
 				previousClock = now;
 				MessageCenter::Flush();
-				cam.update(dt);
+				// cam.update(dt);
 #				ifndef NDEBUG
-				debugInterface.update(dt);
+				// debugInterface.update(dt);
 #				endif
 				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
 
-			debugInterface.shutdown();
+			// debugInterface.shutdown();
 			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
 		}
 	void Quit() {

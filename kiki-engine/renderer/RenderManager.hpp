@@ -14,6 +14,7 @@
 #include "Camera.hpp"
 #include "utils/Pipelines.hpp"
 #include "GltfLoader/GltfLoaderAssimp.h"
+#include "debugging/DebugCamera.hpp"
 
 
 #include <glm/glm.hpp>
@@ -146,6 +147,8 @@ namespace Kiki {
 
         World& world = World::Get();
         entt::registry& registry = world.Registry();
+
+        DebugCamera& debugCam = DebugCamera::get();
     };
 }
 

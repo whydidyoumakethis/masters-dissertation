@@ -7,6 +7,11 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace Kiki {
+    DebugCamera& DebugCamera::get() {
+        static DebugCamera instance;
+        return instance;
+    }
+
     void DebugCamera::update(float dt) {
         TransformComponent& transform = registry.get<TransformComponent>(camera);
         glm::mat4 translation = transform.worldMatrix;
@@ -48,5 +53,9 @@ namespace Kiki {
 
         if (inputManager.isKeyDown(GLFW_KEY_F))
             SceneManager::get().clearLevel();
+    }
+
+    void DebugCamera::reset() {
+        
     }
 }

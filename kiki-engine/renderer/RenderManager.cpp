@@ -690,17 +690,30 @@ namespace Kiki {
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
         float const aspect = aFramebufferWidth / float(aFramebufferHeight);
-        auto cameras = world.Query<CameraComponent>();
 		CameraComponent camComp;
         TransformComponent transformComp;
 
-        for (auto cam : cameras) {
-            auto comp = registry.get<CameraComponent>(cam);
+        if (debugCam.enabled) {
+            if (registry.valid(debugCam.camera)) {
+                if (registry.all_of<CameraComponent>(debugCam.camera))
+                    camComp = registry.get<CameraComponent>(debugCam.camera);
+                if (registry.all_of<TransformComponent>(debugCam.camera))
+                    transformComp = registry.get<TransformComponent>(debugCam.camera);
+            } else {
+                debugCam.reset();
+            }
+        } else {
+            auto cameras = world.Query<CameraComponent>();
 
-            if (comp.isMain) {
-                camComp = comp;
-                transformComp = registry.get<TransformComponent>(cam);
-                break;
+            for (auto cam : cameras) {
+                auto comp = registry.get<CameraComponent>(cam);
+
+                if (comp.isMain) {
+                    camComp = comp;
+                    if (registry.all_of<TransformComponent>(cam))
+                        transformComp = registry.get<TransformComponent>(cam);
+                    break;
+                }
             }
         }
 
@@ -713,7 +726,7 @@ namespace Kiki {
 
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
 
-        aSceneUniforms.camera = glm::inverse(transformComp.worldMatrix); //world matrix doesn't work yet
+        aSceneUniforms.camera = glm::inverse(transformComp.worldMatrix); 
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
