@@ -2,6 +2,7 @@
 #define KIKI_DEBUGGING_DEBUGINTERFACE
 
 #include "windows/EntityViewer.hpp"
+#include "DebugCamera.hpp"
 
 namespace Kiki {
     class DebugInterface {
@@ -19,9 +20,12 @@ namespace Kiki {
         DebugInterface& operator=(const DebugInterface&) = delete;
 
         bool initialised = false;
+        bool enabled = false;
+        bool debugCamAllowed = true;
 
         bool entityViewerVisible, logVisible;
         debug::EntityViewer& entityViewer = debug::EntityViewer::get();
+        DebugCamera& debugCam = DebugCamera::get();
     };
 }
 

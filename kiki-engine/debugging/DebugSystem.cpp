@@ -11,7 +11,9 @@ namespace Kiki {
 
     void DebugSystem::OnUpdate(float dt) {
 #	    ifndef NDEBUG
-        cam.update(dt);
+        if (cam.enabled) 
+            cam.update(dt);
+            
         interface.update(dt);
 #       endif
     }

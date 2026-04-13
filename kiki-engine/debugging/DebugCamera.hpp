@@ -12,10 +12,11 @@ namespace Kiki {
         DebugCamera(const DebugCamera&) = delete;
         DebugCamera& operator=(const DebugCamera&) = delete;
 
-        float lastX, lastY;
+        float lastX, lastY, yaw, pitch;
 
         Kiki::InputManager& inputManager = Kiki::InputManager::get();
-        entt::registry& registry = World::Get().Registry();
+        World& world = World::Get();
+        entt::registry& registry = world.Registry();
 
         public:
         static DebugCamera& get();
@@ -25,10 +26,11 @@ namespace Kiki {
         float speed = 10.f;
         float speedUp = 5.0f;
         float slowDown = 0.05f;
-        float sensitivity = 0.75f;
+        float sensitivity = 0.25f;
 
         void update(float dt);
         void reset();
+        void enter();
     };
 }
 

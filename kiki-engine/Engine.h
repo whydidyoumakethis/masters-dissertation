@@ -41,15 +41,6 @@ namespace Kiki {
 		void Run() {
 			_running = true;
 
-// 			// Temp addition for debug cam
-// 			DebugCamera cam;
-// 			//RenderManager::get().setCamera(cam);
-
-// #			ifndef NDEBUG
-// 			DebugInterface& debugInterface = Kiki::DebugInterface::get();
-// 			debugInterface.initialise();
-// #			endif
-
 			auto previousClock = std::chrono::steady_clock::now();
 
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
@@ -58,16 +49,11 @@ namespace Kiki {
 				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
 				previousClock = now;
 				MessageCenter::Flush();
-				// cam.update(dt);
-#				ifndef NDEBUG
-				// debugInterface.update(dt);
-#				endif
 				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
 
-			// debugInterface.shutdown();
 			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
 		}
 	void Quit() {

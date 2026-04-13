@@ -12,7 +12,7 @@ namespace Kiki {
         DebugCamera& cam = DebugCamera::get();
 
         public:
-        Phase GetPhase() const override { return Phase::PostUpdate; }
+        Phase GetPhase() const override { return Phase::PreUpdate; }
 
         void OnStart() override;
 
