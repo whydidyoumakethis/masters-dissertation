@@ -11,6 +11,7 @@
 #include <imgui.h>
 
 #include <cstring>
+#include <iostream>
 
 namespace debug {
     EntityViewer& EntityViewer::get() {
@@ -72,12 +73,31 @@ namespace debug {
         ImGui::BeginGroup();
 
         // Entities list
-        auto t = world.Query<entt::entity>();
+        static std::vector<entt::id_type> filteredComponents;
+        auto allEntities = world.Query<entt::entity>();
         std::vector<entt::entity> entities;
 
-        for (auto e : t) {
+        for (auto e : allEntities) {
             if (registry.valid(e)) {
-                entities.push_back(e);
+                bool match = true;
+
+                if (filteredComponents.size() > 0) {
+                    for (auto comp : filteredComponents) {
+                        auto* storage = registry.storage(comp);
+                        if (storage == nullptr) {
+                            match = false;
+                            break;
+                        }
+
+                        if (!storage->contains(e)) {
+                            match = false;
+                            break;
+                        }
+                    }
+                }
+
+                if (match)
+                    entities.push_back(e);
 
                 if (!registry.all_of<DebugComponent>(e))
                     registry.emplace<DebugComponent>(e, true);
@@ -87,66 +107,68 @@ namespace debug {
         int numEntities = entities.size();
 
         if (ImGui::BeginChild("Entities", ImVec2(722.0f, -(ImGui::GetTextLineHeightWithSpacing() + 6)), ImGuiChildFlags_Borders, ImGuiWindowFlags_NoMove)) {
-            int numRows = (numEntities + 9) / 10;
-            ImGuiListClipper clipper;
-            ImDrawList* drawList = ImGui::GetWindowDrawList();
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 8.0f));
+            if (numEntities > 0) {
+                int numRows = (numEntities + 9) / 10;
+                ImGuiListClipper clipper;
+                ImDrawList* drawList = ImGui::GetWindowDrawList();
+                ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 8.0f));
 
-            clipper.Begin(numRows);
-            while (clipper.Step()) {
-                for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
-                    for (int j = 0; j < 10; j++) {
-                        int index = (i * 10) + j;
+                clipper.Begin(numRows, 70.0f);
+                while (clipper.Step()) {
+                    for (int i = clipper.DisplayStart; i < clipper.DisplayEnd; i++) {
+                        for (int j = 0; j < 10; j++) {
+                            int index = (i * 10) + j;
 
-                        if (index >= numEntities) 
-                            break; 
+                            if (index >= numEntities) 
+                                break; 
 
-                        entt::entity e = entities[index];
-                        auto id = std::to_string(entt::to_integral(e));
-                        bool selected = selectedEntity == e;
+                            entt::entity e = entities[index];
+                            auto id = std::to_string(entt::to_integral(e));
+                            bool selected = selectedEntity == e;
 
-                        ImGui::PushID(id.c_str());
-                        ImVec2 pos = ImGui::GetCursorScreenPos();
+                            ImGui::PushID(id.c_str());
+                            ImVec2 pos = ImGui::GetCursorScreenPos();
 
-                        // Add button
-                        if (!selected) {
-                            ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 0.2f));
-                            ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.4f));
-                            ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.8f));
-                        }
-
-                        if (ImGui::Button("", ImVec2(62.0f, 62.0f))) {
-                            if (selected) {
-                                selectedEntity = entt::null;
-                            } else {
-                                selectedEntity = e;
-                                world.GetComponent<DebugComponent>(e)->n = false;
+                            // Add button
+                            if (!selected) {
+                                ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.3f, 0.3f, 0.3f, 0.2f));
+                                ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.3f, 0.3f, 0.3f, 0.4f));
+                                ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.3f, 0.3f, 0.3f, 0.8f));
                             }
+
+                            if (ImGui::Button("", ImVec2(62.0f, 62.0f))) {
+                                if (selected) {
+                                    selectedEntity = entt::null;
+                                } else {
+                                    selectedEntity = e;
+                                    world.GetComponent<DebugComponent>(e)->n = false;
+                                }
+                            }
+
+                            if (!selected)
+                                ImGui::PopStyleColor(3);
+
+                            drawList->AddText(ImVec2(pos.x + 2, pos.y + 2), ImGui::GetColorU32(selected ? ImGuiCol_Text:ImGuiCol_TextDisabled), id.c_str());
+
+                            if (world.GetComponent<DebugComponent>(e)->n)
+                                drawList->AddCircleFilled(ImVec2(pos.x + 58.0f, pos.y + 4.0f), 2.0f, ImGui::GetColorU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)));
+
+                            if (registry.all_of<TagComponent>(e)) {
+                                ImGui::PushClipRect(pos, ImVec2(pos.x + 62.0f, pos.y + 62.0f), true);
+                                drawList->AddText(nullptr, 8.0f, ImVec2(pos.x + 2, pos.y + 52), ImGui::GetColorU32(ImGuiCol_TextDisabled), world.GetComponent<TagComponent>(e)->name.c_str());
+                                ImGui::PopClipRect();
+                            }
+
+                            ImGui::PopID();
+
+                            if (j < 9) 
+                                ImGui::SameLine();
                         }
-
-                        if (!selected)
-                            ImGui::PopStyleColor(3);
-
-                        drawList->AddText(ImVec2(pos.x + 2, pos.y + 2), ImGui::GetColorU32(selected ? ImGuiCol_Text:ImGuiCol_TextDisabled), id.c_str());
-
-                        if (world.GetComponent<DebugComponent>(e)->n)
-                            drawList->AddCircleFilled(ImVec2(pos.x + 58.0f, pos.y + 4.0f), 2.0f, ImGui::GetColorU32(ImVec4(0.0f, 1.0f, 0.0f, 1.0f)));
-
-                        if (registry.all_of<TagComponent>(e)) {
-                            ImGui::PushClipRect(pos, ImVec2(pos.x + 62.0f, pos.y + 62.0f), true);
-                            drawList->AddText(nullptr, 8.0f, ImVec2(pos.x + 2, pos.y + 52), ImGui::GetColorU32(ImGuiCol_TextDisabled), world.GetComponent<TagComponent>(e)->name.c_str());
-                            ImGui::PopClipRect();
-                        }
-
-                        ImGui::PopID();
-
-                        if (j < 9) 
-                            ImGui::SameLine();
                     }
                 }
-            }
 
-            ImGui::PopStyleVar();
+                ImGui::PopStyleVar();
+            }
         }
         ImGui::EndChild();
 
@@ -155,7 +177,115 @@ namespace debug {
         ImGui::Text("%d entities", numEntities);
         ImGui::SameLine(652.0f);
         if (ImGui::Button("Filter", ImVec2(70.0f, 0.0f))) {
-            
+            ImGui::OpenPopup("FilterList");
+        }
+
+        if (ImGui::BeginPopup("FilterList")) {
+            auto tagId = entt::type_id<TagComponent>().hash();
+            bool tag = std::find(filteredComponents.begin(), filteredComponents.end(), tagId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("TagComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtertag", &tag)) {
+                if (tag) {
+                    filteredComponents.push_back(tagId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), tagId), filteredComponents.end());
+                }
+            }
+
+            auto transformId = entt::type_id<TransformComponent>().hash();
+            bool transform = std::find(filteredComponents.begin(), filteredComponents.end(), transformId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("TransformComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtertransform", &transform)) {
+                if (transform) {
+                    filteredComponents.push_back(transformId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), transformId), filteredComponents.end());
+                }
+            }
+
+            auto activeId = entt::type_id<ActiveComponent>().hash();
+            bool active = std::find(filteredComponents.begin(), filteredComponents.end(), activeId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("ActiveComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filteractive", &active)) {
+                if (active) {
+                    filteredComponents.push_back(activeId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), activeId), filteredComponents.end());
+                }
+            }
+
+            auto cameraId = entt::type_id<CameraComponent>().hash();
+            bool camera = std::find(filteredComponents.begin(), filteredComponents.end(), cameraId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("CameraComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtercamera", &camera)) {
+                if (camera) {
+                    filteredComponents.push_back(cameraId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), cameraId), filteredComponents.end());
+                }
+            }
+
+            auto colourId = entt::type_id<ColourComponent>().hash();
+            bool colour = std::find(filteredComponents.begin(), filteredComponents.end(), colourId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("ColourComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtercolour", &colour)) {
+                if (colour) {
+                    filteredComponents.push_back(colourId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), colourId), filteredComponents.end());
+                }
+            }
+
+            auto meshId = entt::type_id<MeshComponent>().hash();
+            bool mesh = std::find(filteredComponents.begin(), filteredComponents.end(), meshId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("MeshComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtermesh", &mesh)) {
+                if (mesh) {
+                    filteredComponents.push_back(meshId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), meshId), filteredComponents.end());
+                }
+            }
+
+            auto materialId = entt::type_id<MaterialComponent>().hash();
+            bool material = std::find(filteredComponents.begin(), filteredComponents.end(), materialId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("MaterialComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtermaterial", &material)) {
+                if (material) {
+                    filteredComponents.push_back(materialId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), materialId), filteredComponents.end());
+                }
+            }
+
+            auto transparencyId = entt::type_id<TransparencyComponent>().hash();
+            bool transparency = std::find(filteredComponents.begin(), filteredComponents.end(), transparencyId) != filteredComponents.end();
+            ImGui::AlignTextToFramePadding();
+            ImGui::Text("TransparencyComponent:");
+            ImGui::SameLine(200.0f);
+            if (ImGui::Checkbox("##filtertransparency", &transparency)) {
+                if (transparency) {
+                    filteredComponents.push_back(transparencyId);
+                } else {
+                    filteredComponents.erase(std::remove(filteredComponents.begin(), filteredComponents.end(), transparencyId), filteredComponents.end());
+                }
+            }
+
+            ImGui::EndPopup();
         }
 
         ImGui::EndGroup();
@@ -384,11 +514,23 @@ namespace debug {
         selectedEntity = entt::null;
     }
 
-    void destroyAllEntities() {
+    void EntityViewer::destroyAllEntities() {
+        auto allEntities = world.Query<entt::entity>();
 
+        for (auto e : allEntities) {
+            if (registry.valid(e)) {
+                world.DestroyEntity(e);
+            }
+        }
     }
 
-    void destroyMeshEntities() {
+    void EntityViewer::destroyMeshEntities() {
+        auto allEntities = world.Query<MeshComponent>();
 
+        for (auto e : allEntities) {
+            if (registry.valid(e)) {
+                world.DestroyEntity(e);
+            }
+        }
     }
 }

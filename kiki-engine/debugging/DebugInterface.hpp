@@ -3,6 +3,7 @@
 
 #include "windows/EntityViewer.hpp"
 #include "DebugCamera.hpp"
+#include "renderer/RenderManager.hpp"
 
 namespace Kiki {
     class DebugInterface {
@@ -26,6 +27,8 @@ namespace Kiki {
         bool entityViewerVisible, logVisible;
         debug::EntityViewer& entityViewer = debug::EntityViewer::get();
         DebugCamera& debugCam = DebugCamera::get();
+
+        RenderManager& renderManager = RenderManager::get();
     };
 }
 

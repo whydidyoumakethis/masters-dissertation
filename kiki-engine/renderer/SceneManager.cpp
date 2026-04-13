@@ -190,6 +190,14 @@ namespace Kiki {
         }
     }
 
+    bool SceneManager::validMaterial(int id) {
+        return id >= 0 && id < materials.size();
+    }
+
+    bool SceneManager::validMesh(int id) {
+        return id >= 0 && id < meshes.size();
+    }
+
     void SceneManager::shutdown() {
         materials.clear();
         meshes.clear();

@@ -52,6 +52,19 @@ namespace Kiki {
         rutils::CubemapPaths paths;
     };
 
+    struct ShaderPaths {
+        std::filesystem::path pbr_v = "default.vert.spv";
+        std::filesystem::path pbr_f = "default.frag.spv";
+        std::filesystem::path pbr_alpha_v = "default.vert.spv";
+        std::filesystem::path pbr_alpha_f = "alpha.frag.spv";
+        std::filesystem::path deferred_geometry_v = "default.vert.spv";
+        std::filesystem::path deferred_geometry_f = "deferred_geometry.frag.spv";
+        std::filesystem::path deferred_geometry_alpha_v = "default.vert.spv";
+        std::filesystem::path deferred_geometry_alpha_f = "deferred_geometry_alpha.frag.spv";
+        std::filesystem::path deferred_lighting_v = "fullscreen.vert.spv";
+        std::filesystem::path deferred_lighting_f = "deferred_lighting.frag.spv";
+    };
+
     class RenderManager {
         private:
         RenderManager() = default;
@@ -140,6 +153,8 @@ namespace Kiki {
         // https://registry.khronos.org/vulkan/specs/latest/man/html/vkCmdUpdateBuffer.html
         static_assert(sizeof(SceneUniform) <= 65536, "SceneUniform must be less than 65536 bytes for vkCmdUpdateBuffer");
         static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
+
+        ShaderPaths shaderPaths;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);

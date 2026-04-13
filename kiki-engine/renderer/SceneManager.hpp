@@ -31,6 +31,9 @@ namespace Kiki {
 
         void loadScene(const Mscene& scene);
 
+        bool validMaterial(int id);
+        bool validMesh(int id);
+
         private:
         SceneManager() = default;
         ~SceneManager() = default;

@@ -20,10 +20,9 @@ namespace debug {
         entt::entity selectedEntity = entt::null;
 
         void deleteSelected();
+        void destroyAllEntities();
+        void destroyMeshEntities();
     };
-
-    void destroyAllEntities();
-    void destroyMeshEntities();
 }
 
 #endif

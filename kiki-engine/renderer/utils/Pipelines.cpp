@@ -3,6 +3,7 @@
 #include "ToString.hpp"
 #include "Shaders.hpp"
 #include "../../logging/FatalError.hpp"
+#include "renderer/RenderManager.hpp"
 
 #include <print>
 #include <iostream>
@@ -10,6 +11,8 @@
 namespace rutils {
     Pipelines createAllPipelines(VulkanWindow const& window, PipelineLayouts const& pipelineLayouts) {
         Pipelines pipelines;
+
+        std::filesystem::current_path(PROJECT_SHADER_PATH);
 
         pipelines.pbr = createPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.pbr_alpha = createAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
@@ -118,9 +121,8 @@ namespace rutils {
         //
         // This uses a Vulkan 1.4 feature (from VK KHR maintenance5), which allows us to skip the VkShaderModule
         // creation and instead directly pass SPIR-V code to the pipeline creation.
-        std::filesystem::current_path(PROJECT_BINARY_DIR);
-        auto const vShader = rutils::loadShader("shaders/compiled/default.vert.spv");
-        auto const fShader = rutils::loadShader("shaders/compiled/default.frag.spv");
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.pbr_v.c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.pbr_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -255,9 +257,8 @@ namespace rutils {
         //
         // This uses a Vulkan 1.4 feature (from VK KHR maintenance5), which allows us to skip the VkShaderModule
         // creation and instead directly pass SPIR-V code to the pipeline creation.
-        std::filesystem::current_path(PROJECT_BINARY_DIR);
-        auto const vShader = rutils::loadShader("shaders/compiled/default.vert.spv");
-        auto const fShader = rutils::loadShader("shaders/compiled/alpha.frag.spv");
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.pbr_alpha_v.c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.pbr_alpha_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -377,8 +378,8 @@ namespace rutils {
     Pipeline createDeferredGeometryPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
-        auto const vertSpirV = rutils::loadShader("shaders/compiled/default.vert.spv");
-        auto const fragSpirV = rutils::loadShader("shaders/compiled/deferred_geometry.frag.spv");
+        auto const vertSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_v.c_str());
+        auto const fragSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -499,8 +500,8 @@ namespace rutils {
     Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
-        auto const vertSpirV = rutils::loadShader("shaders/compiled/default.vert.spv");
-        auto const fragSpirV = rutils::loadShader("shaders/compiled/deferred_geometry_alpha.frag.spv");
+        auto const vertSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_alpha_v.c_str());
+        auto const fragSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_alpha_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -634,8 +635,8 @@ namespace rutils {
     Pipeline createDeferredLightingPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
-        auto const vertSpirV = rutils::loadShader("shaders/compiled/fullscreen.vert.spv");
-        auto const fragSpirV = rutils::loadShader("shaders/compiled/deferred_lighting.frag.spv");
+        auto const vertSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.c_str());
+        auto const fragSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
