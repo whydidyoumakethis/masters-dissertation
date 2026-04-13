@@ -20,7 +20,7 @@ namespace Kiki {
 
         bool initialised = false;
 
-        bool entityViewerVisible;
+        bool entityViewerVisible, logVisible;
         debug::EntityViewer& entityViewer = debug::EntityViewer::get();
     };
 }

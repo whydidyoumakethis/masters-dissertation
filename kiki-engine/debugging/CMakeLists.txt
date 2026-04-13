@@ -16,4 +16,5 @@ target_sources(kiki
     TYPE HEADERS
     FILES 
       windows/EntityViewer.hpp
+      windows/Log.hpp
 )

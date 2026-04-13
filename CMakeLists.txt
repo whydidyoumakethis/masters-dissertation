@@ -176,7 +176,7 @@ if(NOT imgui_POPULATED)
 
     # Link backends to their respective requirements
     # 'volk' and 'glfw' must be defined before this point
-    target_link_libraries(imgui PUBLIC volk glfw)
+    target_link_libraries(imgui PUBLIC volk glfw spdlog::spdlog)
     
     # If using volk (Vulkan Loader), ImGui needs this definition
     target_compile_definitions(imgui PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
@@ -202,7 +202,6 @@ target_include_directories(KikiDeps INTERFACE
     ${glm_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR} 
     ${stb_SOURCE_DIR}
-    
 )
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"

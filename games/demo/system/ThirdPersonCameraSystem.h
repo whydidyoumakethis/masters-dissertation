@@ -33,7 +33,7 @@ public:
 				tpcc->followTarget = entity;
 			}
 		}
-		RenderManager::get().setCamera(camera);
+		World::Get().GetComponent<CameraComponent>(camera.camera)->isMain = true;
 	}
 	
 private:

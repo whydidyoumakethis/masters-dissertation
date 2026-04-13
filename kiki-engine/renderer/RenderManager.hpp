@@ -95,8 +95,6 @@ namespace Kiki {
 
         Skybox skybox;
 
-        Camera camera; // default cam
-
         public:
         static RenderManager& get();
 
@@ -117,8 +115,6 @@ namespace Kiki {
 
         void nextFrame();
         void shutdown();
-
-        void setCamera(Camera&);
 
         VkDevice& getDevice() { return window.device; };
         GLFWwindow* getWindow() { return window.window; };
@@ -148,6 +144,8 @@ namespace Kiki {
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
         void createSkybox(const rutils::CubemapPaths& paths);
 
+        World& world = World::Get();
+        entt::registry& registry = world.Registry();
     };
 }
 

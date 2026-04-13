@@ -690,28 +690,36 @@ namespace Kiki {
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
         float const aspect = aFramebufferWidth / float(aFramebufferHeight);
-		auto camSetting = World::Get().Registry().get<CameraComponent>(camera.camera);
+        auto cameras = world.Query<CameraComponent>();
+		CameraComponent camComp;
+        TransformComponent transformComp;
+
+        for (auto cam : cameras) {
+            auto comp = registry.get<CameraComponent>(cam);
+
+            if (comp.isMain) {
+                camComp = comp;
+                transformComp = registry.get<TransformComponent>(cam);
+                break;
+            }
+        }
+
         aSceneUniforms.projection = glm::perspectiveRH_ZO(
-            glm::radians(camSetting.fov), // fov
+            glm::radians(camComp.fov), // fov
             aspect,
-            camSetting.nearPlane, // near
-            camSetting.farPlane // far
+            camComp.nearPlane, // near
+            camComp.farPlane // far
         );
 
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
 
-        auto& registry = World::Get().Registry();
-        aSceneUniforms.camera = glm::inverse(registry.get<TransformComponent>(camera.camera).worldMatrix); //world matrix doesn't work yet
+        aSceneUniforms.camera = glm::inverse(transformComp.worldMatrix); //world matrix doesn't work yet
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
         aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
         aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
-        aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
-    }
-
-    void RenderManager::setCamera(Camera& c) {
-        camera = c;
+        aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
 
     void RenderManager::setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info) {

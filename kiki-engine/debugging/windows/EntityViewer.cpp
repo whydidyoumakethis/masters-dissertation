@@ -268,6 +268,11 @@ namespace debug {
                     ImGui::Text("Far:");
                     ImGui::SameLine(100.0f);
                     ImGui::InputFloat("##editfar", &component->farPlane, 0.0f, 0.0f, "%.1f");
+
+                    ImGui::AlignTextToFramePadding();
+                    ImGui::Text("Main:");
+                    ImGui::SameLine(100.0f);
+                    ImGui::Checkbox("##editmaincam", &component->isMain);
                     
                     ImGui::Dummy(ImVec2(0.0f, 10.0f));
                     ImGui::Indent(indent);
