@@ -41,8 +41,8 @@ namespace Kiki {
 			_running = true;
 
 			// Temp addition for debug cam
-			//DebugCamera cam;
-			//RenderManager::get().setCamera(cam);
+			DebugCamera cam;
+			RenderManager::get().setCamera(cam);
 
 #			ifndef NDEBUG
 			DebugInterface& debugInterface = Kiki::DebugInterface::get();
@@ -57,7 +57,7 @@ namespace Kiki {
 				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
 				previousClock = now;
 				MessageCenter::Flush();
-				//cam.update(dt);
+				cam.update(dt);
 #				ifndef NDEBUG
 				debugInterface.update(dt);
 #				endif

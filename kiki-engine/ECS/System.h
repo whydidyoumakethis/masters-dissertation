@@ -119,8 +119,8 @@ public:
         Kiki::WindowInfo info;
         // info.fullscreen = false;
         // info.monitor = 0;
-        // info.width = 0;
-        // info.height = 0;
+        info.width = 0;
+        info.height = 0;
         // info.decorations = false;
         // info.resizeable = false;
 

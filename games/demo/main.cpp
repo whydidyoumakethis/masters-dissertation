@@ -5,6 +5,8 @@
 #include "system/ThirdPersonCameraSystem.h"
 #include "system/GoalTriggerSystem.h"
 
+#include "GltfLoader/GltfLoaderAssimp.h"
+
 int main(int argc, char** argv) {
 	Kiki::Engine engine;
 	engine.Init();
@@ -23,8 +25,9 @@ int main(int argc, char** argv) {
 			world.Registry().emplace<CharacterComponent>(e);
         }
     }
-	sceneManager.loadModel("road.glb");
+	sceneManager.loadScene(Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "ABeautifulGame.glb"));
 
+	sceneManager.loadModel("road.glb");
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
 	// use wasd to move the character, shift to speed up, space to jump.
 	engine.RegisterSystem<CharacterSystem>();

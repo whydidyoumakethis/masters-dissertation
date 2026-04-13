@@ -1,6 +1,8 @@
 #ifndef KIKI_DEBUGGING_DEBUGINTERFACE
 #define KIKI_DEBUGGING_DEBUGINTERFACE
 
+#include "windows/EntityViewer.hpp"
+
 namespace Kiki {
     class DebugInterface {
         public:
@@ -18,7 +20,8 @@ namespace Kiki {
 
         bool initialised = false;
 
-        bool entityViewer;
+        bool entityViewerVisible;
+        debug::EntityViewer& entityViewer = debug::EntityViewer::get();
     };
 }
 

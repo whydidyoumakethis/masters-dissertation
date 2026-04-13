@@ -5,9 +5,7 @@
 #include <imgui_impl_vulkan.h>
 #include <spdlog/spdlog.h>
 #include <renderer/RenderManager.hpp>
-
-#include "windows/EntityViewer.hpp"
-
+#include <Components/DebugComponent.hpp>
 
 namespace Kiki {
     DebugInterface& DebugInterface::get() {
@@ -29,8 +27,6 @@ namespace Kiki {
                 io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
                 io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;
 
-                
-
                 ImGui_ImplGlfw_InitForVulkan(Kiki::RenderManager::get().getWindow(), true);
 
                 ImGui_ImplVulkan_InitInfo initInfo = {};
@@ -40,6 +36,22 @@ namespace Kiki {
                 }, &initInfo.Instance);
 
                 ImGui_ImplVulkan_Init(&initInfo);
+
+                // Set global style
+                ImGuiStyle& style = ImGui::GetStyle();
+                style.WindowBorderSize = 1.0f;
+                style.ChildBorderSize = 1.0f;
+                style.WindowRounding = 4.0f;
+                style.ChildRounding = 4.0f;
+                style.PopupRounding = 4.0f;
+                style.FrameRounding = 2.0f;
+
+                auto& world = World::Get();
+                auto& registry = world.Registry();
+
+                for (auto e : world.Query<entt::entity>()) {
+                    registry.emplace<DebugComponent>(e);
+                }
             } else {
                 spdlog::warn("DebugInterface already initialised");
             }
@@ -58,8 +70,8 @@ namespace Kiki {
         ImGui::SetNextWindowSize(ImVec2(550, 680), ImGuiCond_FirstUseEver);
         ImGui::Begin("kiki debugger");
 
-        if (ImGui::Button(entityViewer ? "Close Entity Viewer":"Open Entity Viewer")) 
-            entityViewer = !entityViewer;
+        if (ImGui::Button(entityViewerVisible ? "Close Entity Viewer":"Open Entity Viewer")) 
+            entityViewerVisible = !entityViewerVisible;
 
         if (ImGui::CollapsingHeader("Performance")) {
             ImGui::Text("FPS: %.1f", io.Framerate);
@@ -74,11 +86,11 @@ namespace Kiki {
 
         ImGui::End();
 
-        if (entityViewer)
-            debug::EntityViewer::draw(&entityViewer);
+        if (entityViewerVisible)
+            entityViewer.draw(&entityViewerVisible);
 
 
-        // ImGui::ShowDemoWindow();
+        ImGui::ShowDemoWindow();
     }
 
     void DebugInterface::shutdown() {
