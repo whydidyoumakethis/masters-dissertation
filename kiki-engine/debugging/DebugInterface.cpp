@@ -340,7 +340,7 @@ namespace Kiki {
 
                     std::thread([path]() {
                         std::filesystem::path p = path;
-                        SceneManager::get().loadModel(p);
+                        SceneManager::get().loadModel(p.string());
                         loading = false;
                     }).detach();
                 }
