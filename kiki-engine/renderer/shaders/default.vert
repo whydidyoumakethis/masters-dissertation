@@ -27,8 +27,8 @@ layout(location = 2) out vec3 v2fWorldSpace;
 
 void main() {
     v2fTexCoord = iTexCoord;
-    v2fNormal = iNormal;
-    v2fWorldSpace = iPosition;
+    v2fNormal = normalize(transpose(inverse(mat3(object.model))) * iNormal);
+    v2fWorldSpace = (object.model * vec4(iPosition, 1.f)).xyz;
 
     gl_Position = uScene.projCam * object.model * vec4(iPosition, 1.f);
 }
