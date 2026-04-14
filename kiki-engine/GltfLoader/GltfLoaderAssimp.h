@@ -18,7 +18,7 @@ struct Mmesh {
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
-	int matIndex;
+	int matIndex = 0;
 
 };
 
@@ -107,16 +107,30 @@ struct Mtexture {
 	}
 };
 
+enum class MlightType {
+	POINT,
+	DIRECTIONAL,
+	SPOT
+};
+
 struct MmeshInstance {
 	int meshIndex;
 	glm::mat4 transform;
 
 };
-
+struct Mlights {
+	std::string name;
+	glm::vec3 color;
+	glm::vec3 position;
+	MlightType type = MlightType::POINT;
+	glm::vec3 direction = glm::vec3(0.0f, 0.0f, 0.0f);
+	
+};
 struct Mscene {
+	std::vector<MmeshInstance> instances;
 	std::vector<Mmesh> meshes;
 	std::vector<Mtexture> textures;
-	std::vector<MmeshInstance> instances;
+	std::vector<Mlights> lights;
 	glm::mat4 worldTransform;
 };
 
@@ -240,6 +254,46 @@ namespace Kiki {
 			}
 		}
 
+		static glm::mat4 getNodeWorldTransform(const aiNode* node) {
+			glm::mat4 result(1.0f);
+
+			const aiNode* current = node;
+			while (current) {
+				result = toglmMat4(current->mTransformation) * result;
+				current = current->mParent;
+			}
+
+			return result;
+		}
+
+		static void collectLights(const aiScene* scene, Mscene& out) {
+
+			for (unsigned int i = 0; i < scene->mNumLights; i++) {
+				aiLight* aiLight = scene->mLights[i];
+				if (!aiLight) continue;
+				
+				Mlights light;
+				light.name = aiLight->mName.C_Str();
+
+				const aiNode* lightNode = scene->mRootNode->FindNode(aiLight->mName);
+				glm::mat4 nodeworld = glm::mat4(1.0f);
+				if (lightNode) {
+					nodeworld = getNodeWorldTransform(lightNode);
+				}
+
+				glm::vec4 localPos(aiLight->mPosition.x, aiLight->mPosition.y, aiLight->mPosition.z, 1.0f);
+				glm::vec4 worldPos = nodeworld * localPos;
+				light.position = glm::vec3(worldPos);
+				glm::vec3 rawcolor(aiLight->mColorDiffuse.r, aiLight->mColorDiffuse.g, aiLight->mColorDiffuse.b);
+
+				std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
+				std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
+				light.color = rawcolor;
+				out.lights.push_back(light);
+			}
+
+		}
+
 		static Mscene loadScene(const std::filesystem::path& path){
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
@@ -251,6 +305,8 @@ namespace Kiki {
 			out.worldTransform = toglmMat4(t);
 
 			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
+
+			collectLights(scene, out);
 
 			for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
 				Mmesh mesh;
