@@ -96,7 +96,7 @@ namespace rutils {
         vmaUnmapMemory(aAllocator.allocator, staging.allocation);
 
         //// Free image data
-        //stbi_image_free(imageData);
+        // stbi_image_free(imageData);
 
         // Create image
         Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, VK_FORMAT_R8G8B8A8_SRGB, aContext, 
@@ -301,6 +301,10 @@ namespace rutils {
         }
 
         vmaUnmapMemory(allocator.allocator, staging.allocation);
+
+        // for (int i = 0; i < 6; i++) {
+        //     stbi_image_free(faces[i]);
+        // }
 
         // Create image        
         Image ret = createImageTexture(

@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui_impl_glfw.h>
 
 
 namespace Kiki {
@@ -106,19 +107,28 @@ namespace Kiki {
         
             noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
-            VkWriteDescriptorSet desc[1]{};
+            VkWriteDescriptorSet desc[2]{};
 
             VkDescriptorImageInfo textureInfo{};
             textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             textureInfo.imageView = noTexture.view;
             textureInfo.sampler = sampler.handle;
 
+            // empty colour
             desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             desc[0].dstSet = noTextureDst;
             desc[0].dstBinding = 0;
             desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             desc[0].descriptorCount = 1;
             desc[0].pImageInfo = &textureInfo;
+
+            // empty roughness + metalness
+            desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[1].dstSet = noTextureDst;
+            desc[1].dstBinding = 1;
+            desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[1].descriptorCount = 1;
+            desc[1].pImageInfo = &textureInfo;
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
@@ -843,6 +853,15 @@ namespace Kiki {
         vkDeviceWaitIdle(window.device);
 
         SceneManager::get().shutdown();
+
+        #ifndef NDEBUG
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+        #endif
+
+        skybox = {};
+
         noTextureDst = {};
         noTexture = {};
 
@@ -871,12 +890,19 @@ namespace Kiki {
         pipelines.pbr_alpha = {};
         pipelines.deferred_geometry = {};
         pipelines.deferred_geometry_alpha = {};
+        pipelines.deferred_lighting = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
+        pipelineLayouts.skyboxPipelineLayout = {};
 
         depthBuffer = {};
         sceneUBO = {};
+
+        gBufferLayout = {};
+        sceneLayout = {};
+        materialLayout = {};
+        cubemapLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};

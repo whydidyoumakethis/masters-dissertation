@@ -135,15 +135,6 @@ namespace rutils {
 
         // Define shader stages in the pipeline
         VkPipelineShaderStageCreateInfo stages[2]{};
-        // stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        // stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        // stages[0].pName = "main";
-        // stages[0].pNext = &code[0];
-
-        // stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        // stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        // stages[1].pName = "main";
-        // stages[1].pNext = &code[1];
         VkShaderModule vertModule;
         VkShaderModule fragModule;
 
@@ -247,6 +238,9 @@ namespace rutils {
             );
         }
 
+        vkDestroyShaderModule(window.device, vertModule, nullptr);
+        vkDestroyShaderModule(window.device, fragModule, nullptr);
+
         return rutils::Pipeline(window.device, pipe);
     }
 
@@ -271,15 +265,22 @@ namespace rutils {
 
         // Define shader stages in the pipeline
         VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(window.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(window.device, &code[1], nullptr, &fragModule);
+
         stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
         stages[0].pName = "main";
-        stages[0].pNext = &code[0];
 
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
         stages[1].pName = "main";
-        stages[1].pNext = &code[1];
+
 
         VkVertexInputBindingDescription vertexInputs[3]{};
         VkVertexInputAttributeDescription vertexAttributes[3]{};
@@ -371,6 +372,9 @@ namespace rutils {
             );
         }
 
+        vkDestroyShaderModule(window.device, vertModule, nullptr);
+        vkDestroyShaderModule(window.device, fragModule, nullptr);
+
         return rutils::Pipeline(window.device, pipe);
     }
 
@@ -378,30 +382,35 @@ namespace rutils {
     Pipeline createDeferredGeometryPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
-        auto const vertSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_v.c_str());
-        auto const fragSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_f.c_str());
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_v.c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[0].codeSize = vertSpirV.size() * sizeof(std::uint32_t);
-        code[0].pCode = vertSpirV.data();
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
 
         code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[1].codeSize = fragSpirV.size() * sizeof(std::uint32_t);
-        code[1].pCode = fragSpirV.data();
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
 
-        // define shader stages in the pipeline
+        // Define shader stages in the pipeline
         VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
         stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
         stages[0].pName = "main";
-        stages[0].pNext = &code[0];
 
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
         stages[1].pName = "main";
-        stages[1].pNext = &code[1];
-
         VkVertexInputBindingDescription vertexInputs[3]{};
         VkVertexInputAttributeDescription vertexAttributes[3]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
@@ -494,35 +503,44 @@ namespace rutils {
             throw Kiki::FatalError("Unable to create deferred pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
         }
 
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
         return Pipeline(aWindow.device, pipe);
     }
 
     Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
-        auto const vertSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_alpha_v.c_str());
-        auto const fragSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_alpha_f.c_str());
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_alpha_v.c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_geometry_alpha_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[0].codeSize = vertSpirV.size() * sizeof(std::uint32_t);
-        code[0].pCode = vertSpirV.data();
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
 
         code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[1].codeSize = fragSpirV.size() * sizeof(std::uint32_t);
-        code[1].pCode = fragSpirV.data();
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
 
-        // define shader stages in the pipeline
+        // Define shader stages in the pipeline
         VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
         stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
         stages[0].pName = "main";
-        stages[0].pNext = &code[0];
 
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
         stages[1].pName = "main";
-        stages[1].pNext = &code[1];
 
         VkVertexInputBindingDescription vertexInputs[3]{};
         VkVertexInputAttributeDescription vertexAttributes[3]{};
@@ -629,35 +647,44 @@ namespace rutils {
             throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
         }
 
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
         return Pipeline(aWindow.device, pipe);
     }
 
     Pipeline createDeferredLightingPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
         // we only use the vertex and fragment shaders here
-        auto const vertSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.c_str());
-        auto const fragSpirV = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_f.c_str());
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_f.c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[0].codeSize = vertSpirV.size() * sizeof(std::uint32_t);
-        code[0].pCode = vertSpirV.data();
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
 
         code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[1].codeSize = fragSpirV.size() * sizeof(std::uint32_t);
-        code[1].pCode = fragSpirV.data();
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
 
-        // define shader stages in the pipeline
+        // Define shader stages in the pipeline
         VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
         stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
         stages[0].pName = "main";
-        stages[0].pNext = &code[0];
 
         stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
         stages[1].pName = "main";
-        stages[1].pNext = &code[1];
 
         // empty as we're generating the fullscreen quad procedurally
         VkPipelineVertexInputStateCreateInfo inputInfo{};
@@ -745,6 +772,9 @@ namespace rutils {
         if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
             throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
         }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
 
         return Pipeline(aWindow.device, pipe);
     }
