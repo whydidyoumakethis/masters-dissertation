@@ -146,7 +146,7 @@ namespace Kiki {
             // Recreate resources
             rutils::recreateSwapchain(window);
 
-            rutils::createAllPipelines(window, pipelineLayouts);
+            pipelines = rutils::createAllPipelines(window, pipelineLayouts);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
@@ -182,7 +182,7 @@ namespace Kiki {
             &imageIndex
         );
 
-        if (VK_SUBOPTIMAL_KHR == acquireRes || VK_ERROR_OUT_OF_DATE_KHR == acquireRes) {
+        if (VK_ERROR_OUT_OF_DATE_KHR == acquireRes) {
             // This occurs e.g., when the window has been resized. In this case we need to recreate the swap chain to
             // match the new dimensions. Any resources that directly depend on the swap chain need to be recreated
             // as well. While rare, re-creating the swap chain may give us a different image format, which we should
@@ -207,7 +207,10 @@ namespace Kiki {
             return;
         }
 
-        if (VK_SUCCESS != acquireRes) {
+        if (acquireRes == VK_SUBOPTIMAL_KHR) {
+            recreateSwapchain = true;
+        }
+        else if (VK_SUCCESS != acquireRes) {
             throw Kiki::FatalError( "Unable to acquire next swapchain image\n"
                 "vkAcquireNextImageKHR() returned {}", rutils::toString(acquireRes)
             );
