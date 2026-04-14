@@ -1,13 +1,27 @@
 #ifndef KIKI_DEBUGGING_ENTITYVIEWER
 #define KIKI_DEBUGGING_ENTITYVIEWER
 
+#include "ECS/World.h"
+
 namespace debug {
     class EntityViewer {
         public:
-        static void draw(bool* visible);
+        static EntityViewer& get();
+        void draw(bool* visible);
 
         private:
-        static float constexpr iconSize = 32.0f;
+        EntityViewer() = default;
+        ~EntityViewer() = default;
+        EntityViewer(const EntityViewer&) = delete;
+        EntityViewer& operator=(const EntityViewer&) = delete;
+
+        World& world = World::Get();
+        entt::registry& registry = world.Registry();
+        entt::entity selectedEntity = entt::null;
+
+        void deleteSelected();
+        void destroyAllEntities();
+        void destroyMeshEntities();
     };
 }
 

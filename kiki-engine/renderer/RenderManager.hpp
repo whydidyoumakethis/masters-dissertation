@@ -14,6 +14,7 @@
 #include "Camera.hpp"
 #include "utils/Pipelines.hpp"
 #include "GltfLoader/GltfLoaderAssimp.h"
+#include "debugging/DebugCamera.hpp"
 
 
 #include <glm/glm.hpp>
@@ -49,6 +50,19 @@ namespace Kiki {
         VkDescriptorSet descriptorSet;
         Mesh mesh;
         rutils::CubemapPaths paths;
+    };
+
+    struct ShaderPaths {
+        std::filesystem::path pbr_v = "default.vert.spv";
+        std::filesystem::path pbr_f = "default.frag.spv";
+        std::filesystem::path pbr_alpha_v = "default.vert.spv";
+        std::filesystem::path pbr_alpha_f = "alpha.frag.spv";
+        std::filesystem::path deferred_geometry_v = "default.vert.spv";
+        std::filesystem::path deferred_geometry_f = "deferred_geometry.frag.spv";
+        std::filesystem::path deferred_geometry_alpha_v = "default.vert.spv";
+        std::filesystem::path deferred_geometry_alpha_f = "deferred_geometry_alpha.frag.spv";
+        std::filesystem::path deferred_lighting_v = "fullscreen.vert.spv";
+        std::filesystem::path deferred_lighting_f = "deferred_lighting.frag.spv";
     };
 
     class RenderManager {
@@ -95,8 +109,6 @@ namespace Kiki {
 
         Skybox skybox;
 
-        Camera camera; // default cam
-
         public:
         static RenderManager& get();
 
@@ -117,8 +129,6 @@ namespace Kiki {
 
         void nextFrame();
         void shutdown();
-
-        void setCamera(Camera&);
 
         VkDevice& getDevice() { return window.device; };
         GLFWwindow* getWindow() { return window.window; };
@@ -144,10 +154,16 @@ namespace Kiki {
         static_assert(sizeof(SceneUniform) <= 65536, "SceneUniform must be less than 65536 bytes for vkCmdUpdateBuffer");
         static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
 
+        ShaderPaths shaderPaths;
+
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
         void createSkybox(const rutils::CubemapPaths& paths);
 
+        World& world = World::Get();
+        entt::registry& registry = world.Registry();
+
+        DebugCamera& debugCam = DebugCamera::get();
     };
 }
 

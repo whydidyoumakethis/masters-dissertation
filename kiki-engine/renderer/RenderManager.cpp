@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <imgui_impl_glfw.h>
 
 
 namespace Kiki {
@@ -106,19 +107,28 @@ namespace Kiki {
         
             noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
-            VkWriteDescriptorSet desc[1]{};
+            VkWriteDescriptorSet desc[2]{};
 
             VkDescriptorImageInfo textureInfo{};
             textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             textureInfo.imageView = noTexture.view;
             textureInfo.sampler = sampler.handle;
 
+            // empty colour
             desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
             desc[0].dstSet = noTextureDst;
             desc[0].dstBinding = 0;
             desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             desc[0].descriptorCount = 1;
             desc[0].pImageInfo = &textureInfo;
+
+            // empty roughness + metalness
+            desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[1].dstSet = noTextureDst;
+            desc[1].dstBinding = 1;
+            desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[1].descriptorCount = 1;
+            desc[1].pImageInfo = &textureInfo;
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
@@ -136,7 +146,7 @@ namespace Kiki {
             // Recreate resources
             rutils::recreateSwapchain(window);
 
-            rutils::createAllPipelines(window, pipelineLayouts);
+            pipelines = rutils::createAllPipelines(window, pipelineLayouts);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             
@@ -172,7 +182,7 @@ namespace Kiki {
             &imageIndex
         );
 
-        if (VK_SUBOPTIMAL_KHR == acquireRes || VK_ERROR_OUT_OF_DATE_KHR == acquireRes) {
+        if (VK_ERROR_OUT_OF_DATE_KHR == acquireRes) {
             // This occurs e.g., when the window has been resized. In this case we need to recreate the swap chain to
             // match the new dimensions. Any resources that directly depend on the swap chain need to be recreated
             // as well. While rare, re-creating the swap chain may give us a different image format, which we should
@@ -197,7 +207,10 @@ namespace Kiki {
             return;
         }
 
-        if (VK_SUCCESS != acquireRes) {
+        if (acquireRes == VK_SUBOPTIMAL_KHR) {
+            recreateSwapchain = true;
+        }
+        else if (VK_SUCCESS != acquireRes) {
             throw Kiki::FatalError( "Unable to acquire next swapchain image\n"
                 "vkAcquireNextImageKHR() returned {}", rutils::toString(acquireRes)
             );
@@ -690,28 +703,49 @@ namespace Kiki {
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
         float const aspect = aFramebufferWidth / float(aFramebufferHeight);
-		auto camSetting = World::Get().Registry().get<CameraComponent>(camera.camera);
+		CameraComponent camComp;
+        TransformComponent transformComp;
+
+        if (debugCam.enabled) {
+            if (registry.valid(debugCam.camera)) {
+                if (registry.all_of<CameraComponent>(debugCam.camera))
+                    camComp = registry.get<CameraComponent>(debugCam.camera);
+                if (registry.all_of<TransformComponent>(debugCam.camera))
+                    transformComp = registry.get<TransformComponent>(debugCam.camera);
+            } else {
+                debugCam.reset();
+            }
+        } else {
+            auto cameras = world.Query<CameraComponent>();
+
+            for (auto cam : cameras) {
+                auto comp = registry.get<CameraComponent>(cam);
+
+                if (comp.isMain) {
+                    camComp = comp;
+                    if (registry.all_of<TransformComponent>(cam))
+                        transformComp = registry.get<TransformComponent>(cam);
+                    break;
+                }
+            }
+        }
+
         aSceneUniforms.projection = glm::perspectiveRH_ZO(
-            glm::radians(camSetting.fov), // fov
+            glm::radians(camComp.fov), // fov
             aspect,
-            camSetting.nearPlane, // near
-            camSetting.farPlane // far
+            camComp.nearPlane, // near
+            camComp.farPlane // far
         );
 
         aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
 
-        auto& registry = World::Get().Registry();
-        aSceneUniforms.camera = glm::inverse(registry.get<TransformComponent>(camera.camera).worldMatrix); //world matrix doesn't work yet
+        aSceneUniforms.camera = glm::inverse(transformComp.worldMatrix); 
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
         aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
         aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
-        aSceneUniforms.cameraPos = glm::vec4(registry.get<TransformComponent>(camera.camera).position, 0.f);
-    }
-
-    void RenderManager::setCamera(Camera& c) {
-        camera = c;
+        aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
 
     void RenderManager::setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info) {
@@ -822,6 +856,15 @@ namespace Kiki {
         vkDeviceWaitIdle(window.device);
 
         SceneManager::get().shutdown();
+
+        #ifndef NDEBUG
+        ImGui_ImplVulkan_Shutdown();
+        ImGui_ImplGlfw_Shutdown();
+        ImGui::DestroyContext();
+        #endif
+
+        skybox = {};
+
         noTextureDst = {};
         noTexture = {};
 
@@ -850,12 +893,19 @@ namespace Kiki {
         pipelines.pbr_alpha = {};
         pipelines.deferred_geometry = {};
         pipelines.deferred_geometry_alpha = {};
+        pipelines.deferred_lighting = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
+        pipelineLayouts.skyboxPipelineLayout = {};
 
         depthBuffer = {};
         sceneUBO = {};
+
+        gBufferLayout = {};
+        sceneLayout = {};
+        materialLayout = {};
+        cubemapLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
