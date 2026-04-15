@@ -12,8 +12,9 @@
 
 #define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
 
-
+using namespace std;
 struct Mmesh {
+	std::string name;
 	std::vector<glm::vec3> vertices;
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
@@ -112,16 +113,42 @@ enum class MlightType {
 	DIRECTIONAL,
 	SPOT
 };
+enum class MbodyType {
+	STATIC,
+	DYNAMIC,
+	KINEMATIC
+};
+enum class McolliderType {
+	NONE,
+	BOX,
+	SPHERE,
+	CAPSULE,
+	MESH,
+	CONVEX_HULL
+};
+enum class MmiscTags {
+	NONE,
+	FLOOR,
+	LAVA,
+	ITEM,
+	TRIGGER,
+	PLAYER,
+	GOAL,
+	SPAWN
+};
+
 
 struct MmeshInstance {
 	int meshIndex;
 	glm::mat4 transform;
-
+	MbodyType bodyType = MbodyType::STATIC;
+	McolliderType colliderType = McolliderType::NONE;
+	MmiscTags miscTag = MmiscTags::NONE;
 };
 struct Mlights {
 	std::string name;
-	glm::vec3 color;
-	glm::vec3 position;
+	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
+	glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
 	MlightType type = MlightType::POINT;
 	glm::vec3 direction = glm::vec3(0.0f, 0.0f, 0.0f);
 	
@@ -246,6 +273,61 @@ namespace Kiki {
 				MmeshInstance instance;
 				instance.meshIndex = node->mMeshes[i];
 				instance.transform = worldTransform;
+				aiString bodyTypeStr;
+				node->mMetaData->Get("body", bodyTypeStr);
+
+				cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
+
+				if (string(bodyTypeStr.C_Str()) == "dynamic") {
+					instance.bodyType = MbodyType::DYNAMIC;
+				} else if (string(bodyTypeStr.C_Str()) == "kinematic") {
+					instance.bodyType = MbodyType::KINEMATIC;
+				} else {
+					instance.bodyType = MbodyType::STATIC;
+				}
+
+				aiString colliderTypeStr;
+				node->mMetaData->Get("collider", colliderTypeStr);
+
+				cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
+
+				if (string(colliderTypeStr.C_Str()) == "box") {
+					instance.colliderType = McolliderType::BOX;
+				} else if (string(colliderTypeStr.C_Str()) == "sphere") {
+					instance.colliderType = McolliderType::SPHERE;
+				} else if (string(colliderTypeStr.C_Str()) == "capsule") {
+					instance.colliderType = McolliderType::CAPSULE;
+				} else if (string(colliderTypeStr.C_Str()) == "mesh") {
+					instance.colliderType = McolliderType::MESH;
+				} else if (string(colliderTypeStr.C_Str()) == "convex_hull") {
+					instance.colliderType = McolliderType::CONVEX_HULL;
+				} else {
+					instance.colliderType = McolliderType::NONE;
+				}
+
+				aiString miscTagStr;
+				node->mMetaData->Get("misc", miscTagStr);
+
+				cout << "Misc tag for node " << node->mName.C_Str() << ": " << miscTagStr.C_Str() << endl;
+
+				if (string(miscTagStr.C_Str()) == "floor") {
+					instance.miscTag = MmiscTags::FLOOR;
+				} else if (string(miscTagStr.C_Str()) == "lava") {
+					instance.miscTag = MmiscTags::LAVA;
+				} else if (string(miscTagStr.C_Str()) == "item") {
+					instance.miscTag = MmiscTags::ITEM;
+				} else if (string(miscTagStr.C_Str()) == "trigger") {
+					instance.miscTag = MmiscTags::TRIGGER;
+				} else if (string(miscTagStr.C_Str()) == "player") {
+					instance.miscTag = MmiscTags::PLAYER;
+				} else if (string(miscTagStr.C_Str()) == "goal") {
+					instance.miscTag = MmiscTags::GOAL;
+				} else if (string(miscTagStr.C_Str()) == "spawn") {
+					instance.miscTag = MmiscTags::SPAWN;
+				} else {
+					instance.miscTag = MmiscTags::NONE;
+				}
+
 				out.instances.push_back(instance);
 			}
 
@@ -311,6 +393,7 @@ namespace Kiki {
 			for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
 				Mmesh mesh;
 				aiMesh* aiMesh = scene->mMeshes[i];
+				mesh.name = aiMesh->mName.C_Str();
 				mesh.vertices.reserve(aiMesh->mNumVertices);
 				mesh.normals.reserve(aiMesh->mNumVertices);
 				mesh.uvs.reserve(aiMesh->mNumVertices);
