@@ -145,6 +145,12 @@ struct MmeshInstance {
 	McolliderType colliderType = McolliderType::NONE;
 	MmiscTags miscTag = MmiscTags::NONE;
 };
+struct MemtpyInstance {
+	glm::mat4 transform;
+	MbodyType bodyType = MbodyType::STATIC;
+	McolliderType colliderType = McolliderType::NONE;
+	MmiscTags miscTag = MmiscTags::NONE;
+};
 struct Mlights {
 	std::string name;
 	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
@@ -154,6 +160,7 @@ struct Mlights {
 	
 };
 struct Mscene {
+	std::vector<MemtpyInstance> emptyInstances;
 	std::vector<MmeshInstance> instances;
 	std::vector<Mmesh> meshes;
 	std::vector<Mtexture> textures;
@@ -260,6 +267,29 @@ namespace Kiki {
 				t.a4, t.b4, t.c4, t.d4
 			);
 		}
+		static MmiscTags parseMiscTag(aiNode* node) {
+			if (!node || !node->mMetaData) {
+				return MmiscTags::NONE;
+			}
+
+			aiString miscTagStr;
+			if (!node->mMetaData->Get("misc", miscTagStr)) {
+				return MmiscTags::NONE;
+			}
+
+			std::string s = miscTagStr.C_Str();
+
+			if (s == "floor")   return MmiscTags::FLOOR;
+			if (s == "lava")    return MmiscTags::LAVA;
+			if (s == "item")    return MmiscTags::ITEM;
+			if (s == "trigger") return MmiscTags::TRIGGER;
+			if (s == "player")  return MmiscTags::PLAYER;
+			if (s == "goal")    return MmiscTags::GOAL;
+			if (s == "spawn")   return MmiscTags::SPAWN;
+
+			return MmiscTags::NONE;
+
+		}
 
 		static void collectNodeInstances(
 			aiNode* node,
@@ -268,67 +298,66 @@ namespace Kiki {
 		{
 			glm::mat4 localTransform = toglmMat4(node->mTransformation);
 			glm::mat4 worldTransform = parentTransform * localTransform;
-
+			
 			for (unsigned int i = 0; i < node->mNumMeshes; i++) {
 				MmeshInstance instance;
 				instance.meshIndex = node->mMeshes[i];
 				instance.transform = worldTransform;
-				aiString bodyTypeStr;
-				node->mMetaData->Get("body", bodyTypeStr);
 
-				cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
+				if (node->mMetaData) {
+					aiString bodyTypeStr;
+					node->mMetaData->Get("body", bodyTypeStr);
 
-				if (string(bodyTypeStr.C_Str()) == "dynamic") {
-					instance.bodyType = MbodyType::DYNAMIC;
-				} else if (string(bodyTypeStr.C_Str()) == "kinematic") {
-					instance.bodyType = MbodyType::KINEMATIC;
-				} else {
-					instance.bodyType = MbodyType::STATIC;
-				}
+					cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
 
-				aiString colliderTypeStr;
-				node->mMetaData->Get("collider", colliderTypeStr);
+					if (string(bodyTypeStr.C_Str()) == "dynamic") {
+						instance.bodyType = MbodyType::DYNAMIC;
+					}
+					else if (string(bodyTypeStr.C_Str()) == "kinematic") {
+						instance.bodyType = MbodyType::KINEMATIC;
+					}
+					else {
+						instance.bodyType = MbodyType::STATIC;
+					}
 
-				cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
+					aiString colliderTypeStr;
+					node->mMetaData->Get("collider", colliderTypeStr);
 
-				if (string(colliderTypeStr.C_Str()) == "box") {
-					instance.colliderType = McolliderType::BOX;
-				} else if (string(colliderTypeStr.C_Str()) == "sphere") {
-					instance.colliderType = McolliderType::SPHERE;
-				} else if (string(colliderTypeStr.C_Str()) == "capsule") {
-					instance.colliderType = McolliderType::CAPSULE;
-				} else if (string(colliderTypeStr.C_Str()) == "mesh") {
-					instance.colliderType = McolliderType::MESH;
-				} else if (string(colliderTypeStr.C_Str()) == "convex_hull") {
-					instance.colliderType = McolliderType::CONVEX_HULL;
-				} else {
-					instance.colliderType = McolliderType::NONE;
-				}
+					cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
 
-				aiString miscTagStr;
-				node->mMetaData->Get("misc", miscTagStr);
+					if (string(colliderTypeStr.C_Str()) == "box") {
+						instance.colliderType = McolliderType::BOX;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "sphere") {
+						instance.colliderType = McolliderType::SPHERE;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "capsule") {
+						instance.colliderType = McolliderType::CAPSULE;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "mesh") {
+						instance.colliderType = McolliderType::MESH;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "convex_hull") {
+						instance.colliderType = McolliderType::CONVEX_HULL;
+					}
+					else {
+						instance.colliderType = McolliderType::NONE;
+					}
 
-				cout << "Misc tag for node " << node->mName.C_Str() << ": " << miscTagStr.C_Str() << endl;
-
-				if (string(miscTagStr.C_Str()) == "floor") {
-					instance.miscTag = MmiscTags::FLOOR;
-				} else if (string(miscTagStr.C_Str()) == "lava") {
-					instance.miscTag = MmiscTags::LAVA;
-				} else if (string(miscTagStr.C_Str()) == "item") {
-					instance.miscTag = MmiscTags::ITEM;
-				} else if (string(miscTagStr.C_Str()) == "trigger") {
-					instance.miscTag = MmiscTags::TRIGGER;
-				} else if (string(miscTagStr.C_Str()) == "player") {
-					instance.miscTag = MmiscTags::PLAYER;
-				} else if (string(miscTagStr.C_Str()) == "goal") {
-					instance.miscTag = MmiscTags::GOAL;
-				} else if (string(miscTagStr.C_Str()) == "spawn") {
-					instance.miscTag = MmiscTags::SPAWN;
-				} else {
-					instance.miscTag = MmiscTags::NONE;
+					instance.miscTag = parseMiscTag(node);
 				}
 
 				out.instances.push_back(instance);
+			}
+			MmiscTags miscTag = parseMiscTag(node);
+			if (miscTag != MmiscTags::NONE && node->mNumMeshes == 0) {
+				MemtpyInstance emptyInstance;
+				emptyInstance.transform = worldTransform;
+				emptyInstance.bodyType = MbodyType::STATIC; // Default to static for empty instances
+				emptyInstance.colliderType = McolliderType::NONE; // Default to no collider for empty instances
+				emptyInstance.miscTag = miscTag;
+				std::cout << "Empty instance for node " << node->mName.C_Str() << " with misc tag: " << static_cast<int>(miscTag) << std::endl;
+				out.emptyInstances.push_back(emptyInstance);
 			}
 
 			for (unsigned int i = 0; i < node->mNumChildren; i++) {
@@ -367,9 +396,23 @@ namespace Kiki {
 				glm::vec4 worldPos = nodeworld * localPos;
 				light.position = glm::vec3(worldPos);
 				glm::vec3 rawcolor(aiLight->mColorDiffuse.r, aiLight->mColorDiffuse.g, aiLight->mColorDiffuse.b);
+				light.type = (aiLightSourceType)aiLight->mType == aiLightSource_POINT ? MlightType::POINT :
+					(aiLightSourceType)aiLight->mType == aiLightSource_DIRECTIONAL ? MlightType::DIRECTIONAL :
+					(aiLightSourceType)aiLight->mType == aiLightSource_SPOT ? MlightType::SPOT : MlightType::POINT;
+				if (light.type == MlightType::DIRECTIONAL) {
+					glm::vec4 localDir(aiLight->mDirection.x, aiLight->mDirection.y, aiLight->mDirection.z, 0.0f);
+					glm::vec4 worldDir = nodeworld * localDir;
+					light.direction = glm::normalize(glm::vec3(worldDir));
+				}
 
 				std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
 				std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
+
+				std::cout << "Light " << light.name << " type: " <<
+				(light.type == MlightType::POINT ? "POINT" : light.type == MlightType::DIRECTIONAL ? "DIRECTIONAL" : light.type == MlightType::SPOT ? "SPOT" : "UNKNOWN")
+				<< std::endl;
+
+				std::cout << "Light " << light.name << " direction: " << light.direction.x << ", " << light.direction.y << ", " << light.direction.z << std::endl;
 				light.color = rawcolor;
 				out.lights.push_back(light);
 			}

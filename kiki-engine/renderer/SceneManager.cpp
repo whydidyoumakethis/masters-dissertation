@@ -185,8 +185,8 @@ namespace Kiki {
                 }
             }
             registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
-            Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
-			Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+            //Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
 			// Physics setup
 
