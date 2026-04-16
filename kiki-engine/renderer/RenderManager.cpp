@@ -757,7 +757,7 @@ namespace Kiki {
         info.PipelineCache = nullptr;
         info.DescriptorPool = descriptorPool.handle;
         info.MinImageCount = 2;
-        info.ImageCount = 2;
+        info.ImageCount = commandBuffers.size();
         info.Allocator = nullptr;
         info.UseDynamicRendering = true;
         info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };

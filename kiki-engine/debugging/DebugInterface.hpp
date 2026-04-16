@@ -11,7 +11,7 @@ namespace Kiki {
         static DebugInterface& get();
 
         void initialise();
-        void update(float dt);
+        void draw();
         void shutdown();
 
         private:
@@ -24,7 +24,7 @@ namespace Kiki {
         bool enabled = false;
         bool debugCamAllowed = true;
 
-        bool entityViewerVisible, logVisible;
+        bool entityViewerVisible;
         debug::EntityViewer& entityViewer = debug::EntityViewer::get();
         DebugCamera& debugCam = DebugCamera::get();
 
