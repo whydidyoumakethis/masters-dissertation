@@ -6,6 +6,7 @@
 #include "physics/PhysicsComponents.hpp" 
 #include "physics/PhysicsUtils.hpp"   
 #include "physics/PhysicsSystem.hpp" 
+#include "Components/MiscComponent.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -123,40 +124,6 @@ namespace Kiki {
         Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 		return model;
     }
-   // void SceneManager::loadModel(const std::string modelName, int index) {
-   //     auto model = World::Get().CreateEntity();
-   //     auto& registry = World::Get().Registry();
-
-   //     Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, index);
-   //     Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / modelName, mesh.matIndex);
-   //     registry.emplace<TransformComponent>(model);
-   //     registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
-
-   //     auto staticShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
-   //     if (staticShape) {
-   //         registry.emplace<MeshColliderComponent>(model, staticShape);
-			////now assume all models are static...
-   //         registry.emplace<RigidBodyComponent>(
-   //             model,
-   //             JPH::EMotionType::Static,
-   //             0, 
-   //             0.0f, 
-   //             0.5f 
-   //         );
-   //     }
-
-   //     if (texture.hastexture) {
-   //         materials.emplace_back(RenderManager::get().allocateMaterial(texture));
-   //         int id = materials.size() - 1;
-
-   //         registry.emplace<MaterialComponent>(model, id);
-   //     }
-
-   //     registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
-
-   //     Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
-   //     Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
-   // }
 
 
     void SceneManager::loadScene(const Mscene& scene) {
@@ -173,7 +140,7 @@ namespace Kiki {
             glm::vec4 perspective;
 			glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
             transform.rotation = glm::conjugate(transform.rotation);
-            transform.scale = {1, 1, 1}; // TODO: this is a temp fix, will probably cause issues
+            //transform.scale = {1, 1, 1}; // TODO: this is a temp fix, will probably cause issues
 
             registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
             if (texture.hastexture) {
@@ -218,7 +185,10 @@ namespace Kiki {
                 registry.emplace<PhysicalAttributesComponent>(model);
             }
 
-
+			// Misc tags
+            if (instance.miscTag != MmiscTags::NONE) {
+                registry.emplace<MiscComponent>(model, instance.miscTag);
+			}
         }
     }
 

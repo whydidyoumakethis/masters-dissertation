@@ -16,7 +16,7 @@ struct CharacterComponent {
 
     CharacterState state = CharacterState::Idle;
     glm::vec3      velocity = { 0, 0, 0 };
-
+	glm::vec3      spawnPosition = { 0, 0, 0 }; // for respawning after falling off the level
 
 	float          facingYaw = 0.0f;   // current facing direction
 	float          targetYaw = 0.0f;   // target facing direction

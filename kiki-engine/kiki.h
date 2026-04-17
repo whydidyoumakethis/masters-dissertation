@@ -9,5 +9,6 @@
 #include "physics/PhysicsManager.hpp"
 #include "physics/PhysicsComponents.hpp"
 #include "physics/PhysicsSystem.hpp"
+#include "Components/MiscComponent.hpp"
 using namespace entt::literals;
 using namespace Kiki;

@@ -18,9 +18,36 @@ public:
         auto& inputManager = Kiki::InputManager::get();
     }
     void OnStart() override {
-        auto objects = World::Get().Query< CharacterComponent, PhysicalAttributesComponent>();
-        for (auto [entity, character, ip] : objects.each()) {
-			ip.isGroundedNeedsUpdate = true;
+        auto objects2 = World::Get().Query<MiscComponent>();
+        glm::vec3 spawnPos = glm::vec3(0, 0, 0);
+        Entity playerEntity = NullEntity;
+        for (auto [e,misc] : objects2.each()) {
+        	if (misc.miscTag == MmiscTags::PLAYER) {
+        		playerEntity = e;
+        		World::Get().Registry().emplace<CharacterComponent>(e);
+        	}
+        	if (misc.miscTag == MmiscTags::SPAWN) {
+        		auto* transform = World::Get().GetComponent<TransformComponent>(e);
+        		if (transform) {
+        			spawnPos = transform->position;
+        		}
+        	}
+        }
+        
+        if (playerEntity != NullEntity) {
+        	auto* character = World::Get().GetComponent<CharacterComponent>(playerEntity);
+        	auto* transform = World::Get().GetComponent<TransformComponent>(playerEntity);
+			auto* physics = World::Get().GetComponent<PhysicalAttributesComponent>(playerEntity);
+        	if (character) {
+        		character->spawnPosition = spawnPos;
+        	}
+        	if(transform){
+        		transform->position = spawnPos;
+        		transform->dirty = true;
+        	}
+            if(physics){
+                physics->isGroundedNeedsUpdate = true;
+			}
         }
     }
     void OnStop() override {

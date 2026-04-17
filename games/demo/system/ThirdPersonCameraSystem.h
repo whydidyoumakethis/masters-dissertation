@@ -2,6 +2,7 @@
 #include <kiki.h>
 #include "../component/CharacterComponent.h"
 #include "../component/ThirdPersonCameraComponent.hpp"
+
 class ThirdPersonCamera : public Camera {
 public:
 	ThirdPersonCamera() : Camera() {
