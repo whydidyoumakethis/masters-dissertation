@@ -43,6 +43,7 @@ public:
         	}
         	if(transform){
         		transform->position = spawnPos;
+				transform->position.y += 1.1f; // spawn a bit above the ground to avoid initial collision issues
         		transform->dirty = true;
         	}
             if(physics){
