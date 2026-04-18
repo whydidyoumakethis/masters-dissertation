@@ -190,6 +190,20 @@ namespace Kiki {
                 registry.emplace<MiscComponent>(model, instance.miscTag);
 			}
         }
+        for (int i = 0; i < scene.emptyInstances.size(); i++) {
+            auto model = World::Get().CreateEntity();
+            auto& registry = World::Get().Registry();
+            const auto& instance = scene.emptyInstances[i];
+            auto& transform = registry.emplace<TransformComponent>(model);
+            glm::vec3 skew;
+            glm::vec4 perspective;
+            glm::decompose(instance.transform, transform.scale, transform.rotation, transform.position, skew, perspective);
+            transform.rotation = glm::conjugate(transform.rotation);
+            // Misc tags
+            if (instance.miscTag != MmiscTags::NONE) {
+                registry.emplace<MiscComponent>(model, instance.miscTag);
+            }
+        }
     }
 
     bool SceneManager::validMaterial(int id) {
