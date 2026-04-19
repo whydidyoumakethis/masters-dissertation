@@ -4,20 +4,22 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
-namespace Kiki {
+namespace Kiki
+{
 
     static glm::mat4 ComposeTransform(
         const glm::vec3& t,
         const glm::quat& r,
-        const glm::vec3& s
-    ) {
+        const glm::vec3& s)
+    {
         glm::mat4 T = glm::translate(glm::mat4(1.0f), t);
         glm::mat4 R = glm::toMat4(r);
         glm::mat4 S = glm::scale(glm::mat4(1.0f), s);
         return T * R * S;
     }
 
-    static Keyframe SampleTrack(const BoneTrack& track, float time) {
+    static Keyframe SampleTrack(const BoneTrack& track, float time)
+    {
         if (track.keyframes.empty()) {
             return {};
         }
@@ -32,7 +34,8 @@ namespace Kiki {
         return track.keyframes[0];
     }
 
-    void Animator::Update(float dt, const Skeleton& skeleton, const Animation& animation) {
+    void Animator::Update(float dt, const Skeleton& skeleton, const Animation& animation)
+    {
         if (animation.duration <= 0.0f) return;
 
         // --- 时间推进 ---
@@ -59,31 +62,36 @@ namespace Kiki {
         for (size_t i = 0; i < boneCount; i++) {
             const BoneTrack& track = animation.tracks[i];
 
-            Keyframe key = SampleTrack(track, currentTime);
-
-            localMatrices[i] = ComposeTransform(
-                key.translation,
-                key.rotation,
-                key.scale
-            );
-        }
-
-        // --- 2. local → global ---
-        for (size_t i = 0; i < boneCount; i++) {
-            int parent = skeleton.bones[i].parentIndex;
-
-            if (parent < 0) {
-                globalMatrices[i] = localMatrices[i];
+            if (track.keyframes.empty()) {
+                // 没动画 → 用 bind pose
+                localMatrices[i] = skeleton.bones[i].localBindTransform;
             }
             else {
-                globalMatrices[i] = globalMatrices[parent] * localMatrices[i];
+                Keyframe key = SampleTrack(track, currentTime);
+
+                localMatrices[i] = ComposeTransform(
+                    key.translation,
+                    key.rotation,
+                    key.scale
+                );
+            }
+
+            // --- 2. local → global ---
+            for (size_t i = 0; i < boneCount; i++) {
+                int parent = skeleton.bones[i].parentIndex;
+
+                if (parent < 0) {
+                    globalMatrices[i] = localMatrices[i];
+                }
+                else {
+                    globalMatrices[i] = globalMatrices[parent] * localMatrices[i];
+                }
+            }
+
+            // --- 3. global * inverseBind ---
+            for (size_t i = 0; i < boneCount; i++) {
+                finalMatrices[i] = globalMatrices[i] * skeleton.bones[i].inverseBind;
             }
         }
-
-        // --- 3. global * inverseBind ---
-        for (size_t i = 0; i < boneCount; i++) {
-            finalMatrices[i] = globalMatrices[i] * skeleton.bones[i].inverseBind;
-        }
     }
-
 }

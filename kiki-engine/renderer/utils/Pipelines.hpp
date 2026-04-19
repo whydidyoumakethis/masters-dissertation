@@ -34,7 +34,7 @@ namespace rutils {
         PipelineLayouts const& pipelineLayouts
     );
 
-    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
+    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout, VkDescriptorSetLayout animationLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     

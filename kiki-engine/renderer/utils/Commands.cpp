@@ -5,6 +5,7 @@
 #include "Pipelines.hpp"
 #include "Components/TransparencyComponent.hpp"
 #include "Components/ColourComponent.hpp"
+#include "Animation/AnimationComponent.h"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -49,7 +50,7 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox) {
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox, VkDescriptorSet dummyAnimationDesc) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -263,13 +264,44 @@ namespace rutils {
                     ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
 
                     // Bind vertex input
-                    VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-                    VkDeviceSize offsets[3]{};
+                    VkBuffer buffers[5] = {
+                        mesh.positions.buffer,
+                        mesh.texCoords.buffer,
+                        mesh.normals.buffer,
+                        mesh.boneIDs.buffer, 
+                        mesh.weights.buffer 
+                    };
+                    VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
 
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 5, buffers, offsets);
                     vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                     vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+
+                    auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
+
+                    if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
+                        vkCmdBindDescriptorSets(
+                            aCmdBuff,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayouts.pbrPipelineLayout.handle,
+                            2, 
+                            1,
+                            &animComp->descriptorSet,
+                            0, nullptr
+                        );
+                    }
+                    else {
+                        vkCmdBindDescriptorSets(
+                            aCmdBuff,
+                            VK_PIPELINE_BIND_POINT_GRAPHICS,
+                            pipelineLayouts.pbrPipelineLayout.handle,
+                            2,
+                            1,
+                            &dummyAnimationDesc,
+                            0, nullptr
+                        );
+                    }
 
                     // Draw mesh
                     vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
@@ -313,13 +345,44 @@ namespace rutils {
             ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
 
             // Bind vertex input
-            VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-            VkDeviceSize offsets[3]{};
+            VkBuffer buffers[5] = {
+                mesh.positions.buffer,
+                mesh.texCoords.buffer,
+                mesh.normals.buffer,
+                mesh.boneIDs.buffer,  
+                mesh.weights.buffer   
+            };
+            VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
 
-            vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
+            vkCmdBindVertexBuffers(aCmdBuff, 0, 5, buffers, offsets);
             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+
+            auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
+
+            if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
+                vkCmdBindDescriptorSets(
+                    aCmdBuff,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    pipelineLayouts.pbrPipelineLayout.handle,
+                    2, 
+                    1,
+                    &animComp->descriptorSet,
+                    0, nullptr
+                );
+            }
+            else {
+                vkCmdBindDescriptorSets(
+                    aCmdBuff,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    pipelineLayouts.pbrPipelineLayout.handle,
+                    2, 
+                    1,
+                    &dummyAnimationDesc,
+                    0, nullptr
+                );
+            }
 
             // Draw mesh
             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);

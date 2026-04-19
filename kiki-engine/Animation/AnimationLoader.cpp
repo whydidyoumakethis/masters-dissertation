@@ -59,6 +59,7 @@ namespace Kiki {
         Bone bone;
         bone.name = node->mName.C_Str();
         bone.parentIndex = parentIndex;
+        bone.localBindTransform = ToGlmMat4(node->mTransformation);
 
         int currentIndex = (int)skeleton.bones.size();
         skeleton.bones.push_back(bone);

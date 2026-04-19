@@ -13,7 +13,7 @@ int main(int argc, char** argv) {
   
   	auto& world = World::Get();
 	auto& sceneManager = Kiki::SceneManager::get();
-    auto cube = sceneManager.loadModel("test_cube_tex.glb", "Cube", PhysicsType::Dynamic);
+    auto cube = sceneManager.loadModel("Fox.glb", "Cube", PhysicsType::Dynamic);
     auto objects = world.Query<TransformComponent,TagComponent>();
 
 	// when we have loadCharacter implemented, we can replace this with loading the character model and adding the CharacterComponent in the loadCharacter function

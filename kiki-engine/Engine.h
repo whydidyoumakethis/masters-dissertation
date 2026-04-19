@@ -6,6 +6,7 @@
 #include "PhysicsSystem.cpp"
 #include "renderer/SceneManager.hpp"
 #include "Components/TransparencyComponent.hpp"
+#include "Animation/AnimationSystem.h"
 
 #include "../debugging/DebugCamera.hpp"
 #include "debugging/DebugInterface.hpp"
@@ -22,6 +23,7 @@ namespace Kiki {
 		void Init() {
 			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 			_scheduler.RegisterSystem<TransformSystem>();
+			_scheduler.RegisterSystem<AnimationSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
 			_scheduler.RegisterSystem<Kiki::DebugSystem>();

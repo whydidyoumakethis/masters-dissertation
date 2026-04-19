@@ -27,7 +27,8 @@ namespace rutils {
 		VkDescriptorSet aSceneDescriptors,
 		VkDescriptorSet deferredLightingDescriptors,
 		VkDescriptorSet noTexture,
-		Kiki::Skybox const& skybox
+		Kiki::Skybox const& skybox,
+		VkDescriptorSet dummyAnimationDesc
 	);
 
 	void submitCommands(

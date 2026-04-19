@@ -34,6 +34,8 @@ namespace Kiki {
         rutils::Buffer texCoords;
         rutils::Buffer normals;
         rutils::Buffer indices;
+        rutils::Buffer boneIDs;
+        rutils::Buffer weights;
         std::uint32_t vertexCount;
         std::uint32_t indexCount;
     };
@@ -101,7 +103,6 @@ namespace Kiki {
         VkDescriptorSet deferredLightingDescriptors;
 
         rutils::Image depthBuffer;
-        rutils::Allocator allocator;
         rutils::Sampler sampler;
 
         rutils::Image noTexture;
@@ -109,10 +110,29 @@ namespace Kiki {
 
         Skybox skybox;
 
+        rutils::DescriptorSetLayout animationLayout;
+
+        rutils::Buffer dummyAnimationBuffer;
+        VkDescriptorSet dummyAnimationDesc;
+
         public:
+
+
+        rutils::Allocator allocator;
         static RenderManager& get();
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
+        Mesh allocateMesh(
+            std::vector<float> positions,
+            std::vector<std::uint32_t> indices,
+            std::vector<float> normals,
+            std::vector<float> texCoords,
+            std::vector<int> boneIDs,    
+            std::vector<float> weights    
+        );
+
+        rutils::Buffer allocateAnimationBuffer();
+        VkDescriptorSet allocateAnimationDescriptorSet(const rutils::Buffer& buffer);
+
         Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});
