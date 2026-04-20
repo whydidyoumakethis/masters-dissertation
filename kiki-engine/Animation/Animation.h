@@ -21,7 +21,6 @@ namespace Kiki {
     struct Animation {
         float duration = 0.0f;
 
-        // 和 skeleton.bones 一一对应
         std::vector<BoneTrack> tracks;
     };
 

@@ -29,11 +29,9 @@ namespace Kiki {
     ) {
         if (!scene) return;
 
-        // 遍历所有 mesh
         for (unsigned int m = 0; m < scene->mNumMeshes; m++) {
             aiMesh* mesh = scene->mMeshes[m];
 
-            // 遍历所有 bone
             for (unsigned int b = 0; b < mesh->mNumBones; b++) {
                 aiBone* aiBone = mesh->mBones[b];
 
@@ -41,7 +39,6 @@ namespace Kiki {
 
                 int index = skeleton.FindBoneIndex(name);
                 if (index == -1) {
-                    // 找不到就跳过（有些骨头不在节点树里）
                     continue;
                 }
 
@@ -50,7 +47,6 @@ namespace Kiki {
         }
     }
 
-    // 递归函数：遍历 aiNode 树
     static void ProcessNode(
         aiNode* node,
         int parentIndex,
@@ -64,7 +60,6 @@ namespace Kiki {
         int currentIndex = (int)skeleton.bones.size();
         skeleton.bones.push_back(bone);
 
-        // 递归处理子节点
         for (unsigned int i = 0; i < node->mNumChildren; i++) {
             ProcessNode(node->mChildren[i], currentIndex, skeleton);
         }
@@ -75,7 +70,8 @@ namespace Kiki {
 
         auto skeleton = std::make_unique<Skeleton>();
 
-        // 从 root 开始递归
+        skeleton->globalInverseTransform = glm::inverse(ToGlmMat4(scene->mRootNode->mTransformation));
+
         ProcessNode(scene->mRootNode, -1, *skeleton);
 
         LoadInverseBindMatrices(scene, *skeleton);
@@ -94,14 +90,14 @@ namespace Kiki {
 
         auto animation = std::make_unique<Animation>();
 
-        // duration（秒）
+        // duration(second)
         float ticksPerSecond = (float)(anim->mTicksPerSecond != 0.0 ? anim->mTicksPerSecond : 25.0);
         animation->duration = (float)(anim->mDuration / ticksPerSecond);
 
-        //关键：track 数量 = bone 数量
+        // track num = bone num
         animation->tracks.resize(skeleton.bones.size());
 
-        // 遍历所有 channel（骨头轨道）
+        // read all bone channels
         for (unsigned int i = 0; i < anim->mNumChannels; i++) {
             aiNodeAnim* channel = anim->mChannels[i];
 
@@ -109,13 +105,11 @@ namespace Kiki {
             int boneIndex = skeleton.FindBoneIndex(boneName);
 
             if (boneIndex == -1) {
-                // 找不到就跳过
                 continue;
             }
 
             BoneTrack& track = animation->tracks[boneIndex];
 
-            // 关键帧数量取三者最大值
             size_t keyCount = std::max({
                 channel->mNumPositionKeys,
                 channel->mNumRotationKeys,
@@ -127,24 +121,20 @@ namespace Kiki {
             for (size_t k = 0; k < keyCount; k++) {
                 Keyframe& key = track.keyframes[k];
 
-                // --- 时间 ---
                 float time = 0.0f;
                 if (k < channel->mNumPositionKeys) {
                     time = (float)(channel->mPositionKeys[k].mTime / ticksPerSecond);
                 }
                 key.time = time;
 
-                // --- 平移 ---
                 if (k < channel->mNumPositionKeys) {
                     key.translation = ToVec3(channel->mPositionKeys[k].mValue);
                 }
 
-                // --- 旋转 ---
                 if (k < channel->mNumRotationKeys) {
                     key.rotation = ToQuat(channel->mRotationKeys[k].mValue);
                 }
 
-                // --- 缩放 ---
                 if (k < channel->mNumScalingKeys) {
                     key.scale = ToVec3(channel->mScalingKeys[k].mValue);
                 }

@@ -24,7 +24,6 @@ namespace Kiki
             return {};
         }
 
-        // 简化版：直接取最近关键帧（后面可以升级插值）
         for (int i = (int)track.keyframes.size() - 1; i >= 0; i--) {
             if (time >= track.keyframes[i].time) {
                 return track.keyframes[i];
@@ -38,7 +37,6 @@ namespace Kiki
     {
         if (animation.duration <= 0.0f) return;
 
-        // --- 时间推进 ---
         currentTime += dt;
 
         if (looping) {
@@ -58,12 +56,12 @@ namespace Kiki
         globalMatrices.resize(boneCount);
         finalMatrices.resize(boneCount);
 
-        // --- 1. 计算 localMatrices ---
+        // caculate localMatrices ---
         for (size_t i = 0; i < boneCount; i++) {
             const BoneTrack& track = animation.tracks[i];
 
             if (track.keyframes.empty()) {
-                // 没动画 → 用 bind pose
+                // no animation → use bind pose
                 localMatrices[i] = skeleton.bones[i].localBindTransform;
             }
             else {
@@ -90,7 +88,7 @@ namespace Kiki
 
             // --- 3. global * inverseBind ---
             for (size_t i = 0; i < boneCount; i++) {
-                finalMatrices[i] = globalMatrices[i] * skeleton.bones[i].inverseBind;
+                finalMatrices[i] = skeleton.globalInverseTransform * globalMatrices[i] * skeleton.bones[i].inverseBind;
             }
         }
     }

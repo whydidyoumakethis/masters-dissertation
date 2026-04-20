@@ -371,14 +371,12 @@ namespace Kiki {
             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
         );
 
-        // [新增] 创建 GPU Buffer (Bone IDs)
         rutils::Buffer boneIDsGPU = rutils::createBuffer(
             allocator, boneSize,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
             0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
         );
 
-        // [新增] 创建 GPU Buffer (Weights)
         rutils::Buffer weightsGPU = rutils::createBuffer(
             allocator, weightsSize,
             VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -414,7 +412,6 @@ namespace Kiki {
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
         );
 
-        // [新增] 创建 Staging Buffer
         rutils::Buffer boneStaging = rutils::createBuffer(
             allocator, boneSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT

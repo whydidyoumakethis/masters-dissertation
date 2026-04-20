@@ -58,7 +58,6 @@ namespace Kiki {
             n.emplace_back(norm.z);
         }
 
-        // 处理骨骼数据 (平坦化处理)
         std::vector<int> bIDs;
         std::vector<float> bWeights;
 
@@ -72,7 +71,6 @@ namespace Kiki {
         spdlog::info("Allocating Mesh -> Pos: {}, Indices: {}, Normals: {}, UVs: {}, Bones: {}, Weights: {}",
             p.size(), indices.size(), n.size(), t.size(), bIDs.size(), bWeights.size());
 
-        // 重点：RenderManager::allocateMesh 也需要相应修改签名
         meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, bIDs, bWeights));
 
         return meshes.size() - 1;
@@ -103,9 +101,6 @@ namespace Kiki {
 
         std::string fullPath = (std::filesystem::path(PROJECT_ASSETS_PATH) / path).string();
 
-        // ==========================================
-        // 1. [新增] 预检并加载动画数据
-        // ==========================================
         Assimp::Importer importer;
         const aiScene* scene = importer.ReadFile(fullPath, ASSIMP_FLAGS);
 
@@ -117,64 +112,68 @@ namespace Kiki {
         std::unique_ptr<Skeleton> skeleton = nullptr;
         std::unique_ptr<Animation> animation = nullptr;
 
-        // 只有当场景包含动画时，才去解析骨骼和动画曲线
         if (scene->HasAnimations()) {
             skeleton = AnimationLoader::LoadSkeleton(scene);
             if (skeleton) {
-                // 默认加载第一个动画 (index 0)
                 animation = AnimationLoader::LoadAnimation(scene, *skeleton, 0);
             }
         }
 
-        // ==========================================
-        // 2. [修改] 加载 Mesh 和 Texture
-        // ==========================================
-        // 技巧：如果 skeleton 为空，我们传一个局部的 dummy Skeleton。
-        // 因为你的 GltfLoaderAssimp 会在找不到 bone 时 continue，所以 dummy skeleton 会完美返回全 0 的 weights 和 IDs。
         Skeleton dummySkeleton;
         Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(fullPath, 0, skeleton ? *skeleton : dummySkeleton);
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(fullPath, 0);
 
-        // ==========================================
-        // 3. 基础组件赋值
-        // ==========================================
         registry.emplace<TransformComponent>(model);
         registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
 
-        // [修改] 调用更新后的 createMesh，传入 boneIDs 和 weights
         registry.emplace<MeshComponent>(model, createMesh(
             mesh.vertices,
             mesh.indices,
             mesh.normals,
             mesh.uvs,
-            mesh.boneIDs, // 新增
-            mesh.weights  // 新增
+            mesh.boneIDs, 
+            mesh.weights 
         ));
 
-        // ==========================================
-        // 4. [新增] 挂载动画组件
-        // ==========================================
-        if (skeleton && animation) {
+        if (skeleton && scene->HasAnimations()) {
             auto& animComp = registry.emplace<AnimationComponent>(model);
             animComp.skeleton = std::move(skeleton);
-            animComp.currentAnimation = std::move(animation);
 
-            // [修改] 强制更新一次第 0 帧，确保 finalMatrices 初始化完成
-            animComp.animator.Update(0.0f, *animComp.skeleton, *animComp.currentAnimation);
+			// read all animations and assign them to the state machine based on their names
+            for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
+                std::string animName = scene->mAnimations[i]->mName.C_Str();
+                std::transform(animName.begin(), animName.end(), animName.begin(), ::tolower);
 
-            // [实现 TODO] 真正分配 GPU 资源 
+                spdlog::info("Found animation in glTF: {}", animName);
+
+                if (animName.find("idle") != std::string::npos) {
+                    animComp.animations[CharacterState::Idle] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+                else if (animName.find("walking") != std::string::npos) {
+                    animComp.animations[CharacterState::Walking] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+                else if (animName.find("running") != std::string::npos) {
+                    animComp.animations[CharacterState::Running] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+                else if (animName.find("jumping") != std::string::npos) {
+                    animComp.animations[CharacterState::Jumping] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+            }
+
+            animComp.ChangeState(CharacterState::Idle);
+
+            if (animComp.animations.find(CharacterState::Idle) == animComp.animations.end()) {
+                spdlog::warn("No 'Idle' animation found! Using the first available animation as default.");
+                animComp.animations[CharacterState::Idle] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, 0);
+            }
+
+            animComp.animator.Update(0.0f, *animComp.skeleton, *animComp.animations[CharacterState::Idle]);
+
             animComp.boneMatrixBuffer = RenderManager::get().allocateAnimationBuffer();
             animComp.descriptorSet = RenderManager::get().allocateAnimationDescriptorSet(animComp.boneMatrixBuffer);
-
-            // [新增] 立刻把第一帧的骨骼数据推送到刚创建的 GPU Buffer 中
             animComp.UpdateGpuBuffer(RenderManager::get().allocator.allocator);
-
-            spdlog::info("Animation loaded successfully for entity: {}", name);
         }
 
-        // ==========================================
-        // 5. 物理与材质 (保持你原有的逻辑不变)
-        // ==========================================
         JPH::Ref<JPH::Shape> colliderShape;
         JPH::EMotionType joltMotionType;
         uint16_t joltLayer;
@@ -283,8 +282,8 @@ namespace Kiki {
                 mesh.indices,
                 mesh.normals,
                 mesh.uvs,
-                safeBoneIDs,  // 新增
-                safeWeights   // 新增
+                safeBoneIDs, 
+                safeWeights  
             ));
 
             if (texture.hastexture) {

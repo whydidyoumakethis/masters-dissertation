@@ -7,8 +7,8 @@
 namespace Kiki {
 
     struct Bone {
-        std::string name;      // 骨头名字（用于匹配动画）
-        int parentIndex = -1;  // 父骨头索引（-1 = root）
+        std::string name;   
+        int parentIndex = -1; 
 
         glm::mat4 inverseBind = glm::mat4(1.0f);
 
@@ -18,7 +18,8 @@ namespace Kiki {
     struct Skeleton {
         std::vector<Bone> bones;
 
-        // 查找 bone index（动画会用）
+        glm::mat4 globalInverseTransform = glm::mat4(1.0f);
+
         int FindBoneIndex(const std::string& name) const {
             for (int i = 0; i < (int)bones.size(); i++) {
                 if (bones[i].name == name) {
