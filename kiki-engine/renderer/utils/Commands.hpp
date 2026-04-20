@@ -26,10 +26,14 @@ namespace rutils {
 		Kiki::RenderManager::SceneUniform const&,
 		VkDescriptorSet aSceneDescriptors,
 		VkDescriptorSet deferredLightingDescriptors,
-		VkDescriptorSet postProcessingDescriptors,
+		VkDescriptorSet ffxaDescriptors,
+		VkDescriptorSet ssrDescriptors,
+		VkDescriptorSet ssaoDescriptors,
 		VkDescriptorSet noTexture,
 		Kiki::Skybox const& skybox,
-		Image const& postProcessingImage
+		Image const& doneLightingImage,
+		Image const& doneSSAOImage,
+		Image const& doneSSRImage
 	);
 
 	void submitCommands(

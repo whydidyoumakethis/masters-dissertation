@@ -22,6 +22,8 @@ namespace rutils {
         rutils::Pipeline deferred_geometry_alpha;
         rutils::Pipeline deferred_lighting;
         rutils::Pipeline fxaa;
+        rutils::Pipeline ssr;
+        rutils::Pipeline ssao;
     };
 
     struct PipelineLayouts {
@@ -37,7 +39,7 @@ namespace rutils {
     );
 
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
-    PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout postProcessingLayout);
+    PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
@@ -45,6 +47,8 @@ namespace rutils {
     Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createDeferredLightingPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createFXAAPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSRPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSAOPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 
 #endif

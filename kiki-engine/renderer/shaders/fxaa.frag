@@ -7,7 +7,7 @@
 
 layout(location = 0) in vec2 v2fTexCoord;
 
-layout(set = 0, binding = 0) uniform sampler2D uSceneColour;
+layout(set = 1, binding = 0) uniform sampler2D uSceneColour;
 
 layout(location = 0) out vec4 oColor;
 
