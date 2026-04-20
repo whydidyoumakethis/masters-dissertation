@@ -63,6 +63,7 @@ namespace Kiki {
         std::filesystem::path deferred_geometry_alpha_f = "deferred_geometry_alpha.frag.spv";
         std::filesystem::path deferred_lighting_v = "fullscreen.vert.spv";
         std::filesystem::path deferred_lighting_f = "deferred_lighting.frag.spv";
+        std::filesystem::path fxaa_f = "fxaa.frag.spv";
     };
 
     class RenderManager {
@@ -81,6 +82,7 @@ namespace Kiki {
 
         rutils::Pipelines pipelines;
         rutils::DescriptorSetLayout gBufferLayout;
+        rutils::DescriptorSetLayout postProcessingLayout;
         
         rutils::GBuffers gbuffers;
 
@@ -99,7 +101,9 @@ namespace Kiki {
         rutils::DescriptorSetLayout cubemapLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
+        VkDescriptorSet postProcessingDescriptors;
 
+        rutils::Image postProcessingImage;
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;

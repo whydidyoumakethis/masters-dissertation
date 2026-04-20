@@ -48,8 +48,8 @@ namespace rutils {
         return cbuff;
     }
 
-    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox) {
+    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& swapchainImage, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors,	VkDescriptorSet postProcessingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox, Image const& postProcessingImage) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -84,7 +84,7 @@ namespace rutils {
         );
 
         // Barrier: Ensure the color attachment image is in the right layout
-        rutils::imageBarrier(aCmdBuff, aColorAttach.image,
+        rutils::imageBarrier(aCmdBuff, postProcessingImage.image,
             /* Before */
             VK_PIPELINE_STAGE_2_NONE,
             VK_ACCESS_2_NONE,
@@ -391,7 +391,7 @@ namespace rutils {
 
         VkRenderingAttachmentInfo lightingAttach{};
 		lightingAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		lightingAttach.imageView = aColorAttach.view;
+		lightingAttach.imageView = postProcessingImage.view;
 		lightingAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 		lightingAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		lightingAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -413,6 +413,7 @@ namespace rutils {
 
 		lightingInfo.colorAttachmentCount = 1;
 		lightingInfo.pColorAttachments = &lightingAttach;
+        lightingInfo.pDepthAttachment = &depthAttachLighting;
 
 		vkCmdBeginRendering(aCmdBuff, &lightingInfo);
 
@@ -434,8 +435,60 @@ namespace rutils {
 
 		vkCmdEndRendering(aCmdBuff);
 
+        // post processing pass
+        // transition the image we just rendered to be sampled
+        imageBarrier(aCmdBuff, postProcessingImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            // after
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        imageBarrier(aCmdBuff, swapchainImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_NONE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            // after
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        );
+
+        // begin post processing
+        VkRenderingAttachmentInfo postColourAttach{};
+        postColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        postColourAttach.imageView = swapchainImage.view;
+        postColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+        postColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        postColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingInfo postRenderInfo{};
+        postRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        postRenderInfo.layerCount = 1;
+        postRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+        postRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+        postRenderInfo.colorAttachmentCount = 1;
+        postRenderInfo.pColorAttachments = &postColourAttach;
+
+        vkCmdBeginRendering(aCmdBuff, &postRenderInfo);
+
+        // draw fullscreen quad with post-processing shader
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.fxaa.handle);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 1, &postProcessingDescriptors, 0, nullptr);
+        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+        vkCmdEndRendering(aCmdBuff);
+
+        // end post processing pass
+
         // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
-        imageBarrier( aCmdBuff, aColorAttach.image,
+        imageBarrier(aCmdBuff, swapchainImage.image,
             /* Before */
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

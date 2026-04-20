@@ -49,9 +49,12 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
+            postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
+
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
             pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
+            pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, postProcessingLayout.handle);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -60,6 +63,7 @@ namespace Kiki {
             descriptorPool = rutils::createDescriptorPool(window);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
+            postProcessingImage = rutils::createPostProcessingImage(window, allocator);
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
@@ -68,6 +72,8 @@ namespace Kiki {
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
 
+            postProcessingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, postProcessingImage, sampler, postProcessingDescriptors);
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -149,9 +155,11 @@ namespace Kiki {
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
+            postProcessingImage = rutils::createPostProcessingImage(window, allocator);
             
             gbuffers = rutils::createAllGBufferImages(window, allocator);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, postProcessingImage, sampler, postProcessingDescriptors);
 
             recreateSwapchain = false;
         }
@@ -235,9 +243,9 @@ namespace Kiki {
     
         assert(std::size_t(imageIndex) < window.swapImages.size());
 
-        rutils::ImageAndView colorTarget;
-        colorTarget.image = window.swapImages[imageIndex];
-        colorTarget.view = window.swapViews[imageIndex];
+        rutils::ImageAndView swapchainColourTarget;
+        swapchainColourTarget.image = window.swapImages[imageIndex];
+        swapchainColourTarget.view = window.swapViews[imageIndex];
 
         assert(std::size_t(frameIndex) < commandBuffers.size());
 
@@ -245,7 +253,7 @@ namespace Kiki {
             commandBuffers[frameIndex],
             pipelines,
             pipelineLayouts,
-            colorTarget,
+            swapchainColourTarget,
             depthBuffer,
             gbuffers,
             window.swapchainExtent,
@@ -253,8 +261,10 @@ namespace Kiki {
             sceneUniforms,
             sceneDescriptors,
             deferredLightingDescriptors,
+            postProcessingDescriptors,
             noTextureDst,
-            skybox
+            skybox,
+            postProcessingImage
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -894,18 +904,22 @@ namespace Kiki {
         pipelines.deferred_geometry = {};
         pipelines.deferred_geometry_alpha = {};
         pipelines.deferred_lighting = {};
+        pipelines.fxaa = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
+        pipelineLayouts.postprocessPipelineLayout = {};
 
         depthBuffer = {};
+        postProcessingImage = {};
         sceneUBO = {};
 
         gBufferLayout = {};
         sceneLayout = {};
         materialLayout = {};
         cubemapLayout = {};
+        postProcessingLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
