@@ -20,7 +20,7 @@ public:
     void OnStart() override {
         auto objects2 = World::Get().Query<MiscComponent>();
         glm::vec3 spawnPos = glm::vec3(0, 0, 0);
-        Entity playerEntity = NullEntity;
+        //Entity playerEntity = NullEntity;
         for (auto [e,misc] : objects2.each()) {
         	if (misc.miscTag == MmiscTags::PLAYER) {
         		playerEntity = e;
@@ -56,6 +56,7 @@ public:
     }
 private:
     InputManager& inputManager = Kiki::InputManager::get();
+	Entity playerEntity = NullEntity;
     float GetCameraYaw(Entity targetEntity) {
         float yaw = 0.0f;
         auto camView = World::Get().Query<ThirdPersonCameraComponent>();
@@ -109,6 +110,8 @@ private:
             return;
         }
         transform.position += character.velocity * dt;
+		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+  //              physics.setEntityVelocity(playerEntity, character.velocity);
         transform.dirty = true;
     }
     void HandleJump(
