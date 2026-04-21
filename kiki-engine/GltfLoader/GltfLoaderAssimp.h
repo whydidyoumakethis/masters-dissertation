@@ -12,13 +12,14 @@
 
 #define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
 
-
+using namespace std;
 struct Mmesh {
+	std::string name;
 	std::vector<glm::vec3> vertices;
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
-	int matIndex;
+	int matIndex = 0;
 
 };
 
@@ -107,16 +108,63 @@ struct Mtexture {
 	}
 };
 
+enum class MlightType {
+	POINT,
+	DIRECTIONAL,
+	SPOT
+};
+enum class MbodyType {
+	STATIC,
+	DYNAMIC,
+	KINEMATIC
+};
+enum class McolliderType {
+	NONE,
+	BOX,
+	SPHERE,
+	CAPSULE,
+	MESH,
+	CONVEX_HULL
+};
+enum class MmiscTags {
+	NONE,
+	FLOOR,
+	LAVA,
+	ITEM,
+	TRIGGER,
+	PLAYER,
+	GOAL,
+	SPAWN
+};
+
+
 struct MmeshInstance {
 	int meshIndex;
 	glm::mat4 transform;
-
+	MbodyType bodyType = MbodyType::STATIC;
+	McolliderType colliderType = McolliderType::NONE;
+	MmiscTags miscTag = MmiscTags::NONE;
 };
-
+struct MemtpyInstance {
+	glm::mat4 transform;
+	MbodyType bodyType = MbodyType::STATIC;
+	McolliderType colliderType = McolliderType::NONE;
+	MmiscTags miscTag = MmiscTags::NONE;
+};
+struct Mlights {
+	std::string name;
+	glm::vec3 color = glm::vec3(1.0f, 1.0f, 1.0f);
+	glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f);
+	MlightType type = MlightType::POINT;
+	glm::vec3 direction = glm::vec3(0.0f, 0.0f, 0.0f);
+	
+};
 struct Mscene {
+	std::vector<MemtpyInstance> emptyInstances;
+	std::vector<MmeshInstance> instances;
 	std::vector<Mmesh> meshes;
 	std::vector<Mtexture> textures;
-	std::vector<MmeshInstance> instances;
+	std::vector<Mlights> lights;
 	glm::mat4 worldTransform;
 };
 
@@ -219,6 +267,29 @@ namespace Kiki {
 				t.a4, t.b4, t.c4, t.d4
 			);
 		}
+		static MmiscTags parseMiscTag(aiNode* node) {
+			if (!node || !node->mMetaData) {
+				return MmiscTags::NONE;
+			}
+
+			aiString miscTagStr;
+			if (!node->mMetaData->Get("misc", miscTagStr)) {
+				return MmiscTags::NONE;
+			}
+
+			std::string s = miscTagStr.C_Str();
+
+			if (s == "floor")   return MmiscTags::FLOOR;
+			if (s == "lava")    return MmiscTags::LAVA;
+			if (s == "item")    return MmiscTags::ITEM;
+			if (s == "trigger") return MmiscTags::TRIGGER;
+			if (s == "player")  return MmiscTags::PLAYER;
+			if (s == "goal")    return MmiscTags::GOAL;
+			if (s == "spawn")   return MmiscTags::SPAWN;
+
+			return MmiscTags::NONE;
+
+		}
 
 		static void collectNodeInstances(
 			aiNode* node,
@@ -227,17 +298,125 @@ namespace Kiki {
 		{
 			glm::mat4 localTransform = toglmMat4(node->mTransformation);
 			glm::mat4 worldTransform = parentTransform * localTransform;
-
+			
 			for (unsigned int i = 0; i < node->mNumMeshes; i++) {
 				MmeshInstance instance;
 				instance.meshIndex = node->mMeshes[i];
 				instance.transform = worldTransform;
+
+				if (node->mMetaData) {
+					aiString bodyTypeStr;
+					node->mMetaData->Get("body", bodyTypeStr);
+
+					cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
+
+					if (string(bodyTypeStr.C_Str()) == "dynamic") {
+						instance.bodyType = MbodyType::DYNAMIC;
+					}
+					else if (string(bodyTypeStr.C_Str()) == "kinematic") {
+						instance.bodyType = MbodyType::KINEMATIC;
+					}
+					else {
+						instance.bodyType = MbodyType::STATIC;
+					}
+
+					aiString colliderTypeStr;
+					node->mMetaData->Get("collider", colliderTypeStr);
+
+					cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
+
+					if (string(colliderTypeStr.C_Str()) == "box") {
+						instance.colliderType = McolliderType::BOX;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "sphere") {
+						instance.colliderType = McolliderType::SPHERE;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "capsule") {
+						instance.colliderType = McolliderType::CAPSULE;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "mesh") {
+						instance.colliderType = McolliderType::MESH;
+					}
+					else if (string(colliderTypeStr.C_Str()) == "convex_hull") {
+						instance.colliderType = McolliderType::CONVEX_HULL;
+					}
+					else {
+						instance.colliderType = McolliderType::NONE;
+					}
+
+					instance.miscTag = parseMiscTag(node);
+				}
+
 				out.instances.push_back(instance);
+			}
+			MmiscTags miscTag = parseMiscTag(node);
+			if (miscTag != MmiscTags::NONE && node->mNumMeshes == 0) {
+				MemtpyInstance emptyInstance;
+				emptyInstance.transform = worldTransform;
+				emptyInstance.bodyType = MbodyType::STATIC; // Default to static for empty instances
+				emptyInstance.colliderType = McolliderType::NONE; // Default to no collider for empty instances
+				emptyInstance.miscTag = miscTag;
+				std::cout << "Empty instance for node " << node->mName.C_Str() << " with misc tag: " << static_cast<int>(miscTag) << std::endl;
+				out.emptyInstances.push_back(emptyInstance);
 			}
 
 			for (unsigned int i = 0; i < node->mNumChildren; i++) {
 				collectNodeInstances(node->mChildren[i], worldTransform, out);
 			}
+		}
+
+		static glm::mat4 getNodeWorldTransform(const aiNode* node) {
+			glm::mat4 result(1.0f);
+
+			const aiNode* current = node;
+			while (current) {
+				result = toglmMat4(current->mTransformation) * result;
+				current = current->mParent;
+			}
+
+			return result;
+		}
+
+		static void collectLights(const aiScene* scene, Mscene& out) {
+
+			for (unsigned int i = 0; i < scene->mNumLights; i++) {
+				aiLight* aiLight = scene->mLights[i];
+				if (!aiLight) continue;
+				
+				Mlights light;
+				light.name = aiLight->mName.C_Str();
+
+				const aiNode* lightNode = scene->mRootNode->FindNode(aiLight->mName);
+				glm::mat4 nodeworld = glm::mat4(1.0f);
+				if (lightNode) {
+					nodeworld = getNodeWorldTransform(lightNode);
+				}
+
+				glm::vec4 localPos(aiLight->mPosition.x, aiLight->mPosition.y, aiLight->mPosition.z, 1.0f);
+				glm::vec4 worldPos = nodeworld * localPos;
+				light.position = glm::vec3(worldPos);
+				glm::vec3 rawcolor(aiLight->mColorDiffuse.r, aiLight->mColorDiffuse.g, aiLight->mColorDiffuse.b);
+				light.type = (aiLightSourceType)aiLight->mType == aiLightSource_POINT ? MlightType::POINT :
+					(aiLightSourceType)aiLight->mType == aiLightSource_DIRECTIONAL ? MlightType::DIRECTIONAL :
+					(aiLightSourceType)aiLight->mType == aiLightSource_SPOT ? MlightType::SPOT : MlightType::POINT;
+				if (light.type == MlightType::DIRECTIONAL) {
+					glm::vec4 localDir(aiLight->mDirection.x, aiLight->mDirection.y, aiLight->mDirection.z, 0.0f);
+					glm::vec4 worldDir = nodeworld * localDir;
+					light.direction = glm::normalize(glm::vec3(worldDir));
+				}
+
+				std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
+				std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
+
+				std::cout << "Light " << light.name << " type: " <<
+				(light.type == MlightType::POINT ? "POINT" : light.type == MlightType::DIRECTIONAL ? "DIRECTIONAL" : light.type == MlightType::SPOT ? "SPOT" : "UNKNOWN")
+				<< std::endl;
+
+				std::cout << "Light " << light.name << " direction: " << light.direction.x << ", " << light.direction.y << ", " << light.direction.z << std::endl;
+				light.color = rawcolor;
+				out.lights.push_back(light);
+			}
+
 		}
 
 		static Mscene loadScene(const std::filesystem::path& path){
@@ -252,9 +431,12 @@ namespace Kiki {
 
 			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
 
+			collectLights(scene, out);
+
 			for (unsigned int i = 0; i < scene->mNumMeshes; i++) {
 				Mmesh mesh;
 				aiMesh* aiMesh = scene->mMeshes[i];
+				mesh.name = aiMesh->mName.C_Str();
 				mesh.vertices.reserve(aiMesh->mNumVertices);
 				mesh.normals.reserve(aiMesh->mNumVertices);
 				mesh.uvs.reserve(aiMesh->mNumVertices);

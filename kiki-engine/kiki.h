@@ -10,7 +10,7 @@
 #include "physics/PhysicsComponents.hpp"
 #include "physics/PhysicsSystem.hpp"
 #include "interface/InterfaceSystem.hpp"
-
+#include "Components/MiscComponent.hpp"
 
 using namespace entt::literals;
 using namespace Kiki;
