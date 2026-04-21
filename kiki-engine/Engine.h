@@ -13,6 +13,7 @@
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include <spdlog/spdlog.h>
 #include "debugging/DebugSystem.hpp"
+#include "interface/InterfaceSystem.hpp"
 
 #include <chrono>
 
@@ -25,6 +26,7 @@ namespace Kiki {
 			_scheduler.RegisterSystem<RenderSystem>();
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
 			_scheduler.RegisterSystem<Kiki::DebugSystem>();
+			_scheduler.RegisterSystem<Kiki::InterfaceSystem>();
 		}
 
 		// for game layer to register systems
