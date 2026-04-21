@@ -26,8 +26,6 @@ set(TARGET_UNIT_TESTS OFF CACHE INTERNAL "")
 set(TARGET_SAMPLES OFF CACHE INTERNAL "")
 set(TARGET_HELLO_WORLD OFF CACHE INTERNAL "")
 
-
-
 # Jolt Physics
 FetchContent_Declare(
     JoltPhysics

@@ -4,6 +4,31 @@
 #include "../../logging/FatalError.hpp"
 
 namespace rutils {
+    DescriptorSetLayout createAnimationDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding binding{};
+
+        binding.binding = 0;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.descriptorCount = 1;
+
+        binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &binding;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError(
+                "Unable to create animation descriptor set layout\n"
+                "vkCreateDescriptorSetLayout() returned {}", toString(res)
+            );
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorSetLayout createSceneDescriptorLayout(VulkanWindow const& window) {
         VkDescriptorSetLayoutBinding bindings[1]{};
         bindings[0].binding = 0; // number must match the index of the corresponding
@@ -354,5 +379,27 @@ namespace rutils {
         desc[4].pImageInfo = &depthInfo;
 
         vkUpdateDescriptorSets(window.device, 5, desc, 0, nullptr);
+    }
+}
+    void updateAnimationDescriptorSet(
+        VulkanWindow const& window,
+        VkDescriptorSet descriptorSet,
+        VkBuffer animationBuffer,
+        VkDeviceSize range
+    ) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = animationBuffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = range;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = descriptorSet;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, &write, 0, nullptr);
     }
 }

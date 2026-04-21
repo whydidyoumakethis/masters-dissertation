@@ -9,8 +9,9 @@
 #include <stb_image.h>
 #include <Components/ColourComponent.hpp>
 #include <assimp/GltfMaterial.h>
+#include "Animation/Skeleton.h"
 
-#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
+#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_LimitBoneWeights
 
 using namespace std;
 struct Mmesh {
@@ -19,7 +20,11 @@ struct Mmesh {
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
-	int matIndex = 0;
+
+	std::vector<glm::ivec4> boneIDs;
+	std::vector<glm::vec4> weights;
+
+	int matIndex;
 
 };
 
@@ -171,7 +176,26 @@ struct Mscene {
 namespace Kiki {
 	class GltfLoaderAssimp {
 	public:
-		static Mmesh loadMesh(const std::filesystem::path& path, int index) {
+		static void AddBoneData(
+			glm::ivec4& ids,
+			glm::vec4& weights,
+			int boneID,
+			float weight
+		) {
+			for (int i = 0; i < 4; i++) {
+				if (weights[i] == 0.0f) {
+					ids[i] = boneID;
+					weights[i] = weight;
+					return;
+				}
+			}
+		}
+
+		static Mmesh loadMesh(
+			const std::filesystem::path& path,
+			int index,
+			const Skeleton& skeleton)
+		{
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -184,6 +208,8 @@ namespace Kiki {
 			out.normals.reserve(mesh->mNumVertices);
 			out.uvs.reserve(mesh->mNumVertices);
 			out.matIndex = mesh->mMaterialIndex;
+			out.boneIDs.resize(mesh->mNumVertices, glm::ivec4(0));
+			out.weights.resize(mesh->mNumVertices, glm::vec4(0.0f));
 			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
 				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
@@ -197,6 +223,43 @@ namespace Kiki {
 				aiFace face = mesh->mFaces[i];
 				for (unsigned int j = 0; j < face.mNumIndices; j++) {
 					out.indices.push_back(face.mIndices[j]);
+				}
+			}
+			
+
+			// 遍历所有骨骼
+			for (unsigned int i = 0; i < mesh->mNumBones; i++) {
+				aiBone* bone = mesh->mBones[i];
+
+				std::string boneName = bone->mName.C_Str();
+
+				//从 skeleton 查 index,如果找不到就跳过
+				int boneID = skeleton.FindBoneIndex(boneName);
+				if (boneID == -1) continue;
+
+				// 遍历这个骨骼影响的所有顶点
+				for (unsigned int w = 0; w < bone->mNumWeights; w++) {
+					int vertexID = bone->mWeights[w].mVertexId;
+					float weight = bone->mWeights[w].mWeight;
+
+					AddBoneData(
+						out.boneIDs[vertexID],
+						out.weights[vertexID],
+						boneID,
+						weight
+					);
+				}
+			}
+			// 权重归一化（防止模型爆炸）
+			for (size_t i = 0; i < out.weights.size(); i++) {
+				float sum =
+					out.weights[i].x +
+					out.weights[i].y +
+					out.weights[i].z +
+					out.weights[i].w;
+
+				if (sum > 0.0f) {
+					out.weights[i] /= sum;
 				}
 			}
 			return out;

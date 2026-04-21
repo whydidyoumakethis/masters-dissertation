@@ -8,6 +8,11 @@
 #include "physics/PhysicsSystem.hpp" 
 #include "Components/MiscComponent.hpp"
 
+#include "Animation/AnimationLoader.h"
+#include "Animation/AnimationComponent.h"
+
+#include <assimp/Importer.hpp> 
+
 #include <spdlog/spdlog.h>
 
 namespace Kiki {
@@ -26,7 +31,15 @@ namespace Kiki {
         return materials[id];
     }
 
-    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords) {
+    int SceneManager::createMesh(
+        std::vector<glm::vec3> const& positions,
+        std::vector<std::uint32_t> const& indices,
+        std::vector<glm::vec3> const& normals,
+        std::vector<glm::vec2> const& texCoords,
+        std::vector<glm::ivec4> const& boneIDs,  
+        std::vector<glm::vec4> const& weights  
+    )
+    {
         std::vector<float> p, t, n;
 
         for (glm::vec3 pos : positions) {
@@ -46,7 +59,20 @@ namespace Kiki {
             n.emplace_back(norm.z);
         }
 
-        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t));
+        std::vector<int> bIDs;
+        std::vector<float> bWeights;
+
+        for (const auto& id : boneIDs) {
+            bIDs.push_back(id.x); bIDs.push_back(id.y); bIDs.push_back(id.z); bIDs.push_back(id.w);
+        }
+        for (const auto& w : weights) {
+            bWeights.push_back(w.x); bWeights.push_back(w.y); bWeights.push_back(w.z); bWeights.push_back(w.w);
+        }
+
+        spdlog::info("Allocating Mesh -> Pos: {}, Indices: {}, Normals: {}, UVs: {}, Bones: {}, Weights: {}",
+            p.size(), indices.size(), n.size(), t.size(), bIDs.size(), bWeights.size());
+
+        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, bIDs, bWeights));
 
         return meshes.size() - 1;
     }
@@ -74,11 +100,81 @@ namespace Kiki {
         auto model = World::Get().CreateEntity();
         auto& registry = World::Get().Registry();
 
-        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(std::filesystem::path(PROJECT_ASSETS_PATH) / path, 0);
-        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / path, 0);
+        std::string fullPath = (std::filesystem::path(PROJECT_ASSETS_PATH) / path).string();
+
+        Assimp::Importer importer;
+        const aiScene* scene = importer.ReadFile(fullPath, ASSIMP_FLAGS);
+
+        if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
+            spdlog::error("Failed to load glTF file: {} with error: {}", fullPath, importer.GetErrorString());
+            return model;
+        }
+
+        std::unique_ptr<Skeleton> skeleton = nullptr;
+        std::unique_ptr<Animation> animation = nullptr;
+
+        if (scene->HasAnimations()) {
+            skeleton = AnimationLoader::LoadSkeleton(scene);
+            if (skeleton) {
+                animation = AnimationLoader::LoadAnimation(scene, *skeleton, 0);
+            }
+        }
+
+        Skeleton dummySkeleton;
+        Mmesh mesh = Kiki::GltfLoaderAssimp::loadMesh(fullPath, 0, skeleton ? *skeleton : dummySkeleton);
+        Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(fullPath, 0);
+
         registry.emplace<TransformComponent>(model);
-        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
         registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
+
+        registry.emplace<MeshComponent>(model, createMesh(
+            mesh.vertices,
+            mesh.indices,
+            mesh.normals,
+            mesh.uvs,
+            mesh.boneIDs, 
+            mesh.weights 
+        ));
+
+        if (skeleton && scene->HasAnimations()) {
+            auto& animComp = registry.emplace<AnimationComponent>(model);
+            animComp.skeleton = std::move(skeleton);
+
+			// read all animations and assign them to the state machine based on their names
+            for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
+                std::string animName = scene->mAnimations[i]->mName.C_Str();
+                std::transform(animName.begin(), animName.end(), animName.begin(), ::tolower);
+
+                spdlog::info("Found animation in glTF: {}", animName);
+
+                if (animName.find("idle") != std::string::npos) {
+                    animComp.animations[CharacterState::Idle] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+                else if (animName.find("walking") != std::string::npos) {
+                    animComp.animations[CharacterState::Walking] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+                else if (animName.find("running") != std::string::npos) {
+                    animComp.animations[CharacterState::Running] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+                else if (animName.find("jumping") != std::string::npos) {
+                    animComp.animations[CharacterState::Jumping] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, i);
+                }
+            }
+
+            animComp.ChangeState(CharacterState::Idle);
+
+            if (animComp.animations.find(CharacterState::Idle) == animComp.animations.end()) {
+                spdlog::warn("No 'Idle' animation found! Using the first available animation as default.");
+                animComp.animations[CharacterState::Idle] = AnimationLoader::LoadAnimation(scene, *animComp.skeleton, 0);
+            }
+
+            animComp.animator.Update(0.0f, *animComp.skeleton, *animComp.animations[CharacterState::Idle]);
+
+            animComp.boneMatrixBuffer = RenderManager::get().allocateAnimationBuffer();
+            animComp.descriptorSet = RenderManager::get().allocateAnimationDescriptorSet(animComp.boneMatrixBuffer);
+            animComp.UpdateGpuBuffer(RenderManager::get().allocator.allocator);
+        }
+
         JPH::Ref<JPH::Shape> colliderShape;
         JPH::EMotionType joltMotionType;
         uint16_t joltLayer;
@@ -106,23 +202,21 @@ namespace Kiki {
         if (colliderShape) {
             registry.emplace<MeshColliderComponent>(model, colliderShape);
             registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
-			registry.emplace<PhysicalAttributesComponent>(model);
+            registry.emplace<PhysicalAttributesComponent>(model);
             spdlog::info("Model {} loaded as {}", path,
                 type == PhysicsType::Static ? "Static" : (type == PhysicsType::Dynamic ? "Dynamic" : "Kinematic"));
         }
 
         if (texture.hastexture) {
-
-     
-            registry.emplace<MaterialComponent>(model,
-                    createMaterial(texture));
+            registry.emplace<MaterialComponent>(model, createMaterial(texture));
         }
 
         registry.emplace<ColourComponent>(model, glm::vec3(1, 0, 0));
 
-        Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
-        Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
-		return model;
+        // Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
+        // Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
+
+        return model;
     }
 
 
@@ -142,7 +236,23 @@ namespace Kiki {
             transform.rotation = glm::conjugate(transform.rotation);
             //transform.scale = {1, 1, 1}; // TODO: this is a temp fix, will probably cause issues
 
-            registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs));
+            std::vector<glm::ivec4> safeBoneIDs = mesh.boneIDs;
+            std::vector<glm::vec4> safeWeights = mesh.weights;
+
+            if (safeBoneIDs.empty() || safeWeights.empty()) {
+                safeBoneIDs.assign(mesh.vertices.size(), glm::ivec4(0));
+                safeWeights.assign(mesh.vertices.size(), glm::vec4(0.0f));
+            }
+
+            registry.emplace<MeshComponent>(model, createMesh(
+                mesh.vertices,
+                mesh.indices,
+                mesh.normals,
+                mesh.uvs,
+                safeBoneIDs, 
+                safeWeights  
+            ));
+
             if (texture.hastexture) {
                 materials.emplace_back(RenderManager::get().allocateMaterial(texture));
 				int id = materials.size() - 1;

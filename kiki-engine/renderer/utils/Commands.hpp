@@ -33,7 +33,8 @@ namespace rutils {
 		Kiki::Skybox const& skybox,
 		Image const& doneLightingImage,
 		Image const& doneSSAOImage,
-		Image const& doneSSRImage
+		Image const& doneSSRImage,
+		VkDescriptorSet dummyAnimationDesc
 	);
 
 	void submitCommands(
