@@ -1018,6 +1018,7 @@ namespace Kiki {
         vkDeviceWaitIdle(window.device);
 
         SceneManager::get().shutdown();
+        dummyAnimationBuffer = {};
 
         #ifndef NDEBUG
         ImGui_ImplVulkan_Shutdown();
@@ -1033,7 +1034,6 @@ namespace Kiki {
 
         gbuffers = {};
         depthBuffer = {};
-        dummyAnimationBuffer = {};
 
         tempTextureCmdPool = {};
 
