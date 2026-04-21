@@ -30,6 +30,8 @@ add_subdirectory(Components)
 
 add_subdirectory(debugging)
 
+add_subdirectory(interface)
+
 
 target_link_libraries(kiki
   PUBLIC

@@ -9,4 +9,6 @@ target_sources(kiki
       ColourComponent.hpp
       CameraComponent.h
       DebugComponent.hpp
+      MiscComponent.hpp
+      InterfaceComponent.hpp
 )
