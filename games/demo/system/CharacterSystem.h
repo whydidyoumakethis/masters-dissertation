@@ -18,9 +18,37 @@ public:
         auto& inputManager = Kiki::InputManager::get();
     }
     void OnStart() override {
-        auto objects = World::Get().Query< CharacterComponent, PhysicalAttributesComponent>();
-        for (auto [entity, character, ip] : objects.each()) {
-			ip.isGroundedNeedsUpdate = true;
+        auto objects2 = World::Get().Query<MiscComponent>();
+        glm::vec3 spawnPos = glm::vec3(0, 0, 0);
+        //Entity playerEntity = NullEntity;
+        for (auto [e,misc] : objects2.each()) {
+        	if (misc.miscTag == MmiscTags::PLAYER) {
+        		playerEntity = e;
+        		World::Get().Registry().emplace<CharacterComponent>(e);
+        	}
+        	if (misc.miscTag == MmiscTags::SPAWN) {
+        		auto* transform = World::Get().GetComponent<TransformComponent>(e);
+        		if (transform) {
+        			spawnPos = transform->position;
+        		}
+        	}
+        }
+        
+        if (playerEntity != NullEntity) {
+        	auto* character = World::Get().GetComponent<CharacterComponent>(playerEntity);
+        	auto* transform = World::Get().GetComponent<TransformComponent>(playerEntity);
+			auto* physics = World::Get().GetComponent<PhysicalAttributesComponent>(playerEntity);
+        	if (character) {
+        		character->spawnPosition = spawnPos;
+        	}
+        	if(transform){
+        		transform->position = spawnPos;
+				//transform->position.y += 1.1f; // spawn a bit above the ground to avoid initial collision issues
+        		transform->dirty = true;
+        	}
+            if(physics){
+                physics->isGroundedNeedsUpdate = true;
+			}
         }
     }
     void OnStop() override {
@@ -28,6 +56,7 @@ public:
     }
 private:
     InputManager& inputManager = Kiki::InputManager::get();
+	Entity playerEntity = NullEntity;
     float GetCameraYaw(Entity targetEntity) {
         float yaw = 0.0f;
         auto camView = World::Get().Query<ThirdPersonCameraComponent>();
@@ -81,6 +110,8 @@ private:
             return;
         }
         transform.position += character.velocity * dt;
+		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+  //              physics.setEntityVelocity(playerEntity, character.velocity);
         transform.dirty = true;
     }
     void HandleJump(
