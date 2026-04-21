@@ -3,7 +3,7 @@
 struct CameraComponent {
     float fov = 90.0f;
     float nearPlane = 0.1f;
-    float farPlane = 100.0f;
+    float farPlane = 2000.0f;
     bool  isMain = false;   // mark the main camera
 
     // reserve
