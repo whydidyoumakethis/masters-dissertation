@@ -10,6 +10,7 @@
 #include "utils/Image.hpp"
 #include "../logging/FatalError.hpp"
 #include "SceneManager.hpp"
+#include "Animation/AnimationComponent.h"
 
 #include <iostream>
 #include <spdlog/spdlog.h>
@@ -1016,6 +1017,17 @@ namespace Kiki {
 
     void RenderManager::shutdown() {
         vkDeviceWaitIdle(window.device);
+
+        auto& registry = World::Get().Registry();
+        auto view = registry.view<Kiki::AnimationComponent>();
+
+        for (auto entity : view) {
+            auto& animComp = registry.get<Kiki::AnimationComponent>(entity);
+            if (animComp.boneMatrixBuffer.buffer != VK_NULL_HANDLE) {
+                vmaDestroyBuffer(allocator.allocator, animComp.boneMatrixBuffer.buffer, animComp.boneMatrixBuffer.allocation);
+                animComp.boneMatrixBuffer.buffer = VK_NULL_HANDLE;
+            }
+        }
 
         SceneManager::get().shutdown();
         dummyAnimationBuffer = {};
