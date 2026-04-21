@@ -380,7 +380,7 @@ namespace rutils {
 
         vkUpdateDescriptorSets(window.device, 5, desc, 0, nullptr);
     }
-}
+
     void updateAnimationDescriptorSet(
         VulkanWindow const& window,
         VkDescriptorSet descriptorSet,

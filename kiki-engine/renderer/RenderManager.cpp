@@ -69,9 +69,9 @@ namespace Kiki {
 
             postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
 
-            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
-            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
-            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
+            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle, animationLayout.handle);
+            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle, animationLayout.handle);
+            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle, animationLayout.handle);
             pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -1029,9 +1029,11 @@ namespace Kiki {
 
         noTextureDst = {};
         noTexture = {};
+        dummyAnimationDesc = {};
 
         gbuffers = {};
         depthBuffer = {};
+        dummyAnimationBuffer = {};
 
         tempTextureCmdPool = {};
 
@@ -1076,6 +1078,7 @@ namespace Kiki {
         materialLayout = {};
         cubemapLayout = {};
         postProcessingLayout = {};
+        animationLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
