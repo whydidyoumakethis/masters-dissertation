@@ -593,17 +593,17 @@ namespace rutils {
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
         vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
-        vkCmdEndRendering(aCmdBuff);
-        // end fxaa pass
-
-        // TODO: ui pass should go here, after fxaa :)
-
         // begin imgui pass
 #       ifndef NDEBUG
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
 #       endif
         // end imgui pass
+
+        vkCmdEndRendering(aCmdBuff);
+        // end fxaa pass
+
+        // TODO: ui pass should go here, after fxaa :)
 
         // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
         imageBarrier(aCmdBuff, swapchainImage.image,
