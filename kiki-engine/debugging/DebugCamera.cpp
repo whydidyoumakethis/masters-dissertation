@@ -73,6 +73,9 @@ namespace Kiki {
     }
 
     void DebugCamera::enter() {
+        if (!registry.valid(camera))
+            reset();
+
         auto cameras = world.Query<CameraComponent>();
         auto& cameraComp = registry.get_or_emplace<CameraComponent>(camera);
         auto& transformComp = registry.get_or_emplace<TransformComponent>(camera);
