@@ -50,6 +50,7 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
+            
             constexpr uint32_t MAX_BONES = 100;
             VkDeviceSize dummyBufferSize = sizeof(glm::mat4) * MAX_BONES;
 
@@ -66,9 +67,12 @@ namespace Kiki {
             std::memcpy(mappedData, identityBones.data(), dummyBufferSize);
             vmaUnmapMemory(allocator.allocator, dummyAnimationBuffer.allocation);
 
-            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle, animationLayout.handle);
-            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle, animationLayout.handle);
-            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle, animationLayout.handle);
+            postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
+
+            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
+            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
+            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
+            pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -79,6 +83,9 @@ namespace Kiki {
 
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
+            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
@@ -86,6 +93,15 @@ namespace Kiki {
 
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+
+            ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
+
+            ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+
+            fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
 
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
@@ -189,6 +205,15 @@ namespace Kiki {
             gbuffers = rutils::createAllGBufferImages(window, allocator);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
 
+            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
+
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
+
             recreateSwapchain = false;
         }
 
@@ -271,9 +296,9 @@ namespace Kiki {
     
         assert(std::size_t(imageIndex) < window.swapImages.size());
 
-        rutils::ImageAndView colorTarget;
-        colorTarget.image = window.swapImages[imageIndex];
-        colorTarget.view = window.swapViews[imageIndex];
+        rutils::ImageAndView swapchainColourTarget;
+        swapchainColourTarget.image = window.swapImages[imageIndex];
+        swapchainColourTarget.view = window.swapViews[imageIndex];
 
         assert(std::size_t(frameIndex) < commandBuffers.size());
 
@@ -281,7 +306,7 @@ namespace Kiki {
             commandBuffers[frameIndex],
             pipelines,
             pipelineLayouts,
-            colorTarget,
+            swapchainColourTarget,
             depthBuffer,
             gbuffers,
             window.swapchainExtent,
@@ -289,8 +314,14 @@ namespace Kiki {
             sceneUniforms,
             sceneDescriptors,
             deferredLightingDescriptors,
+            fxaaDescriptors,
+            ssrDescriptors,
+            ssaoDescriptors,
             noTextureDst,
             skybox,
+            doneLightingImage,
+            doneSSAOImage,
+            doneSSRImage,
             dummyAnimationDesc
         );
 
@@ -888,7 +919,7 @@ namespace Kiki {
         info.PipelineCache = nullptr;
         info.DescriptorPool = descriptorPool.handle;
         info.MinImageCount = 2;
-        info.ImageCount = 2;
+        info.ImageCount = commandBuffers.size();
         info.Allocator = nullptr;
         info.UseDynamicRendering = true;
         info.PipelineInfoMain.PipelineRenderingCreateInfo = { .sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR };
@@ -1025,18 +1056,26 @@ namespace Kiki {
         pipelines.deferred_geometry = {};
         pipelines.deferred_geometry_alpha = {};
         pipelines.deferred_lighting = {};
+        pipelines.fxaa = {};
+        pipelines.ssr = {};
+        pipelines.ssao = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
+        pipelineLayouts.postprocessPipelineLayout = {};
 
         depthBuffer = {};
+        doneLightingImage = {};
+        doneSSRImage = {};
+        doneSSAOImage = {};
         sceneUBO = {};
 
         gBufferLayout = {};
         sceneLayout = {};
         materialLayout = {};
         cubemapLayout = {};
+        postProcessingLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};

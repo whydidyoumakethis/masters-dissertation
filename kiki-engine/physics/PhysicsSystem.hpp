@@ -65,6 +65,12 @@ namespace Kiki {
 
             return result;
         }
+        void setEntityVelocity(entt::entity entity, const glm::vec3& velocity) {
+            auto& reg = World::Get().Registry();
+            if (auto* rb = reg.try_get<RigidBodyComponent>(entity)) {
+                _manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, ToJPH(velocity));
+            }
+		}
     };
     class PhysicsSystem : public System {
     public:

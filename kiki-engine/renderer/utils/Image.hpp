@@ -75,6 +75,7 @@ namespace rutils {
 	std::uint32_t computeMipLevelCount(std::uint32_t aWidth, std::uint32_t aHeight);
 
 	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator);
+	Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator);
 	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator);
 	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format);
 }

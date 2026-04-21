@@ -30,6 +30,8 @@ add_subdirectory(Components)
 
 add_subdirectory(debugging)
 
+add_subdirectory(interface)
+
 add_subdirectory(Animation)
 
 target_link_libraries(kiki

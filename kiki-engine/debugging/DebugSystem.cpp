@@ -14,7 +14,7 @@ namespace Kiki {
         if (cam.enabled) 
             cam.update(dt);
             
-        interface.update(dt);
+        interface.draw();
 #       endif
     }
 

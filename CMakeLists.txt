@@ -7,6 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "")
 
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 include(FetchContent)
 
 # --- Jolt Physics Configuration ---
@@ -180,6 +182,43 @@ if(NOT imgui_POPULATED)
     target_compile_definitions(imgui PUBLIC IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
 endif()
 
+# FreeType
+FetchContent_Declare(
+    freetype
+    GIT_REPOSITORY "https://github.com/freetype/freetype.git"
+    GIT_TAG        "a6d486002dc6fb26dadfbca45bcab02e1250963a"
+)
+
+set(FT_DISABLE_ZLIB  ON CACHE INTERNAL "")
+set(FT_DISABLE_BZIP2 ON CACHE INTERNAL "")
+set(FT_DISABLE_PNG   ON CACHE INTERNAL "")
+set(FT_DISABLE_HARFBUZZ ON CACHE INTERNAL "")
+set(FT_DISABLE_BROTLI ON CACHE INTERNAL "")
+
+FetchContent_MakeAvailable(freetype)
+
+FetchContent_Declare(
+  tinyxml2
+  GIT_REPOSITORY https://github.com/leethomason/tinyxml2.git
+  GIT_TAG        9.0.0
+)
+FetchContent_MakeAvailable(tinyxml2)
+
+FetchContent_Declare(
+    msdfgen
+    GIT_REPOSITORY "https://github.com/Chlumsky/msdfgen.git"
+    GIT_TAG        "da07a9c04f9f92a247fef7da57aa62085647757e"
+)
+
+set(MSDFGEN_USE_VCPKG OFF CACHE BOOL "" FORCE)
+set(MSDFGEN_USE_SKIA OFF CACHE BOOL "" FORCE)  
+set(MSDFGEN_USE_TINYXML2 OFF CACHE BOOL "" FORCE)
+set(MSDFGEN_USE_LODEPNG OFF CACHE BOOL "" FORCE)
+set(MSDFGEN_BUILD_STANDALONE OFF CACHE BOOL "" FORCE)
+set(MSDFGEN_INSTALL OFF CACHE BOOL "" FORCE)
+
+FetchContent_MakeAvailable(msdfgen)
+
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
@@ -194,12 +233,17 @@ target_link_libraries(KikiDeps INTERFACE
     assimp::assimp
     Jolt
     imgui
+    freetype
+    msdfgen::msdfgen
+    msdfgen::msdfgen-ext
 )
 
 target_include_directories(KikiDeps INTERFACE 
     ${glm_SOURCE_DIR}
     ${joltphysics_SOURCE_DIR} 
     ${stb_SOURCE_DIR}
+    ${msdfgen_SOURCE_DIR}
+    ${msdfgen_BINARY_DIR}
 )
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"

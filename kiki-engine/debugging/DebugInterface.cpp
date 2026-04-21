@@ -8,7 +8,6 @@
 #include <Components/DebugComponent.hpp>
 #include <renderer/SceneManager.hpp>
 
-#include "windows/Log.hpp"
 
 namespace Kiki {
     DebugInterface& DebugInterface::get() {
@@ -63,7 +62,7 @@ namespace Kiki {
         }
     }
 
-    void DebugInterface::update(float dt) {
+    void DebugInterface::draw() {
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
@@ -92,9 +91,6 @@ namespace Kiki {
 
             if (ImGui::Button(entityViewerVisible ? "Close Entity Viewer":"Open Entity Viewer", ImVec2(ImGui::GetContentRegionAvail().x - 20.0f, 0.0f))) 
                 entityViewerVisible = !entityViewerVisible;
-
-            if (ImGui::Button(logVisible ? "Close Log":"Open Log", ImVec2(ImGui::GetContentRegionAvail().x - 20.0f, 0.0f))) 
-                logVisible = !logVisible;
 
             ImGui::Dummy(ImVec2(0.0f, 10.0f));
             ImGui::Unindent(20.0f);
