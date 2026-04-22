@@ -232,17 +232,14 @@ namespace Kiki {
 			}
 			
 
-			// 遍历所有骨骼
 			for (unsigned int i = 0; i < mesh->mNumBones; i++) {
 				aiBone* bone = mesh->mBones[i];
 
 				std::string boneName = bone->mName.C_Str();
 
-				//从 skeleton 查 index,如果找不到就跳过
 				int boneID = skeleton.FindBoneIndex(boneName);
 				if (boneID == -1) continue;
 
-				// 遍历这个骨骼影响的所有顶点
 				for (unsigned int w = 0; w < bone->mNumWeights; w++) {
 					int vertexID = bone->mWeights[w].mVertexId;
 					float weight = bone->mWeights[w].mWeight;
@@ -255,7 +252,6 @@ namespace Kiki {
 					);
 				}
 			}
-			// 权重归一化（防止模型爆炸）
 			for (size_t i = 0; i < out.weights.size(); i++) {
 				float sum =
 					out.weights[i].x +
@@ -497,13 +493,11 @@ namespace Kiki {
 			auto& t = scene->mRootNode->mTransformation;
 			out.worldTransform = toglmMat4(t);
 
-			// === 新增：在解析 Mesh 之前，先把骨骼和动画抽出来存进 out 里面 ===
 			if (scene->HasAnimations()) {
 				out.hasAnimations = true;
 				out.skeleton = AnimationLoader::LoadSkeleton(scene);
 
 				if (out.skeleton) {
-					// 遍历文件里所有的动画，按名字转小写存进 map 里，方便后续查表
 					for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
 						std::string animName = scene->mAnimations[i]->mName.C_Str();
 						std::transform(animName.begin(), animName.end(), animName.begin(), ::tolower);
@@ -539,7 +533,7 @@ namespace Kiki {
 						mesh.indices.push_back(face.mIndices[k]);
 					}
 				}
-				// === 新增：提取该 Mesh 的骨骼 ID 和 蒙皮权重 ===
+
 				mesh.boneIDs.resize(aiMesh->mNumVertices, glm::ivec4(0));
 				mesh.weights.resize(aiMesh->mNumVertices, glm::vec4(0.0f));
 
@@ -563,7 +557,7 @@ namespace Kiki {
 							);
 						}
 					}
-					// 权重归一化防爆
+
 					for (size_t v = 0; v < mesh.weights.size(); v++) {
 						float sum = mesh.weights[v].x + mesh.weights[v].y + mesh.weights[v].z + mesh.weights[v].w;
 						if (sum > 0.0f) mesh.weights[v] /= sum;

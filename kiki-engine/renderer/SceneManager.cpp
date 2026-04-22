@@ -265,27 +265,17 @@ namespace Kiki {
             //Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
-            // === 新增：动画组件迁移逻辑 ===
-            // 逻辑：如果场景有动画数据，且当前实例是玩家（或者你希望它有动画的节点）
             if (scene.hasAnimations && (instance.miscTag == MmiscTags::PLAYER)) {
 
                 spdlog::info("Instance {} is a PLAYER with animations, attaching AnimationComponent...", i);
 
                 auto& animComp = registry.emplace<AnimationComponent>(model);
 
-                // 1. 骨骼迁移
-                // 注意：由于 Mscene 里的 skeleton 是 unique_ptr，如果是单玩家，我们可以 move。
-                // 如果以后有多个相同骨骼的怪，这里需要实现 Skeleton 的深拷贝(Clone)逻辑。
-                // 这里我们先模仿 loadModel 的逻辑：
                 if (scene.skeleton) {
-                    // 暂时假设每个实例需要一份独立的骨骼实例
-                    // 如果你的 Skeleton 类没有拷贝构造函数，请先确保它能支持拷贝
                     animComp.skeleton = std::move(scene.skeleton);
                 }
 
-                // 2. 动画状态机配置 (从 Mscene.animations 映射到 CharacterState)
                 for (auto& [animName, animPtr] : scene.animations) {
-                    // 这里的逻辑直接照搬你原来的 loadModel：
                     if (animName.find("idle") != std::string::npos) {
                         animComp.animations[CharacterState::Idle] = std::move(animPtr);
                     }
@@ -300,11 +290,9 @@ namespace Kiki {
                     }
                 }
 
-                // 3. 设置默认状态
+                // set default state
                 animComp.ChangeState(CharacterState::Idle);
 
-                // 4. GPU 资源分配 (Vulkan 相关)
-                // 这部分代码也是从 loadModel 完整平移过来的
                 animComp.boneMatrixBuffer = RenderManager::get().allocateAnimationBuffer();
                 animComp.descriptorSet = RenderManager::get().allocateAnimationDescriptorSet(animComp.boneMatrixBuffer);
                 animComp.UpdateGpuBuffer(RenderManager::get().allocator.allocator);
