@@ -24,7 +24,7 @@ namespace Kiki {
 
     std::string FontManager::loadFont(std::filesystem::path path, std::string name, std::u32string characters, int baseSize) {
         if (freetype) {
-            msdfgen::FontHandle* handle = msdfgen::loadFont(freetype, path.c_str());
+            msdfgen::FontHandle* handle = msdfgen::loadFont(freetype, path.string().c_str());
 
             if (handle) {
                 iutils::Font font;
@@ -65,6 +65,7 @@ namespace Kiki {
                 }
             }
         }
+        return "";
     }
 
     void FontManager::addCharacters(iutils::Font* font, std::u32string characters) {
