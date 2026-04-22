@@ -35,7 +35,7 @@ namespace Kiki {
 
         entt::entity loadModel(const std::string path, const std::string name = "Object", PhysicsType type = PhysicsType::Static);
 
-        void loadScene(const Mscene& scene);
+        void loadScene(Mscene scene);
 
         bool validMaterial(int id);
         bool validMesh(int id);

@@ -10,6 +10,7 @@
 #include <Components/ColourComponent.hpp>
 #include <assimp/GltfMaterial.h>
 #include "Animation/Skeleton.h"
+#include "Animation/AnimationLoader.h"
 
 #define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate | aiProcess_LimitBoneWeights
 
@@ -171,6 +172,10 @@ struct Mscene {
 	std::vector<Mtexture> textures;
 	std::vector<Mlights> lights;
 	glm::mat4 worldTransform;
+	// === 新增：用于存储动画和骨骼数据 ===
+	std::unique_ptr<Kiki::Skeleton> skeleton = nullptr;
+	std::map<std::string, std::unique_ptr<Kiki::Animation>> animations;
+	bool hasAnimations = false;
 };
 
 namespace Kiki {
@@ -492,6 +497,21 @@ namespace Kiki {
 			auto& t = scene->mRootNode->mTransformation;
 			out.worldTransform = toglmMat4(t);
 
+			// === 新增：在解析 Mesh 之前，先把骨骼和动画抽出来存进 out 里面 ===
+			if (scene->HasAnimations()) {
+				out.hasAnimations = true;
+				out.skeleton = AnimationLoader::LoadSkeleton(scene);
+
+				if (out.skeleton) {
+					// 遍历文件里所有的动画，按名字转小写存进 map 里，方便后续查表
+					for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
+						std::string animName = scene->mAnimations[i]->mName.C_Str();
+						std::transform(animName.begin(), animName.end(), animName.begin(), ::tolower);
+						out.animations[animName] = AnimationLoader::LoadAnimation(scene, *out.skeleton, i);
+					}
+				}
+			}
+
 			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
 
 			collectLights(scene, out);
@@ -517,6 +537,36 @@ namespace Kiki {
 					aiFace face = aiMesh->mFaces[j];
 					for (unsigned int k = 0; k < face.mNumIndices; k++) {
 						mesh.indices.push_back(face.mIndices[k]);
+					}
+				}
+				// === 新增：提取该 Mesh 的骨骼 ID 和 蒙皮权重 ===
+				mesh.boneIDs.resize(aiMesh->mNumVertices, glm::ivec4(0));
+				mesh.weights.resize(aiMesh->mNumVertices, glm::vec4(0.0f));
+
+				if (out.skeleton) {
+					for (unsigned int b = 0; b < aiMesh->mNumBones; b++) {
+						aiBone* bone = aiMesh->mBones[b];
+						std::string boneName = bone->mName.C_Str();
+
+						int boneID = out.skeleton->FindBoneIndex(boneName);
+						if (boneID == -1) continue;
+
+						for (unsigned int w = 0; w < bone->mNumWeights; w++) {
+							int vertexID = bone->mWeights[w].mVertexId;
+							float weight = bone->mWeights[w].mWeight;
+
+							AddBoneData(
+								mesh.boneIDs[vertexID],
+								mesh.weights[vertexID],
+								boneID,
+								weight
+							);
+						}
+					}
+					// 权重归一化防爆
+					for (size_t v = 0; v < mesh.weights.size(); v++) {
+						float sum = mesh.weights[v].x + mesh.weights[v].y + mesh.weights[v].z + mesh.weights[v].w;
+						if (sum > 0.0f) mesh.weights[v] /= sum;
 					}
 				}
 				out.meshes.push_back(mesh);
