@@ -1,1 +1,1 @@
-cmake -B output -S .. -G "Visual Studio 18 2026"
+cmake -B output/Debug -S .. -G "Visual Studio 18 2026" -DCMAKE_CONFIGURATION_TYPES="Debug"
