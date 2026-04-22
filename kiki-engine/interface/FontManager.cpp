@@ -65,6 +65,7 @@ namespace Kiki {
                 }
             }
         }
+        return "";
     }
 
     void FontManager::addCharacters(iutils::Font* font, std::u32string characters) {
