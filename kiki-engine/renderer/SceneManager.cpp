@@ -162,23 +162,38 @@ namespace Kiki {
             JPH::EMotionType joltMotionType;
             uint16_t joltLayer;
             //COPIED WHAT WAS DONE IN LOAD MODEL, PLEASE WORK ON THIS FUNCTION FROM NOW AS PREVIOUS FUNCTION HAS DEPRECATED FUNCTIONS
+
 			switch (instance.bodyType) {
 			case MbodyType::STATIC:
-                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+                //colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
                 joltMotionType = JPH::EMotionType::Static;
                 joltLayer = 0; // NON_MOVING
                 break;
             case MbodyType::DYNAMIC:
-                colliderShape = CreateConvexHull(mesh.vertices);
+                //colliderShape = CreateConvexHull(mesh.vertices);
                 joltMotionType = JPH::EMotionType::Dynamic;
                 joltLayer = 1; // MOVING
 				break;
             case MbodyType::KINEMATIC:
-                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+                //colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
                 joltMotionType = JPH::EMotionType::Kinematic;
 				joltLayer = 0;
                 break;
              }
+
+            switch (instance.colliderType) {
+
+            case McolliderType::BOX:
+                colliderShape = CreateConvexHull(mesh.vertices);
+                break;
+            case McolliderType::CONVEX_HULL:
+                colliderShape = CreateConvexHull(mesh.vertices);
+                break;
+            case McolliderType::MESH:
+                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+                break;
+            }
+
             if (colliderShape) {
                 registry.emplace<MeshColliderComponent>(model, colliderShape);
 				registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
