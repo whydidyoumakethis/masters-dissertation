@@ -88,15 +88,10 @@ FetchContent_Declare(
     GIT_TAG        "v1.17.0"
 )
 
-# fastgltf
-FetchContent_Declare(
-    fastgltf
-    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
-    GIT_TAG        "v0.9.0"
-)
+
 
 FetchContent_MakeAvailable(
-    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog fastgltf
+    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog 
 )
 
 # --- Shader Compilation ---
@@ -122,13 +117,7 @@ endforeach()
 add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
 
 # --- KikiDeps Interface ---
-# fastGLTF
-FetchContent_Declare(
-    fastgltf
-    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
-    GIT_TAG "v0.9.0"
-)
-FetchContent_MakeAvailable(fastgltf)
+
 
 # stb
 FetchContent_Declare(
@@ -259,7 +248,6 @@ target_link_libraries(KikiDeps INTERFACE
     VulkanMemoryAllocator
     EnTT::EnTT
     spdlog::spdlog
-    fastgltf::fastgltf
     assimp::assimp
     Jolt
     imgui

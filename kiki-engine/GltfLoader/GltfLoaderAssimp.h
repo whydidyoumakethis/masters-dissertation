@@ -21,6 +21,9 @@ struct Mmesh {
 	std::vector<uint32_t> indices;
 	int matIndex = 0;
 
+	std::vector<glm::vec3> tangents;
+	std::vector<glm::vec3> bitangents;
+
 };
 
 struct RGBA {
@@ -441,6 +444,8 @@ namespace Kiki {
 				mesh.normals.reserve(aiMesh->mNumVertices);
 				mesh.uvs.reserve(aiMesh->mNumVertices);
 				mesh.matIndex = aiMesh->mMaterialIndex;
+				mesh.tangents.reserve(aiMesh->mNumVertices);
+				mesh.bitangents.reserve(aiMesh->mNumVertices);
 				for (unsigned int j = 0; j < aiMesh->mNumVertices; j++) {
 					mesh.vertices.emplace_back(aiMesh->mVertices[j].x, aiMesh->mVertices[j].y, aiMesh->mVertices[j].z);
 					if (aiMesh->HasNormals()) {
@@ -448,6 +453,10 @@ namespace Kiki {
 					}
 					if (aiMesh->HasTextureCoords(0)) {
 						mesh.uvs.emplace_back(aiMesh->mTextureCoords[0][j].x, aiMesh->mTextureCoords[0][j].y);
+					}
+					if(aiMesh->HasTangentsAndBitangents()){
+						mesh.tangents.emplace_back(aiMesh->mTangents[j].x, aiMesh->mTangents[j].y, aiMesh->mTangents[j].z);
+						mesh.bitangents.emplace_back(aiMesh->mBitangents[j].x, aiMesh->mBitangents[j].y, aiMesh->mBitangents[j].z);
 					}
 				}
 				for (unsigned int j = 0; j < aiMesh->mNumFaces; j++) {
