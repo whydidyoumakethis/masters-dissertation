@@ -17,14 +17,18 @@ layout(location = 3) out vec4 gWorldPos;
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 baseColour;
-    vec4 flags; // sprite, useTexture
+    vec4 flags; // sprite, useTexture, roughnessFactor, metallicFactor
 } object;
 
 void main()
 {
     // Beckman roughness = roughness^2
     float roughness = pow(texture(uTexRoughnessMetalness, v2fTexCoord).g, 2.f);
+    roughness *= object.flags.z;
+
     float metalness = texture(uTexRoughnessMetalness, v2fTexCoord).b;
+    metalness *= object.flags.w;
+
     vec3 baseColour = texture(uTexColor, v2fTexCoord).rgb;
     vec3 normal = normalize(v2fNormal);
 

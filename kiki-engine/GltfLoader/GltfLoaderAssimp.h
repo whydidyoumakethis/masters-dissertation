@@ -49,6 +49,8 @@ struct Mtexture {
 	alphaMode mode = alphaMode::OPAQUE;
 	float alphaCutoff = 0;
 	glm::vec4 baseColour = glm::vec4(1.f);
+	float roughnessFactor = 1.f;
+	float metallicFactor = 1.f;
 
 
 	~Mtexture() {
@@ -79,7 +81,9 @@ struct Mtexture {
 		name(std::move(other.name)),
 		mode(other.mode),
 		alphaCutoff(other.alphaCutoff),
-		baseColour(other.baseColour)
+		baseColour(other.baseColour),
+		roughnessFactor(other.roughnessFactor),
+		metallicFactor(other.metallicFactor)
 	{
 		other.rawDataPtr = nullptr;
 		other.roughness = nullptr;
@@ -106,6 +110,8 @@ struct Mtexture {
 			mode = other.mode;
 			alphaCutoff = other.alphaCutoff;
 			baseColour = other.baseColour;
+			roughnessFactor = other.roughnessFactor;
+			metallicFactor = other.metallicFactor;
 
 			other.rawDataPtr = nullptr;
 			other.roughness = nullptr;
@@ -479,6 +485,18 @@ namespace Kiki {
 				if (mat->Get(AI_MATKEY_BASE_COLOR, baseColour) == AI_SUCCESS) {
 					texture.baseColour = glm::vec4(baseColour.r, baseColour.g, baseColour.b, baseColour.a);
 				}
+
+				float rF = 1.f;
+				float mF = 1.f;
+
+				if (mat->Get(AI_MATKEY_ROUGHNESS_FACTOR, rF) == AI_SUCCESS) {
+					texture.roughnessFactor = rF;
+				}
+
+				if (mat->Get(AI_MATKEY_METALLIC_FACTOR, mF) == AI_SUCCESS) {
+					texture.metallicFactor = mF;
+				}
+
 
 				aiString textureName;
 				aiString roughName;

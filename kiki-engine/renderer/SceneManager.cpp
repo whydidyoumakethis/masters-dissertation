@@ -7,6 +7,7 @@
 #include "physics/PhysicsUtils.hpp"   
 #include "physics/PhysicsSystem.hpp" 
 #include "Components/MiscComponent.hpp"
+#include "Components/RoughnessMetallicFactorComponent.hpp"
 
 #include <spdlog/spdlog.h>
 
@@ -152,6 +153,7 @@ namespace Kiki {
                 }
             }
             registry.emplace<ColourComponent>(model, glm::vec3(texture.baseColour));
+            registry.emplace<RoughnessMetallicFactorComponent>(model, glm::vec2(texture.roughnessFactor, texture.metallicFactor));
             //Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 

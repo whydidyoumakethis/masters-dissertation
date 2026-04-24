@@ -5,6 +5,7 @@
 #include "Pipelines.hpp"
 #include "Components/TransparencyComponent.hpp"
 #include "Components/ColourComponent.hpp"
+#include "Components/RoughnessMetallicFactorComponent.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -243,13 +244,15 @@ namespace rutils {
                     glm::vec4 flags;
                     flags.x = 0.f; // sprite
                     flags.y = 1.f; // useTexture
+                    flags.z = 1.f; // roughnessFactor
+                    flags.w = 1.f; // metalnessFactor
 
                     if (registry.all_of<MaterialComponent>(e)) {
                         auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
                         if (sceneManager.validMaterial(materialComponent->id)) {
                             Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
-                            
+
                             // if material doesn't have a texture, use base colour instead
                             if (material.hasTexture == false) {
                                 flags.y = 0.f;
@@ -271,6 +274,17 @@ namespace rutils {
                         colour = registry.get<ColourComponent>(e).colour;
                     } else {
                         colour = glm::vec3(0.3f, 0.3f, 0.3f);
+                    }
+
+                    glm::vec2 roughnessMetalnessFactors;
+
+                    if (registry.all_of<RoughnessMetallicFactorComponent>(e)) {
+                        roughnessMetalnessFactors = registry.get<RoughnessMetallicFactorComponent>(e).roughnessMetallicFactors;
+                        flags.z = roughnessMetalnessFactors.r;
+                        flags.w = roughnessMetalnessFactors.g;
+                    }
+                    else {
+                        roughnessMetalnessFactors = glm::vec2(1.f, 1.f);
                     }
 
                     ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f), flags);
@@ -305,6 +319,8 @@ namespace rutils {
             glm::vec4 flags;
             flags.x = 0.f; // sprite
             flags.y = 1.f; // useTexture
+            flags.z = 1.f; // roughnessFactor
+            flags.w = 1.f; // metalnessFactor
 
             if (registry.all_of<MaterialComponent>(e)) {
                 auto materialComponent = world.GetComponent<MaterialComponent>(e);
@@ -337,6 +353,18 @@ namespace rutils {
 
             if (transparentComponent.sprite) {
                 flags.x = 1.f;
+            }
+
+
+            glm::vec2 roughnessMetalnessFactors;
+
+            if (registry.all_of<RoughnessMetallicFactorComponent>(e)) {
+                roughnessMetalnessFactors = registry.get<RoughnessMetallicFactorComponent>(e).roughnessMetallicFactors;
+                flags.z = roughnessMetalnessFactors.r;
+                flags.w = roughnessMetalnessFactors.g;
+            }
+            else {
+                roughnessMetalnessFactors = glm::vec2(1.f, 1.f);
             }
 
             ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), flags);
