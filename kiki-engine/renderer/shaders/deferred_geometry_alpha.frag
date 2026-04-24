@@ -25,11 +25,16 @@ vec3 calculateMappedNormal() {
     vec3 normalMapNormal = texture(uTexNormalMap, v2fTexCoord).rgb;
     normalMapNormal = normalize((normalMapNormal * 2.f) - 1.f);
 
-    // MikkTSpace reconstruction: do not orthogonalize T, do not normalize B.
     vec3 N = normalize(v2fNormal);
     vec3 T = normalize(v2fTangent.xyz);
-    vec3 B = cross(N, T) * v2fTangent.w;
+    float sign = v2fTangent.w;
 
+    T = normalize(T - N * dot(T, N));
+
+    // construct bitangent
+    vec3 B = normalize(cross(N, T) * sign);
+
+    // build TBN
     mat3 tbn = mat3(T, B, N);
 
     vec3 mappedNormal = normalize(tbn * normalMapNormal);
