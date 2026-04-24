@@ -1,9 +1,11 @@
 #version 450
 
 // edge direction tuning
-#define FXAA_REDUCE_MULT (0.25f * (1.f / 8.f))
-#define FXAA_REDUCE_MIN (1.f / 128.f)
-#define FXAA_SPAN_MAX 8.f
+// TODO: put this into a push constant
+#define FXAA_STRENGTH 16.f
+#define FXAA_REDUCE_MULT (0.25f * (1.f / FXAA_STRENGTH))
+#define FXAA_REDUCE_MIN (1.f / (FXAA_STRENGTH * 16.f))
+#define FXAA_SPAN_MAX FXAA_STRENGTH
 
 layout(location = 0) in vec2 v2fTexCoord;
 
