@@ -34,6 +34,7 @@ namespace Kiki {
         rutils::Buffer texCoords;
         rutils::Buffer normals;
         rutils::Buffer indices;
+        rutils::Buffer tangents;
         std::uint32_t vertexCount;
         std::uint32_t indexCount;
     };
@@ -41,8 +42,10 @@ namespace Kiki {
     struct Material {
         rutils::Image texture;
         rutils::Image roughnessMetalness;
+        rutils::Image normalMap;
         VkDescriptorSet descriptorSet;
         bool hasTexture = false;
+        bool hasNormalMap = false;
     };
 
     struct Skybox {
@@ -116,6 +119,7 @@ namespace Kiki {
         rutils::Sampler sampler;
 
         rutils::Image noTexture;
+        rutils::Image noNormalMap;
         VkDescriptorSet noTextureDst;
 
         Skybox skybox;
@@ -123,7 +127,7 @@ namespace Kiki {
         public:
         static RenderManager& get();
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents);
         Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});

@@ -5,9 +5,11 @@
 layout(location = 0) in vec2 v2fTexCoord;
 layout(location = 1) in vec3 v2fNormal;
 layout(location = 2) in vec3 v2fWorldSpace;
+layout(location = 3) in vec4 v2fTangent;
 
 layout(set = 1, binding = 0) uniform sampler2D uTexColor;
 layout(set = 1, binding = 1) uniform sampler2D uTexRoughnessMetalness;
+layout(set = 1, binding = 2) uniform sampler2D uTexNormalMap;
 
 layout(location = 0) out vec4 gTexColour;
 layout(location = 1) out vec4 gNormal;
@@ -20,6 +22,27 @@ layout(push_constant) uniform PushConstants {
     vec4 flags; // sprite, useTexture, roughnessFactor, metallicFactor
 } object;
 
+vec3 calculateMappedNormal() {
+    vec3 normalMapNormal = texture(uTexNormalMap, v2fTexCoord).rgb;
+    normalMapNormal = normalize((normalMapNormal * 2.f) - 1.f);
+
+    vec3 N = normalize(v2fNormal);
+    vec3 T = normalize(v2fTangent.xyz);
+    float sign = v2fTangent.w;
+
+    T = normalize(T - N * dot(T, N));
+
+    // construct bitangent
+    vec3 B = normalize(cross(N, T) * sign);
+
+    // build TBN
+    mat3 tbn = mat3(T, B, N);
+
+    vec3 mappedNormal = normalize(tbn * normalMapNormal);
+
+    return (mappedNormal * 0.5f) + 0.5f;
+}
+
 void main()
 {
     // Beckman roughness = roughness^2
@@ -30,7 +53,6 @@ void main()
     metalness *= object.flags.w;
 
     vec3 baseColour = texture(uTexColor, v2fTexCoord).rgb;
-    vec3 normal = normalize(v2fNormal);
 
     // if not useTexture then use the baseColour
     if (object.flags.y == 0) {
@@ -38,7 +60,8 @@ void main()
     }
 
     gTexColour = vec4(baseColour, 1.f);
-    gNormal = vec4((normalize(normal) * 0.5f) + 0.5, 1.f);
+
+    gNormal = vec4(calculateMappedNormal(), 1.f);
     gRoughnessMetalness = vec2(roughness, metalness);
     gWorldPos = vec4(v2fWorldSpace.rgb, 1.f);
 }

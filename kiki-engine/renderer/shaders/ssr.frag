@@ -91,7 +91,7 @@ void main()
     vec3 reflectDirection = normalize(reflect(-viewDirection, normal)); // reflect the view direction around the normal
 
     // skip rays pointing away from the screen
-    if (dot(reflectDirection, viewDirection) >= 1.f) {
+    if (dot(reflectDirection, viewDirection) >= 0.99f) {
         oColor = vec4(sceneColour, 1.f);
         return;
     }

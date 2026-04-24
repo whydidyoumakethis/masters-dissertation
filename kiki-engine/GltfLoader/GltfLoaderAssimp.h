@@ -10,7 +10,7 @@
 #include <Components/ColourComponent.hpp>
 #include <assimp/GltfMaterial.h>
 
-#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_Triangulate
+#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals
 
 using namespace std;
 struct Mmesh {
@@ -21,7 +21,7 @@ struct Mmesh {
 	std::vector<uint32_t> indices;
 	int matIndex = 0;
 
-	std::vector<glm::vec3> tangents;
+	std::vector<glm::vec4> tangents;
 	std::vector<glm::vec3> bitangents;
 
 };
@@ -40,10 +40,13 @@ struct Mtexture {
 	std::vector<uint8_t> rawData; // For compressed textures
 	stbi_uc* rawDataPtr = nullptr;
 	stbi_uc* roughness = nullptr;
+	stbi_uc* normalMap = nullptr;
 	int width = 0;
 	int height = 0;
 	int roughWidth = 0;
 	int roughHeight = 0;
+	int normalMapWidth = 0;
+	int normalMapHeight = 0;
 	int channels = 0;
 	std::string name;
 	alphaMode mode = alphaMode::OPAQUE;
@@ -51,6 +54,7 @@ struct Mtexture {
 	glm::vec4 baseColour = glm::vec4(1.f);
 	float roughnessFactor = 1.f;
 	float metallicFactor = 1.f;
+	bool hasNormalMap = false;
 
 
 	~Mtexture() {
@@ -59,6 +63,10 @@ struct Mtexture {
 		}
 		if (roughness) {
 			stbi_image_free(roughness);
+		}
+
+		if (normalMap) {
+			stbi_image_free(normalMap);
 		}
 	}
 
@@ -73,20 +81,25 @@ struct Mtexture {
 		rawData(std::move(other.rawData)),
 		rawDataPtr(other.rawDataPtr),
 		roughness(other.roughness),
+		normalMap(other.normalMap),
 		width(other.width),
 		height(other.height),
 		channels(other.channels),
 		roughWidth(other.roughWidth),
 		roughHeight(other.roughHeight),
+		normalMapWidth(other.normalMapWidth),
+		normalMapHeight(other.normalMapHeight),
 		name(std::move(other.name)),
 		mode(other.mode),
 		alphaCutoff(other.alphaCutoff),
 		baseColour(other.baseColour),
 		roughnessFactor(other.roughnessFactor),
-		metallicFactor(other.metallicFactor)
+		metallicFactor(other.metallicFactor),
+		hasNormalMap(other.hasNormalMap)
 	{
 		other.rawDataPtr = nullptr;
 		other.roughness = nullptr;
+		other.normalMap = nullptr;
 	}
 	explicit Mtexture(bool hasTex)
 		: hastexture(hasTex) {
@@ -95,26 +108,32 @@ struct Mtexture {
 		if (this != &other) {
 			if (rawDataPtr) stbi_image_free(rawDataPtr);
 			if (roughness) stbi_image_free(roughness);
+			if (normalMap) stbi_image_free(normalMap);
 
 			hastexture = other.hastexture;
 			data = std::move(other.data);
 			rawData = std::move(other.rawData);
 			rawDataPtr = other.rawDataPtr;
 			roughness = other.roughness;
+			normalMap = other.normalMap;
 			width = other.width;
 			height = other.height;
 			channels = other.channels;
 			roughWidth = other.roughWidth;
 			roughHeight = other.roughHeight;
+			normalMapWidth = other.normalMapWidth;
+			normalMapHeight = other.normalMapHeight;
 			name = std::move(other.name);
 			mode = other.mode;
 			alphaCutoff = other.alphaCutoff;
 			baseColour = other.baseColour;
 			roughnessFactor = other.roughnessFactor;
 			metallicFactor = other.metallicFactor;
+			hasNormalMap = other.hasNormalMap;
 
 			other.rawDataPtr = nullptr;
 			other.roughness = nullptr;
+			other.normalMap = nullptr;
 		}
 		return *this;
 	}
@@ -464,7 +483,20 @@ namespace Kiki {
 						mesh.uvs.emplace_back(aiMesh->mTextureCoords[0][j].x, aiMesh->mTextureCoords[0][j].y);
 					}
 					if(aiMesh->HasTangentsAndBitangents()){
-						mesh.tangents.emplace_back(aiMesh->mTangents[j].x, aiMesh->mTangents[j].y, aiMesh->mTangents[j].z);
+						glm::vec3 T(aiMesh->mTangents[j].x, aiMesh->mTangents[j].y, aiMesh->mTangents[j].z);
+						glm::vec3 B(aiMesh->mBitangents[j].x, aiMesh->mBitangents[j].y, aiMesh->mBitangents[j].z);
+						glm::vec3 N(aiMesh->mNormals[j].x, aiMesh->mNormals[j].y, aiMesh->mNormals[j].z);
+
+						float handedness;
+
+						if (glm::dot(glm::cross(N, T), B) < 0.f) {
+							handedness = -1.f;
+						}
+						else {
+							handedness = 1.f;
+						}
+
+						mesh.tangents.emplace_back(aiMesh->mTangents[j].x, aiMesh->mTangents[j].y, aiMesh->mTangents[j].z, handedness);
 						mesh.bitangents.emplace_back(aiMesh->mBitangents[j].x, aiMesh->mBitangents[j].y, aiMesh->mBitangents[j].z);
 					}
 				}
@@ -500,10 +532,12 @@ namespace Kiki {
 
 				aiString textureName;
 				aiString roughName;
+				aiString normalMapName;
 				mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
 				mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
+				mat->GetTexture(aiTextureType_NORMALS, 0, &normalMapName);
 				if (textureName.length > 0) {
-					texture.hastexture = 1;
+					texture.hastexture = true;
 					int j = std::stoi(textureName.C_Str() + 1);
 					const aiTexture* aiTexture = scene->mTextures[j];
 					texture.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.width, &texture.height, &texture.channels, 4);
@@ -517,6 +551,17 @@ namespace Kiki {
 					texture.roughness = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
 				} else {
 					texture.roughness = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.roughWidth, &texture.roughHeight, &texture.channels, 4);
+				}
+
+				if (normalMapName.length > 0) {
+					texture.hasNormalMap = true;
+					int j = std::stoi(normalMapName.C_Str() + 1);
+					const aiTexture* aiTexture = scene->mTextures[j];
+					texture.normalMap = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.normalMapWidth, &texture.normalMapHeight, &texture.channels, 4);
+				}
+				else {
+					texture.hasNormalMap = false;
+					texture.normalMap = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty_normals.png").string().c_str(), &texture.normalMapWidth, &texture.normalMapHeight, &texture.channels, 4);
 				}
 
 				aiString alphaMode;
