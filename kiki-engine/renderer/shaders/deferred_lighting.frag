@@ -94,6 +94,4 @@ void main()
     finalColour = clamp(finalColour, 0.f, 1.f);
 
     oColor = vec4(finalColour, 1.0);
-
-    oColor = vec4(encodedNormal, 1.f);
 }
