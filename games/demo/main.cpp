@@ -13,11 +13,14 @@ int main(int argc, char** argv) {
   
   	auto& world = World::Get();
 	auto& sceneManager = Kiki::SceneManager::get();
-    auto cube = sceneManager.loadModel("CesiumMan.glb", "Cube", PhysicsType::Dynamic);
-    auto objects = world.Query<TransformComponent,TagComponent>();
+    //auto cube = sceneManager.loadModel("CesiumMan.glb", "Cube", PhysicsType::Dynamic);
+    //auto objects = world.Query<TransformComponent,TagComponent>();
 
-	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level.glb");
-	Kiki::SceneManager::get().loadScene(std::move(scene));
+	//Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level.glb");
+	//Kiki::SceneManager::get().loadScene(std::move(scene));
+
+	Mscene characterScene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "CesiumMan.glb");
+	Kiki::SceneManager::get().loadScene(std::move(characterScene));
 
 	// example of setting a custom skybox
 	Kiki::RenderManager::get().setCustomSkybox(

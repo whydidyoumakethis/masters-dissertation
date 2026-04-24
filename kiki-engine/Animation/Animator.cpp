@@ -73,23 +73,22 @@ namespace Kiki
                     key.scale
                 );
             }
+        }
+        // --- 2. local → global ---
+        for (size_t i = 0; i < boneCount; i++) {
+            int parent = skeleton.bones[i].parentIndex;
 
-            // --- 2. local → global ---
-            for (size_t i = 0; i < boneCount; i++) {
-                int parent = skeleton.bones[i].parentIndex;
-
-                if (parent < 0) {
-                    globalMatrices[i] = localMatrices[i];
-                }
-                else {
-                    globalMatrices[i] = globalMatrices[parent] * localMatrices[i];
-                }
+            if (parent < 0) {
+                globalMatrices[i] = localMatrices[i];
             }
-
-            // --- 3. global * inverseBind ---
-            for (size_t i = 0; i < boneCount; i++) {
-                finalMatrices[i] = skeleton.globalInverseTransform * globalMatrices[i] * skeleton.bones[i].inverseBind;
+            else {
+                globalMatrices[i] = globalMatrices[parent] * localMatrices[i];
             }
+        }
+
+        // --- 3. global * inverseBind ---
+        for (size_t i = 0; i < boneCount; i++) {
+            finalMatrices[i] = skeleton.globalInverseTransform * globalMatrices[i] * skeleton.bones[i].inverseBind;
         }
     }
 }

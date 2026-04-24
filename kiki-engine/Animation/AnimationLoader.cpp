@@ -4,6 +4,9 @@
 #include <glm/gtc/quaternion.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
+#define GLM_ENABLE_EXPERIMENTAL
+#include <glm/gtx/matrix_decompose.hpp> 
+
 namespace Kiki {
 
     static glm::mat4 ToGlmMat4(const aiMatrix4x4& m) {
@@ -118,17 +121,37 @@ namespace Kiki {
 
             track.keyframes.resize(keyCount);
 
+            glm::vec3 bindScale;
+            glm::quat bindRotation;
+            glm::vec3 bindTranslation;
+            glm::vec3 skew;
+            glm::vec4 perspective;
+
+            glm::decompose(
+                skeleton.bones[boneIndex].localBindTransform,
+                bindScale,
+                bindRotation,
+                bindTranslation,
+                skew,
+                perspective
+            );
+			bindRotation = glm::conjugate(bindRotation);
             for (size_t k = 0; k < keyCount; k++) {
                 Keyframe& key = track.keyframes[k];
 
-                float time = 0.0f;
-                if (k < channel->mNumPositionKeys) {
-                    time = (float)(channel->mPositionKeys[k].mTime / ticksPerSecond);
-                }
-                key.time = time;
+				key.translation = bindTranslation;
+				key.rotation = bindRotation;
+				key.scale = bindScale;
 
                 if (k < channel->mNumPositionKeys) {
+                    key.time = (float)(channel->mPositionKeys[k].mTime / ticksPerSecond);
                     key.translation = ToVec3(channel->mPositionKeys[k].mValue);
+                }
+                else if (k < channel->mNumRotationKeys) {
+                    key.time = (float)(channel->mRotationKeys[k].mTime / ticksPerSecond);
+                }
+                else if (k < channel->mNumScalingKeys) {
+                    key.time = (float)(channel->mScalingKeys[k].mTime / ticksPerSecond);
                 }
 
                 if (k < channel->mNumRotationKeys) {

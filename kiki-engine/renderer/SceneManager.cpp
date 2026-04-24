@@ -234,7 +234,7 @@ namespace Kiki {
             glm::vec4 perspective;
 			glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
             transform.rotation = glm::conjugate(transform.rotation);
-            //transform.scale = {1, 1, 1}; // TODO: this is a temp fix, will probably cause issues
+            transform.scale = {0.3, 0.3, 0.3}; // TODO: this is a temp fix, will probably cause issues
 
             std::vector<glm::ivec4> safeBoneIDs = mesh.boneIDs;
             std::vector<glm::vec4> safeWeights = mesh.weights;
