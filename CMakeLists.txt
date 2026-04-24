@@ -1,15 +1,24 @@
 cmake_minimum_required(VERSION 3.15)
+
+cmake_policy(SET CMP0091 NEW)
+
 project(KikiEngine)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE) # Ensures deps build as .lib, not .dll
 
 set(CMAKE_WARN_DEPRECATED OFF CACHE BOOL "" FORCE)
 set(CMAKE_SUPPRESS_DEVELOPER_WARNINGS 1 CACHE INTERNAL "")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
-include(FetchContent)
+set(MSDFGEN_USE_DYNAMIC_CRT ON CACHE BOOL "" FORCE)      
+set(MSDFGEN_BUILD_STANDALONE OFF CACHE BOOL "" FORCE)
+set(MSDF_ATLAS_DYNAMIC_RUNTIME ON CACHE BOOL "" FORCE)
+
+set(FREETYPE_LIBRARY_TYPE STATIC CACHE INTERNAL "")
 
 # --- Jolt Physics Configuration ---
 # Must be set before FetchContent to ensure Jolt builds with correct settings
@@ -27,6 +36,7 @@ set(TARGET_SAMPLES OFF CACHE INTERNAL "")
 set(TARGET_HELLO_WORLD OFF CACHE INTERNAL "")
 
 
+include(FetchContent)
 
 # Jolt Physics
 FetchContent_Declare(
@@ -78,15 +88,10 @@ FetchContent_Declare(
     GIT_TAG        "v1.17.0"
 )
 
-# fastgltf
-FetchContent_Declare(
-    fastgltf
-    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
-    GIT_TAG        "v0.9.0"
-)
+
 
 FetchContent_MakeAvailable(
-    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog fastgltf
+    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog 
 )
 
 # --- Shader Compilation ---
@@ -112,13 +117,7 @@ endforeach()
 add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
 
 # --- KikiDeps Interface ---
-# fastGLTF
-FetchContent_Declare(
-    fastgltf
-    GIT_REPOSITORY "https://github.com/spnda/fastgltf.git"
-    GIT_TAG "v0.9.0"
-)
-FetchContent_MakeAvailable(fastgltf)
+
 
 # stb
 FetchContent_Declare(
@@ -196,8 +195,11 @@ set(FT_DISABLE_BZIP2 ON CACHE INTERNAL "")
 set(FT_DISABLE_PNG   ON CACHE INTERNAL "")
 set(FT_DISABLE_HARFBUZZ ON CACHE INTERNAL "")
 set(FT_DISABLE_BROTLI ON CACHE INTERNAL "")
+set(FREETYPE_LIBRARY_TYPE STATIC CACHE INTERNAL "")
 
 FetchContent_MakeAvailable(freetype)
+
+set(TINYXML2_INSTALL OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
   tinyxml2
@@ -212,14 +214,29 @@ FetchContent_Declare(
     GIT_TAG        "da07a9c04f9f92a247fef7da57aa62085647757e"
 )
 
+if(TARGET freetype)
+    add_library(Freetype::Freetype ALIAS freetype)
+endif()
+
+set(MSDFGEN_INSTALL OFF CACHE BOOL "" FORCE)
 set(MSDFGEN_USE_VCPKG OFF CACHE BOOL "" FORCE)
 set(MSDFGEN_USE_SKIA OFF CACHE BOOL "" FORCE)  
 set(MSDFGEN_USE_TINYXML2 OFF CACHE BOOL "" FORCE)
 set(MSDFGEN_USE_LODEPNG OFF CACHE BOOL "" FORCE)
+set(MSDFGEN_DISABLE_PNG ON CACHE BOOL "" FORCE)
+set(MSDFGEN_DISABLE_SVG ON CACHE BOOL "" FORCE)
 set(MSDFGEN_BUILD_STANDALONE OFF CACHE BOOL "" FORCE)
 set(MSDFGEN_INSTALL OFF CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(msdfgen)
+
+if(MSVC)
+    set_target_properties(msdfgen-core msdfgen-ext PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL"
+    )
+endif()
+
+# set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
@@ -231,7 +248,6 @@ target_link_libraries(KikiDeps INTERFACE
     VulkanMemoryAllocator
     EnTT::EnTT
     spdlog::spdlog
-    fastgltf::fastgltf
     assimp::assimp
     Jolt
     imgui

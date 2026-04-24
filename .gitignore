@@ -2,6 +2,10 @@
 build/output/
 .vscode/
 
+out/
+
+CMakeSettings.json
+
 ##################################################
 ## Standard GitHub C++ gitignore template below ##
 ##################################################
