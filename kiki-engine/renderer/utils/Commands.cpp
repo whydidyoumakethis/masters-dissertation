@@ -592,6 +592,17 @@ namespace rutils {
         // draw fullscreen quad with post-processing shader
         vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssr.handle);
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
+
+        SSRSettings ssrSettings;
+        ssrSettings.settings.x = 128; // maxSteps
+        ssrSettings.settings.y = 6; // binarySteps
+        ssrSettings.settings.z = 0.1f; // stepSize
+        ssrSettings.settings.w = 0.2f; // thicknessTolerance
+
+        // TODO: debug, could change the ssr settings here :)
+
+        vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ssrSettings), &ssrSettings);
+
         vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
         vkCmdEndRendering(aCmdBuff);

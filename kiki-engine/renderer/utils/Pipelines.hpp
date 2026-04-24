@@ -16,6 +16,14 @@ namespace rutils {
         glm::vec4 flags;
     };
 
+    struct SSRSettings {
+        glm::vec4 settings = glm::vec4(64, 6, 0.25f, 0.4f);
+        // x = maxSteps, int
+        // y = binarySteps, int
+        // z = stepSize, float
+        // w = thicknessTolerance, float
+    };
+
     struct Pipelines {
         rutils::Pipeline pbr;
         rutils::Pipeline pbr_alpha;
