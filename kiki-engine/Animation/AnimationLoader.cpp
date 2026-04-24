@@ -135,7 +135,7 @@ namespace Kiki {
                 skew,
                 perspective
             );
-			bindRotation = glm::conjugate(bindRotation);
+			//bindRotation = glm::conjugate(bindRotation);
             for (size_t k = 0; k < keyCount; k++) {
                 Keyframe& key = track.keyframes[k];
 

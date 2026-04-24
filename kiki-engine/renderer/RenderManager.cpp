@@ -828,8 +828,6 @@ namespace Kiki {
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {
         //  width / height
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
-        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator);
-
         // roughWidth / roughHeight
         rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator);
         VkDescriptorImageInfo textureInfo[2]{};
