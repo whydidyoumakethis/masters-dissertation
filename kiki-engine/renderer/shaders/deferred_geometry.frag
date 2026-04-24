@@ -32,6 +32,8 @@ vec3 calculateMappedNormal() {
 
     T = normalize(T - N * dot(T, N));
 
+    normalMapNormal.x *= sign;
+
     // construct bitangent
     vec3 B = normalize(cross(N, T) * sign);
 
