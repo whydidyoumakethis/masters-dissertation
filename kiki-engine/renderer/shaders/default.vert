@@ -19,6 +19,8 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
 layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 baseColour;
+    int sprite;
+    int useTexture;
 } object;
 
 layout(location = 0) out vec2 v2fTexCoord;

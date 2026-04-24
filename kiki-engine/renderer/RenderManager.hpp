@@ -42,6 +42,7 @@ namespace Kiki {
         rutils::Image texture;
         rutils::Image roughnessMetalness;
         VkDescriptorSet descriptorSet;
+        bool hasTexture = false;
     };
 
     struct Skybox {

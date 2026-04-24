@@ -48,6 +48,7 @@ struct Mtexture {
 	std::string name;
 	alphaMode mode = alphaMode::OPAQUE;
 	float alphaCutoff = 0;
+	glm::vec4 baseColour = glm::vec4(1.f);
 
 
 	~Mtexture() {
@@ -77,7 +78,8 @@ struct Mtexture {
 		roughHeight(other.roughHeight),
 		name(std::move(other.name)),
 		mode(other.mode),
-		alphaCutoff(other.alphaCutoff)
+		alphaCutoff(other.alphaCutoff),
+		baseColour(other.baseColour)
 	{
 		other.rawDataPtr = nullptr;
 		other.roughness = nullptr;
@@ -103,6 +105,7 @@ struct Mtexture {
 			name = std::move(other.name);
 			mode = other.mode;
 			alphaCutoff = other.alphaCutoff;
+			baseColour = other.baseColour;
 
 			other.rawDataPtr = nullptr;
 			other.roughness = nullptr;
@@ -471,15 +474,23 @@ namespace Kiki {
 				Mtexture texture;
 				const aiMaterial* mat = scene->mMaterials[i];
 				
+
+				aiColor4D baseColour(1.f, 1.f, 1.f, 1.f);
+				if (mat->Get(AI_MATKEY_BASE_COLOR, baseColour) == AI_SUCCESS) {
+					texture.baseColour = glm::vec4(baseColour.r, baseColour.g, baseColour.b, baseColour.a);
+				}
+
 				aiString textureName;
 				aiString roughName;
 				mat->GetTexture(AI_MATKEY_BASE_COLOR_TEXTURE, &textureName);
 				mat->GetTexture(AI_MATKEY_ROUGHNESS_TEXTURE, &roughName);
 				if (textureName.length > 0) {
+					texture.hastexture = 1;
 					int j = std::stoi(textureName.C_Str() + 1);
 					const aiTexture* aiTexture = scene->mTextures[j];
 					texture.rawDataPtr = stbi_load_from_memory(reinterpret_cast<const stbi_uc*>(aiTexture->pcData), aiTexture->mWidth, &texture.width, &texture.height, &texture.channels, 4);
 				} else {
+					texture.hastexture = 0;
 					texture.rawDataPtr = stbi_load((std::filesystem::path(PROJECT_ASSETS_PATH) / "empty.png").string().c_str(), &texture.width, &texture.height, &texture.channels, 4);
 				}
 				if (roughName.length > 0) {

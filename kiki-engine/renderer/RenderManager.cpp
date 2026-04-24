@@ -728,7 +728,7 @@ namespace Kiki {
         constexpr auto numSets = sizeof(desc) / sizeof(desc[0]);
         vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
 
-        return Material(std::move(texture), std::move(roughnessMetalness), std::move(descriptorSet));
+        return Material(std::move(texture), std::move(roughnessMetalness), std::move(descriptorSet), textureData.hastexture);
     }
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {

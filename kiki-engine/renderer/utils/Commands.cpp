@@ -240,16 +240,28 @@ namespace rutils {
                 if (!registry.all_of<TransparencyComponent>(e)) {
                     Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(meshComponent.id);
 
+                    glm::vec4 flags;
+                    flags.x = 0.f; // sprite
+                    flags.y = 1.f; // useTexture
+
                     if (registry.all_of<MaterialComponent>(e)) {
                         auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
                         if (sceneManager.validMaterial(materialComponent->id)) {
                             Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
+                            
+                            // if material doesn't have a texture, use base colour instead
+                            if (material.hasTexture == false) {
+                                flags.y = 0.f;
+                            }
+
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
                         } else {
+                            flags.y = 0.f;
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                         }
                     } else {
+                        flags.y = 0.f;
                         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                     }
 
@@ -261,7 +273,7 @@ namespace rutils {
                         colour = glm::vec3(0.3f, 0.3f, 0.3f);
                     }
 
-                    ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
+                    ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f), flags);
 
                     // Bind vertex input
                     VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
@@ -290,16 +302,28 @@ namespace rutils {
             TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
             TransformComponent const& transform = registry.get<TransformComponent>(e);
 
+            glm::vec4 flags;
+            flags.x = 0.f; // sprite
+            flags.y = 1.f; // useTexture
+
             if (registry.all_of<MaterialComponent>(e)) {
                 auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
                 if (sceneManager.validMaterial(materialComponent->id)) {
                     Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
+
+                    // if material doesn't have a texture, use base colour instead
+                    if (material.hasTexture == false) {
+                        flags.y = 0.f;
+                    }
+
                     vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
                 } else {
+                    flags.y = 0.f;
                     vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                 }
             } else {
+                flags.y = 0.f;
                 vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
             }
 
@@ -311,7 +335,11 @@ namespace rutils {
                 colour = glm::vec3(0.3f, 0.3f, 0.3f);
             }
 
-            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
+            if (transparentComponent.sprite) {
+                flags.x = 1.f;
+            }
+
+            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), flags);
 
             // Bind vertex input
             VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };

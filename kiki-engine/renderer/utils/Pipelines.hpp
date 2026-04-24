@@ -11,8 +11,9 @@ namespace rutils {
     struct ObjectData {
         glm::mat4 model;
         glm::vec4 baseColour;
-        std::uint32_t sprite = 0;
-        std::uint32_t padding[3];
+        // std::uint32_t sprite = 0;
+        // std::uint32_t useTexture = 1;
+        glm::vec4 flags;
     };
 
     struct Pipelines {

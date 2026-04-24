@@ -151,7 +151,7 @@ namespace Kiki {
                     registry.emplace<TransparencyComponent>(model); // yeah idk what else to do other then just have this added
                 }
             }
-            registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
+            registry.emplace<ColourComponent>(model, glm::vec3(texture.baseColour));
             //Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
