@@ -49,9 +49,12 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
+            postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
+
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
             pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
+            pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -60,6 +63,9 @@ namespace Kiki {
             descriptorPool = rutils::createDescriptorPool(window);
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
+            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
@@ -67,6 +73,15 @@ namespace Kiki {
 
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+
+            ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
+
+            ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+
+            fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
 
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
@@ -100,19 +115,27 @@ namespace Kiki {
             stbi_set_flip_vertically_on_load(1);
 
             int width, height, c;
+            int normals_width, normals_height, normals_c;
 
             stbi_uc* emptyTexture = stbi_load((std::filesystem::path(PROJECT_ROOT_PATH) / "assets/empty.png").string().c_str(), &width, &height, &c, 4 /* want 4 c h a n n e l s = RGBA */);
+            stbi_uc* emptyNormalsTexture = stbi_load((std::filesystem::path(PROJECT_ROOT_PATH) / "assets/empty_normals.png").string().c_str(), &normals_width, &normals_height, &normals_c, 4 /* want 4 c h a n n e l s = RGBA */);
 
             noTexture = rutils::loadImageTexture(emptyTexture, width, height, window, tempTextureCmdPool.handle, allocator);
-        
+            noNormalMap = rutils::loadImageTexture(emptyNormalsTexture, normals_width, normals_height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+            
             noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
-            VkWriteDescriptorSet desc[2]{};
+            VkWriteDescriptorSet desc[3]{};
 
             VkDescriptorImageInfo textureInfo{};
             textureInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
             textureInfo.imageView = noTexture.view;
             textureInfo.sampler = sampler.handle;
+
+            VkDescriptorImageInfo noNormalsInfo{};
+            noNormalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            noNormalsInfo.imageView = noNormalMap.view;
+            noNormalsInfo.sampler = sampler.handle;
 
             // empty colour
             desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -129,6 +152,14 @@ namespace Kiki {
             desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
             desc[1].descriptorCount = 1;
             desc[1].pImageInfo = &textureInfo;
+
+            // empty normal map
+            desc[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[2].dstSet = noTextureDst;
+            desc[2].dstBinding = 2;
+            desc[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[2].descriptorCount = 1;
+            desc[2].pImageInfo = &noNormalsInfo;
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
@@ -152,6 +183,15 @@ namespace Kiki {
             
             gbuffers = rutils::createAllGBufferImages(window, allocator);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+
+            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
+
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
 
             recreateSwapchain = false;
         }
@@ -235,9 +275,9 @@ namespace Kiki {
     
         assert(std::size_t(imageIndex) < window.swapImages.size());
 
-        rutils::ImageAndView colorTarget;
-        colorTarget.image = window.swapImages[imageIndex];
-        colorTarget.view = window.swapViews[imageIndex];
+        rutils::ImageAndView swapchainColourTarget;
+        swapchainColourTarget.image = window.swapImages[imageIndex];
+        swapchainColourTarget.view = window.swapViews[imageIndex];
 
         assert(std::size_t(frameIndex) < commandBuffers.size());
 
@@ -245,7 +285,7 @@ namespace Kiki {
             commandBuffers[frameIndex],
             pipelines,
             pipelineLayouts,
-            colorTarget,
+            swapchainColourTarget,
             depthBuffer,
             gbuffers,
             window.swapchainExtent,
@@ -253,8 +293,14 @@ namespace Kiki {
             sceneUniforms,
             sceneDescriptors,
             deferredLightingDescriptors,
+            fxaaDescriptors,
+            ssrDescriptors,
+            ssaoDescriptors,
             noTextureDst,
-            skybox
+            skybox,
+            doneLightingImage,
+            doneSSAOImage,
+            doneSSRImage
         );
 
         assert(std::size_t(frameIndex) < renderFinished.size());
@@ -290,11 +336,12 @@ namespace Kiki {
         }
     }
 
-    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords) {
+    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents) {
         int posSize = positions.size() * sizeof(float);
         int indSize = indices.size() * sizeof (std::uint32_t);
         int texSize = texCoords.size() * sizeof(float);
         int normalsSize = normals.size() * sizeof(float);
+        int tangentsSize = tangents.size() * sizeof(float);
 
         // Create on GPU vertex buffer
         rutils::Buffer vertexPosGPU = rutils::createBuffer(
@@ -332,6 +379,15 @@ namespace Kiki {
             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
         );
 
+        // Create on GPU tangent buffer
+        rutils::Buffer tangentsGPU = rutils::createBuffer(
+            allocator,
+            tangentsSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, // no additional VmaAllocationCreateFlags
+            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
+        );
+
         // Create staging buffers
         rutils::Buffer posStaging = rutils::createBuffer(
             allocator,
@@ -357,6 +413,13 @@ namespace Kiki {
         rutils::Buffer normalsStaging = rutils::createBuffer(
             allocator,
             normalsSize,
+            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer tangentsStaging = rutils::createBuffer(
+            allocator,
+            tangentsSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
         );
@@ -396,6 +459,15 @@ namespace Kiki {
         }
         std::memcpy(normalsPtr, normals.data(), normalsSize);
         vmaUnmapMemory(allocator.allocator, normalsStaging.allocation);
+
+        void* tangentsPtr = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, tangentsStaging.allocation, &tangentsPtr); res != VK_SUCCESS) {
+            throw FatalError( "Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(tangentsPtr, tangents.data(), tangentsSize);
+        vmaUnmapMemory(allocator.allocator, tangentsStaging.allocation);
 
         // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
         // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
@@ -474,6 +546,19 @@ namespace Kiki {
             VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
         );
 
+        VkBufferCopy tancopy{};
+        tancopy.size = tangentsSize;
+
+        vkCmdCopyBuffer(uploadCmd, tangentsStaging.buffer, tangentsGPU.buffer, 1, &tancopy);
+
+        rutils::bufferBarrier(uploadCmd, tangentsGPU.buffer,
+            // before
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            // after
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+            VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
     
         if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
             throw FatalError( "Ending command buffer recording\n"
@@ -508,7 +593,7 @@ namespace Kiki {
             );
         }
 
-        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), positions.size() / 3, indices.size());
+        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), std::move(tangentsGPU), positions.size() / 3, indices.size());
     }
 
     Mesh RenderManager::allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices) {
@@ -664,9 +749,10 @@ namespace Kiki {
 
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
-        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
 
-        VkDescriptorImageInfo textureInfo[2]{};
+        VkDescriptorImageInfo textureInfo[3]{};
 
         // base colour
         textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -678,9 +764,14 @@ namespace Kiki {
         textureInfo[1].imageView = roughnessMetalness.view;
         textureInfo[1].sampler = sampler.handle;
 
+        // normal map
+        textureInfo[2].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        textureInfo[2].imageView = normalMap.view;
+        textureInfo[2].sampler = sampler.handle;
+
         VkDescriptorSet descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
-        VkWriteDescriptorSet desc[2]{};
+        VkWriteDescriptorSet desc[3]{};
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = descriptorSet;
         desc[0].dstBinding = 0;
@@ -695,10 +786,17 @@ namespace Kiki {
         desc[1].descriptorCount = 1;
         desc[1].pImageInfo = &textureInfo[1];
 
+        desc[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[2].dstSet = descriptorSet;
+        desc[2].dstBinding = 2;
+        desc[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[2].descriptorCount = 1;
+        desc[2].pImageInfo = &textureInfo[2];
+
         constexpr auto numSets = sizeof(desc) / sizeof(desc[0]);
         vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
 
-        return Material(std::move(texture), std::move(roughnessMetalness), std::move(descriptorSet));
+        return Material(std::move(texture), std::move(roughnessMetalness), std::move(normalMap), std::move(descriptorSet), textureData.hastexture, textureData.hasNormalMap);
     }
 
     void RenderManager::updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight) {
@@ -867,6 +965,7 @@ namespace Kiki {
 
         noTextureDst = {};
         noTexture = {};
+        noNormalMap = {};
 
         gbuffers = {};
         depthBuffer = {};
@@ -894,18 +993,26 @@ namespace Kiki {
         pipelines.deferred_geometry = {};
         pipelines.deferred_geometry_alpha = {};
         pipelines.deferred_lighting = {};
+        pipelines.fxaa = {};
+        pipelines.ssr = {};
+        pipelines.ssao = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
+        pipelineLayouts.postprocessPipelineLayout = {};
 
         depthBuffer = {};
+        doneLightingImage = {};
+        doneSSRImage = {};
+        doneSSAOImage = {};
         sceneUBO = {};
 
         gBufferLayout = {};
         sceneLayout = {};
         materialLayout = {};
         cubemapLayout = {};
+        postProcessingLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};

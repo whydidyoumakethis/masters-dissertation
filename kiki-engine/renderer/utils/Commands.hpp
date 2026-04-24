@@ -18,7 +18,7 @@ namespace rutils {
 		VkCommandBuffer,
 		Pipelines const&,
 		PipelineLayouts const&,
-		ImageAndView const&,
+		ImageAndView const& swapchainImage,
 		Image const& aDepthAttach,
 		GBuffers& gbuffers,
 		VkExtent2D const&,
@@ -26,8 +26,14 @@ namespace rutils {
 		Kiki::RenderManager::SceneUniform const&,
 		VkDescriptorSet aSceneDescriptors,
 		VkDescriptorSet deferredLightingDescriptors,
+		VkDescriptorSet ffxaDescriptors,
+		VkDescriptorSet ssrDescriptors,
+		VkDescriptorSet ssaoDescriptors,
 		VkDescriptorSet noTexture,
-		Kiki::Skybox const& skybox
+		Kiki::Skybox const& skybox,
+		Image const& doneLightingImage,
+		Image const& doneSSAOImage,
+		Image const& doneSSRImage
 	);
 
 	void submitCommands(

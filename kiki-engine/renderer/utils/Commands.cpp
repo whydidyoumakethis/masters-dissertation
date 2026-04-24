@@ -5,6 +5,7 @@
 #include "Pipelines.hpp"
 #include "Components/TransparencyComponent.hpp"
 #include "Components/ColourComponent.hpp"
+#include "Components/RoughnessMetallicFactorComponent.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -48,8 +49,9 @@ namespace rutils {
         return cbuff;
     }
 
-    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox) {
+    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& swapchainImage, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors,	VkDescriptorSet fxaaDescriptors, VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet ssaoDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox, Image const& doneLightingImage, Image const& doneSSAOImage, Image const& doneSSRImage) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -84,7 +86,7 @@ namespace rutils {
         );
 
         // Barrier: Ensure the color attachment image is in the right layout
-        rutils::imageBarrier(aCmdBuff, aColorAttach.image,
+        rutils::imageBarrier(aCmdBuff, doneLightingImage.image,
             /* Before */
             VK_PIPELINE_STAGE_2_NONE,
             VK_ACCESS_2_NONE,
@@ -141,7 +143,7 @@ namespace rutils {
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		);
 
-		rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
+		rutils::imageBarrier(aCmdBuff, gbuffers.mappedNormals.image,
 			// before
 			VK_PIPELINE_STAGE_2_NONE,
 			VK_ACCESS_2_NONE,
@@ -188,9 +190,9 @@ namespace rutils {
 		gBufferAttachments[2].clearValue.color.float32[2] = 0.f;
 		gBufferAttachments[2].clearValue.color.float32[3] = 0.f;
 
-        // world pos
+        // mapped normals
 		gBufferAttachments[3].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		gBufferAttachments[3].imageView = gbuffers.worldPos.view;
+		gBufferAttachments[3].imageView = gbuffers.mappedNormals.view;
 		gBufferAttachments[3].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 		gBufferAttachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		gBufferAttachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -239,16 +241,30 @@ namespace rutils {
                 if (!registry.all_of<TransparencyComponent>(e)) {
                     Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(meshComponent.id);
 
+                    glm::vec4 flags;
+                    flags.x = 0.f; // sprite
+                    flags.y = 1.f; // useTexture
+                    flags.z = 1.f; // roughnessFactor
+                    flags.w = 1.f; // metalnessFactor
+
                     if (registry.all_of<MaterialComponent>(e)) {
                         auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
                         if (sceneManager.validMaterial(materialComponent->id)) {
                             Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
+
+                            // if material doesn't have a texture, use base colour instead
+                            if (material.hasTexture == false) {
+                                flags.y = 0.f;
+                            }
+
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
                         } else {
+                            flags.y = 0.f;
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                         }
                     } else {
+                        flags.y = 0.f;
                         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                     }
 
@@ -260,13 +276,24 @@ namespace rutils {
                         colour = glm::vec3(0.3f, 0.3f, 0.3f);
                     }
 
-                    ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
+                    glm::vec2 roughnessMetalnessFactors;
+
+                    if (registry.all_of<RoughnessMetallicFactorComponent>(e)) {
+                        roughnessMetalnessFactors = registry.get<RoughnessMetallicFactorComponent>(e).roughnessMetallicFactors;
+                        flags.z = roughnessMetalnessFactors.r;
+                        flags.w = roughnessMetalnessFactors.g;
+                    }
+                    else {
+                        roughnessMetalnessFactors = glm::vec2(1.f, 1.f);
+                    }
+
+                    ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f), flags);
 
                     // Bind vertex input
-                    VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-                    VkDeviceSize offsets[3]{};
+                    VkBuffer buffers[4] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer, mesh.tangents.buffer };
+                    VkDeviceSize offsets[4]{};
 
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 4, buffers, offsets);
                     vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                     vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
@@ -289,16 +316,30 @@ namespace rutils {
             TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
             TransformComponent const& transform = registry.get<TransformComponent>(e);
 
+            glm::vec4 flags;
+            flags.x = 0.f; // sprite
+            flags.y = 1.f; // useTexture
+            flags.z = 1.f; // roughnessFactor
+            flags.w = 1.f; // metalnessFactor
+
             if (registry.all_of<MaterialComponent>(e)) {
                 auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
                 if (sceneManager.validMaterial(materialComponent->id)) {
                     Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
+
+                    // if material doesn't have a texture, use base colour instead
+                    if (material.hasTexture == false) {
+                        flags.y = 0.f;
+                    }
+
                     vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
                 } else {
+                    flags.y = 0.f;
                     vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                 }
             } else {
+                flags.y = 0.f;
                 vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
             }
 
@@ -310,13 +351,29 @@ namespace rutils {
                 colour = glm::vec3(0.3f, 0.3f, 0.3f);
             }
 
-            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
+            if (transparentComponent.sprite) {
+                flags.x = 1.f;
+            }
+
+
+            glm::vec2 roughnessMetalnessFactors;
+
+            if (registry.all_of<RoughnessMetallicFactorComponent>(e)) {
+                roughnessMetalnessFactors = registry.get<RoughnessMetallicFactorComponent>(e).roughnessMetallicFactors;
+                flags.z = roughnessMetalnessFactors.r;
+                flags.w = roughnessMetalnessFactors.g;
+            }
+            else {
+                roughnessMetalnessFactors = glm::vec2(1.f, 1.f);
+            }
+
+            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), flags);
 
             // Bind vertex input
-            VkBuffer buffers[3] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer };
-            VkDeviceSize offsets[3]{};
+            VkBuffer buffers[4] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer, mesh.tangents.buffer };
+            VkDeviceSize offsets[4]{};
 
-            vkCmdBindVertexBuffers(aCmdBuff, 0, 3, buffers, offsets);
+            vkCmdBindVertexBuffers(aCmdBuff, 0, 4, buffers, offsets);
             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
@@ -364,7 +421,7 @@ namespace rutils {
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 		);
 
-        rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
+        rutils::imageBarrier(aCmdBuff, gbuffers.mappedNormals.image,
 			// before
 			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
 			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -391,7 +448,7 @@ namespace rutils {
 
         VkRenderingAttachmentInfo lightingAttach{};
 		lightingAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		lightingAttach.imageView = aColorAttach.view;
+		lightingAttach.imageView = doneLightingImage.view;
 		lightingAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 		lightingAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		lightingAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -413,6 +470,7 @@ namespace rutils {
 
 		lightingInfo.colorAttachmentCount = 1;
 		lightingInfo.pColorAttachments = &lightingAttach;
+        lightingInfo.pDepthAttachment = &depthAttachLighting;
 
 		vkCmdBeginRendering(aCmdBuff, &lightingInfo);
 
@@ -427,15 +485,195 @@ namespace rutils {
 		vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
 		vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
+		vkCmdEndRendering(aCmdBuff);
+
+        // begin ssao pass
+        // transition the image we just rendered to be sampled
+        imageBarrier(aCmdBuff, doneLightingImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            // after
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        imageBarrier(aCmdBuff, doneSSAOImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_NONE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            // after
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        );
+
+        VkRenderingAttachmentInfo ssaoColourAttach{};
+        ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        ssaoColourAttach.imageView = doneSSAOImage.view;
+        ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+        ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingInfo ssaoRenderInfo{};
+        ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        ssaoRenderInfo.layerCount = 1;
+        ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+        ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+        ssaoRenderInfo.colorAttachmentCount = 1;
+        ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+        vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+		VkDescriptorSet ssaoSets[] = {
+			aSceneDescriptors,
+			ssaoDescriptors
+		};
+
+        // draw fullscreen quad with post-processing shader
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
+        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+        vkCmdEndRendering(aCmdBuff);
+        // end ssao pass
+
+        // begin ssr pass
+        // transition the image we just rendered to be sampled
+        imageBarrier(aCmdBuff, doneSSAOImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            // after
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        imageBarrier(aCmdBuff, doneSSRImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_NONE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            // after
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        );
+
+        VkRenderingAttachmentInfo ssrColourAttach{};
+        ssrColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        ssrColourAttach.imageView = doneSSRImage.view;
+        ssrColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+        ssrColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        ssrColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingInfo ssrRenderInfo{};
+        ssrRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        ssrRenderInfo.layerCount = 1;
+        ssrRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+        ssrRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+        ssrRenderInfo.colorAttachmentCount = 1;
+        ssrRenderInfo.pColorAttachments = &ssrColourAttach;
+
+        vkCmdBeginRendering(aCmdBuff, &ssrRenderInfo);
+
+		VkDescriptorSet ssrSets[] = {
+			aSceneDescriptors,
+			ssrDescriptors
+		};
+
+        // draw fullscreen quad with post-processing shader
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssr.handle);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
+
+        SSRSettings ssrSettings;
+        ssrSettings.settings.x = 128; // maxSteps
+        ssrSettings.settings.y = 6; // binarySteps
+        ssrSettings.settings.z = 0.1f; // stepSize
+        ssrSettings.settings.w = 0.2f; // thicknessTolerance
+
+        // TODO: debug, could change the ssr settings here :)
+
+        vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ssrSettings), &ssrSettings);
+
+        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+        vkCmdEndRendering(aCmdBuff);
+        // end ssr pass
+
+        // begin fxaa pass
+        // transition the image we just rendered to be sampled
+        imageBarrier(aCmdBuff, doneSSRImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            // after
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        imageBarrier(aCmdBuff, swapchainImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_NONE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            // after
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        );
+
+        VkRenderingAttachmentInfo fxaaColourAttach{};
+        fxaaColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        fxaaColourAttach.imageView = swapchainImage.view;
+        fxaaColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+        fxaaColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        fxaaColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingInfo fxaaRenderInfo{};
+        fxaaRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        fxaaRenderInfo.layerCount = 1;
+        fxaaRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+        fxaaRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+        fxaaRenderInfo.colorAttachmentCount = 1;
+        fxaaRenderInfo.pColorAttachments = &fxaaColourAttach;
+
+        vkCmdBeginRendering(aCmdBuff, &fxaaRenderInfo);
+
+        VkDescriptorSet fxaaSets[] = {
+            aSceneDescriptors,
+            fxaaDescriptors
+        };
+
+        // draw fullscreen quad with post-processing shader
+        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.fxaa.handle);
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
+        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+        // begin imgui pass
 #       ifndef NDEBUG
         ImGui::Render();
         ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
 #       endif
+        // end imgui pass
 
-		vkCmdEndRendering(aCmdBuff);
+        vkCmdEndRendering(aCmdBuff);
+        // end fxaa pass
+
+        // TODO: ui pass should go here, after fxaa :)
 
         // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
-        imageBarrier( aCmdBuff, aColorAttach.image,
+        imageBarrier(aCmdBuff, swapchainImage.image,
             /* Before */
             VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
             VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

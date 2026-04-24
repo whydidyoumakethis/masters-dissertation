@@ -11,8 +11,17 @@ namespace rutils {
     struct ObjectData {
         glm::mat4 model;
         glm::vec4 baseColour;
-        std::uint32_t sprite = 0;
-        std::uint32_t padding[3];
+        // std::uint32_t sprite = 0;
+        // std::uint32_t useTexture = 1;
+        glm::vec4 flags;
+    };
+
+    struct SSRSettings {
+        glm::vec4 settings = glm::vec4(64, 6, 0.25f, 0.4f);
+        // x = maxSteps, int
+        // y = binarySteps, int
+        // z = stepSize, float
+        // w = thicknessTolerance, float
     };
 
     struct Pipelines {
@@ -21,12 +30,16 @@ namespace rutils {
         rutils::Pipeline deferred_geometry;
         rutils::Pipeline deferred_geometry_alpha;
         rutils::Pipeline deferred_lighting;
+        rutils::Pipeline fxaa;
+        rutils::Pipeline ssr;
+        rutils::Pipeline ssao;
     };
 
     struct PipelineLayouts {
         PipelineLayout pbrPipelineLayout;
         PipelineLayout deferredPipelineLayout;
         PipelineLayout skyboxPipelineLayout;
+        PipelineLayout postprocessPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -35,12 +48,16 @@ namespace rutils {
     );
 
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
+    PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
     Pipeline createDeferredGeometryPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createDeferredLightingPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createFXAAPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSRPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSAOPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 
 #endif

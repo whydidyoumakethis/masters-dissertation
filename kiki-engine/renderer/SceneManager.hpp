@@ -21,7 +21,7 @@ namespace Kiki {
         int createMaterial(Mtexture& texture);
         Material const& getMaterial(int id);
 
-        int createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords);
+        int createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords, std::vector<glm::vec4> const& tangents);
         Mesh& getMesh(int id);
 
         void clearLevel();
