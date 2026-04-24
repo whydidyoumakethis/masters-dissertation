@@ -33,7 +33,6 @@ void main() {
     v2fTexCoord = iTexCoord;
     v2fNormal = normalize(transpose(inverse(mat3(object.model))) * iNormal);
     v2fWorldSpace = (object.model * vec4(iPosition, 1.f)).xyz;
-    // v2fTangent = normalize(mat3(object.model) * iTangent);
 
     vec3 T = normalize(mat3(object.model) * iTangent.xyz);
     T = normalize(T - v2fNormal * dot(T, v2fNormal));

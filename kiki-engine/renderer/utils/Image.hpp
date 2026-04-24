@@ -34,7 +34,7 @@ namespace rutils {
 		rutils::Image textureColour;
 		rutils::Image normals;
 		rutils::Image roughnessMetalness;
-		rutils::Image worldPos;
+		rutils::Image mappedNormals;
 	};
 
 	struct CubemapPaths {
@@ -47,7 +47,7 @@ namespace rutils {
     };
 
 
-	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&);
+	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
 
 	Image createImageTexture(
 		Allocator const&,

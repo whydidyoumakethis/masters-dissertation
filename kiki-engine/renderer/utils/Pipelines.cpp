@@ -83,7 +83,7 @@ namespace rutils {
 
         vertexAttributes[3].binding = 3;
         vertexAttributes[3].location = 3; // must match shader
-        vertexAttributes[3].format = VK_FORMAT_R32G32B32_SFLOAT;
+        vertexAttributes[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
         vertexAttributes[3].offset = 0;
 
         inputInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -514,7 +514,7 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT};
         renderingInfo.colorAttachmentCount = 4;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
@@ -658,7 +658,7 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT};
         renderingInfo.colorAttachmentCount = 4;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;

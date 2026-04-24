@@ -114,6 +114,7 @@ namespace rutils {
         bindings[4].descriptorCount = 1;
         bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
+        // mapped normals
         bindings[5].binding = 5;
         bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[5].descriptorCount = 1;
@@ -133,7 +134,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createPostProcessingDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[5]{};
+        VkDescriptorSetLayoutBinding bindings[6]{};
 
         // scene colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -164,6 +165,12 @@ namespace rutils {
         bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[4].descriptorCount = 1;
         bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // mapped normals
+        bindings[5].binding = 5;
+        bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[5].descriptorCount = 1;
+        bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -236,10 +243,10 @@ namespace rutils {
         roughnessMetalnessInfo.imageView = gbuffers.roughnessMetalness.view;
         roughnessMetalnessInfo.sampler = sampler.handle;
 
-        VkDescriptorImageInfo worldPosInfo{};
-        worldPosInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        worldPosInfo.imageView = gbuffers.worldPos.view;
-        worldPosInfo.sampler = sampler.handle;
+        VkDescriptorImageInfo mappedNormalsInfo{};
+        mappedNormalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        mappedNormalsInfo.imageView = gbuffers.mappedNormals.view;
+        mappedNormalsInfo.sampler = sampler.handle;
 
         VkDescriptorImageInfo skyboxInfo{};
         skyboxInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -277,7 +284,7 @@ namespace rutils {
         desc[3].dstBinding = 3;
         desc[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         desc[3].descriptorCount = 1;
-        desc[3].pImageInfo = &worldPosInfo;
+        desc[3].pImageInfo = &mappedNormalsInfo;
 
         desc[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[4].dstSet = deferredLightingDescriptors;
@@ -297,7 +304,7 @@ namespace rutils {
     }
 
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors) {
-        VkWriteDescriptorSet desc[5]{};
+        VkWriteDescriptorSet desc[6]{};
 
         VkDescriptorImageInfo sceneColourInfo{};
         sceneColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -323,6 +330,11 @@ namespace rutils {
         depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         depthInfo.imageView = depthBuffer.view;
         depthInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo mappedNormalsInfo{};
+        mappedNormalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        mappedNormalsInfo.imageView = gbuffers.mappedNormals.view;
+        mappedNormalsInfo.sampler = sampler.handle;
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = postProcessingDescriptors;
@@ -359,6 +371,13 @@ namespace rutils {
         desc[4].descriptorCount = 1;
         desc[4].pImageInfo = &depthInfo;
 
-        vkUpdateDescriptorSets(window.device, 5, desc, 0, nullptr);
+        desc[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[5].dstSet = postProcessingDescriptors;
+        desc[5].dstBinding = 5;
+        desc[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[5].descriptorCount = 1;
+        desc[5].pImageInfo = &mappedNormalsInfo;
+
+        vkUpdateDescriptorSets(window.device, 6, desc, 0, nullptr);
     }
 }

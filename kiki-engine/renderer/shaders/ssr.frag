@@ -18,6 +18,7 @@ layout(set = 1, binding = 1) uniform sampler2D gTexColour;
 layout(set = 1, binding = 2) uniform sampler2D gNormal;
 layout(set = 1, binding = 3) uniform sampler2D gRoughnessMetalness;
 layout(set = 1, binding = 4) uniform sampler2D gDepth;
+layout(set = 1, binding = 5) uniform sampler2D gMappedNormal;
 
 layout(location = 0) out vec4 oColor;
 
@@ -82,13 +83,16 @@ void main()
     }
 
     // decode normal from [0, 1] back to [-1, 1]
-    vec3 encodedNormal = texture(gNormal, v2fTexCoord).rgb;
-    vec3 normal = normalize((encodedNormal * 2.f) - 1.f);
+    vec3 encodedGeometricNormal = texture(gNormal, v2fTexCoord).rgb;
+    vec3 geometricNormal = normalize((encodedGeometricNormal * 2.f) - 1.f);
+
+    vec3 encodedMappedNormal = texture(gMappedNormal, v2fTexCoord).rgb;
+    vec3 mappedNormal = normalize((encodedMappedNormal * 2.f) - 1.f);
 
     vec3 worldPos = reconstructWorldPos(v2fTexCoord);
 
     vec3 viewDirection = normalize(uScene.cameraPos.xyz - worldPos); // direction from surface to camera
-    vec3 reflectDirection = normalize(reflect(-viewDirection, normal)); // reflect the view direction around the normal
+    vec3 reflectDirection = normalize(reflect(-viewDirection, geometricNormal)); // reflect the view direction around the normal
 
     // skip rays pointing away from the screen
     if (dot(reflectDirection, viewDirection) >= 0.99f) {
@@ -151,7 +155,7 @@ void main()
         // less reflections on rough surfaces
         float roughnessFade = 1.f - roughness;
 
-        reflectionStrength = edgeFade.x * edgeFade.y * roughnessFade * metalness;
+        reflectionStrength = edgeFade.x * edgeFade.y * roughnessFade * metalness * clamp(dot(geometricNormal, mappedNormal), 0.f, 1.f);
     }
 
     // linear interpolation between sceneColour and reflectionColour based on the reflectionStrength

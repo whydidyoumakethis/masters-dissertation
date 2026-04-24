@@ -143,7 +143,7 @@ namespace rutils {
 			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 		);
 
-		rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
+		rutils::imageBarrier(aCmdBuff, gbuffers.mappedNormals.image,
 			// before
 			VK_PIPELINE_STAGE_2_NONE,
 			VK_ACCESS_2_NONE,
@@ -190,9 +190,9 @@ namespace rutils {
 		gBufferAttachments[2].clearValue.color.float32[2] = 0.f;
 		gBufferAttachments[2].clearValue.color.float32[3] = 0.f;
 
-        // world pos
+        // mapped normals
 		gBufferAttachments[3].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		gBufferAttachments[3].imageView = gbuffers.worldPos.view;
+		gBufferAttachments[3].imageView = gbuffers.mappedNormals.view;
 		gBufferAttachments[3].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 		gBufferAttachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		gBufferAttachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -421,7 +421,7 @@ namespace rutils {
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
 		);
 
-        rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
+        rutils::imageBarrier(aCmdBuff, gbuffers.mappedNormals.image,
 			// before
 			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
 			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

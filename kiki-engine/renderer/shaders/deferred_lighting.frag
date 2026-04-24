@@ -19,7 +19,7 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
 layout(set = 1, binding = 0) uniform sampler2D gTexColour;
 layout(set = 1, binding = 1) uniform sampler2D gNormal;
 layout(set = 1, binding = 2) uniform sampler2D gRoughnessMetalness;
-layout(set = 1, binding = 3) uniform sampler2D gWorldPos;
+layout(set = 1, binding = 3) uniform sampler2D gMappedNormal;
 layout(set = 1, binding = 4) uniform sampler2D gDepth;
 layout(set = 1, binding = 5) uniform samplerCube skybox;
 
@@ -70,7 +70,7 @@ void main()
     vec3 sceneAmbient = vec3(0.08f);
 
     // normals encoded in g-buffer as [0, 1], reverse this to recover normals in [-1, 1]
-    vec3 encodedNormal = texture(gNormal, v2fTexCoord).rgb;
+    vec3 encodedNormal = texture(gMappedNormal, v2fTexCoord).rgb;
     vec3 normal = normalize((encodedNormal * 2.f) - 1.f);
 
     // vector pointing towards the camera
@@ -94,4 +94,6 @@ void main()
     finalColour = clamp(finalColour, 0.f, 1.f);
 
     oColor = vec4(finalColour, 1.0);
+
+    oColor = vec4(encodedNormal, 1.f);
 }

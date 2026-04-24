@@ -63,7 +63,7 @@ namespace rutils {
 		return *this;
 	}
 
-    Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator) {
+    Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, VkFormat format) {
 		// // Flip images vertically by default. Vulkan expects the first scanline to be the bottom-most scanline. PNG et al.
         // // instead define the first scanline to be the top-most one.
         // stbi_set_flip_vertically_on_load( 1 );
@@ -633,7 +633,7 @@ namespace rutils {
         gbuffers.textureColour = createGBufferImage(window, allocator, VK_FORMAT_R8G8B8A8_UNORM);
         gbuffers.normals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
         gbuffers.roughnessMetalness = createGBufferImage(window, allocator, VK_FORMAT_R8G8_UNORM);
-        gbuffers.worldPos = createGBufferImage(window, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        gbuffers.mappedNormals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
 
         return gbuffers;
     }

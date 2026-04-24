@@ -121,7 +121,7 @@ namespace Kiki {
             stbi_uc* emptyNormalsTexture = stbi_load((std::filesystem::path(PROJECT_ROOT_PATH) / "assets/empty_normals.png").string().c_str(), &normals_width, &normals_height, &normals_c, 4 /* want 4 c h a n n e l s = RGBA */);
 
             noTexture = rutils::loadImageTexture(emptyTexture, width, height, window, tempTextureCmdPool.handle, allocator);
-            noNormalMap = rutils::loadImageTexture(emptyNormalsTexture, normals_width, normals_height, window, tempTextureCmdPool.handle, allocator);
+            noNormalMap = rutils::loadImageTexture(emptyNormalsTexture, normals_width, normals_height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
             
             noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
@@ -749,8 +749,8 @@ namespace Kiki {
 
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
-        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
-        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
 
         VkDescriptorImageInfo textureInfo[3]{};
 

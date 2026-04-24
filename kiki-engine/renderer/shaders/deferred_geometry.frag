@@ -14,7 +14,7 @@ layout(set = 1, binding = 2) uniform sampler2D uTexNormalMap;
 layout(location = 0) out vec4 gTexColour;
 layout(location = 1) out vec4 gNormal;
 layout(location = 2) out vec2 gRoughnessMetalness;
-layout(location = 3) out vec4 gWorldPos;
+layout(location = 3) out vec4 gMappedNormal;
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
@@ -26,16 +26,11 @@ vec3 calculateMappedNormal() {
     vec3 normalMapNormal = texture(uTexNormalMap, v2fTexCoord).rgb;
     normalMapNormal = normalize((normalMapNormal * 2.f) - 1.f);
 
+    // MikkTSpace reconstruction: do not orthogonalize T, do not normalize B.
     vec3 N = normalize(v2fNormal);
     vec3 T = normalize(v2fTangent.xyz);
-    float sign = v2fTangent.w;
+    vec3 B = cross(N, T) * 1.f;
 
-    T = normalize(T - N * dot(T, N));
-
-    // construct bitangent
-    vec3 B = normalize(cross(N, T) * sign);
-
-    // build TBN
     mat3 tbn = mat3(T, B, N);
 
     vec3 mappedNormal = normalize(tbn * normalMapNormal);
@@ -61,7 +56,8 @@ void main()
 
     gTexColour = vec4(baseColour, 1.f);
 
-    gNormal = vec4(calculateMappedNormal(), 1.f);
+    gNormal = vec4((normalize(v2fNormal) * 0.5f) + 0.5f, 1.f);
+
     gRoughnessMetalness = vec2(roughness, metalness);
-    gWorldPos = vec4(v2fWorldSpace.rgb, 1.f);
+    gMappedNormal = vec4(calculateMappedNormal(), 1.f);
 }
