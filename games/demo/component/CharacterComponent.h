@@ -11,7 +11,7 @@ enum class CharacterState {
 struct CharacterComponent {
     float walkSpeed = 5.0f;
     float runSpeed = 18.0f;
-    float jumpForce = 10000.0f;
+    float jumpForce = 50000.0f;
 	float rotateSpeed = 10.0f; // character rotation speed (for interpolating facing direction)
 
     CharacterState state = CharacterState::Idle;

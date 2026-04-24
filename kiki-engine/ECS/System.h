@@ -72,6 +72,12 @@ public:
             sys->OnStop();
         _systems.clear();
     }
+    void printSystemOrder() {
+        spdlog::info("Current system execution order:");
+        for (const auto& sys : _systems) {
+            spdlog::info("- {}", typeid(*sys).name());
+        }
+	}
 
 private:
     std::vector<std::unique_ptr<System>> _systems;
