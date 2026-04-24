@@ -1,37 +1,184 @@
 #ifndef KIKI_RENDERER
 #define KIKI_RENDERER
 
+#include "../Components/MaterialComponent.hpp"
+#include "../Components/MeshComponent.hpp"
+#include "../Components/TransparencyComponent.hpp"
 #include "utils/VulkanWindow.hpp"
 #include "utils/VulkanWrapper.hpp"
 #include "utils/Synchronisation.hpp"
+#include "utils/Allocator.hpp"
+#include "utils/Buffer.hpp"
+#include "utils/Image.hpp"
 #include "WindowInfo.hpp"
+#include "Camera.hpp"
+#include "utils/Pipelines.hpp"
+#include "GltfLoader/GltfLoaderAssimp.h"
+#include "debugging/DebugCamera.hpp"
+
+
+#include <glm/glm.hpp>
+#include <stb_image.h>
+#include <string.h>
+#include <cstring>
+
+#include <imgui_impl_vulkan.h>
+
+
+#define GLM_ENABLE_EXPERIMENTAL
 
 
 namespace Kiki {
-    class RenderManager {
-        public:
-        static RenderManager& get();
-        void initialise(WindowInfo info);
-        void nextFrame();
-        void shutdown();
-        GLFWwindow* getWindow();
+    struct Mesh {
+        rutils::Buffer positions;
+        rutils::Buffer texCoords;
+        rutils::Buffer normals;
+        rutils::Buffer indices;
+        rutils::Buffer tangents;
+        std::uint32_t vertexCount;
+        std::uint32_t indexCount;
+    };
 
+    struct Material {
+        rutils::Image texture;
+        rutils::Image roughnessMetalness;
+        rutils::Image normalMap;
+        VkDescriptorSet descriptorSet;
+        bool hasTexture = false;
+        bool hasNormalMap = false;
+    };
+
+    struct Skybox {
+        rutils::Image cubemap;
+        rutils::Sampler sampler;
+        VkDescriptorSet descriptorSet;
+        Mesh mesh;
+        rutils::CubemapPaths paths;
+    };
+
+    struct ShaderPaths {
+        std::filesystem::path pbr_v = "default.vert.spv";
+        std::filesystem::path pbr_f = "default.frag.spv";
+        std::filesystem::path pbr_alpha_v = "default.vert.spv";
+        std::filesystem::path pbr_alpha_f = "alpha.frag.spv";
+        std::filesystem::path deferred_geometry_v = "default.vert.spv";
+        std::filesystem::path deferred_geometry_f = "deferred_geometry.frag.spv";
+        std::filesystem::path deferred_geometry_alpha_v = "default.vert.spv";
+        std::filesystem::path deferred_geometry_alpha_f = "deferred_geometry_alpha.frag.spv";
+        std::filesystem::path deferred_lighting_v = "fullscreen.vert.spv";
+        std::filesystem::path deferred_lighting_f = "deferred_lighting.frag.spv";
+        std::filesystem::path fxaa_f = "fxaa.frag.spv";
+        std::filesystem::path ssr_f = "ssr.frag.spv";
+        std::filesystem::path ssao_f = "ssao.frag.spv";
+    };
+
+    class RenderManager {
         private:
         RenderManager() = default;
         ~RenderManager() = default;
+        RenderManager(const RenderManager&) = delete;
+        RenderManager& operator=(const RenderManager&) = delete;
 
         bool recreateSwapchain = false;
+        bool initialised = false;
 
         rutils::VulkanWindow window;
 
-        rutils::PipelineLayout pipelineLayout;
-        rutils::Pipeline pipeline;
+        rutils::PipelineLayouts pipelineLayouts;
+
+        rutils::Pipelines pipelines;
+        rutils::DescriptorSetLayout gBufferLayout;
+        rutils::DescriptorSetLayout postProcessingLayout;
+        
+        rutils::GBuffers gbuffers;
+
         rutils::CommandPool commandPool;
+
+        rutils::Buffer sceneUBO;
 
         std::size_t frameIndex = 0;
         std::vector<VkCommandBuffer> commandBuffers;
         std::vector<rutils::Fence> frameDone;
         std::vector<rutils::Semaphore> imageAvailable, renderFinished;
+        rutils::DescriptorPool descriptorPool;
+
+        rutils::DescriptorSetLayout sceneLayout;
+        rutils::DescriptorSetLayout materialLayout;
+        rutils::DescriptorSetLayout cubemapLayout;
+        VkDescriptorSet sceneDescriptors;
+        VkDescriptorSet deferredLightingDescriptors;
+        VkDescriptorSet fxaaDescriptors;
+        VkDescriptorSet ssrDescriptors;
+        VkDescriptorSet ssaoDescriptors;
+
+        rutils::Image doneLightingImage;
+        rutils::Image doneSSRImage;
+        rutils::Image doneSSAOImage;
+        rutils::Image depthBuffer;
+        rutils::Allocator allocator;
+        rutils::Sampler sampler;
+
+        rutils::Image noTexture;
+        rutils::Image noNormalMap;
+        VkDescriptorSet noTextureDst;
+
+        Skybox skybox;
+
+        public:
+        static RenderManager& get();
+
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents);
+        Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
+
+        void initialise(WindowInfo info = Kiki::WindowInfo{});
+        Material allocateMaterial(const Mtexture& materialData);
+
+        void setCustomSkybox(
+            std::filesystem::path right,
+            std::filesystem::path left,
+            std::filesystem::path up,
+            std::filesystem::path down,
+            std::filesystem::path front,
+            std::filesystem::path back
+        );
+
+        void nextFrame();
+        void shutdown();
+
+        VkDevice& getDevice() { return window.device; };
+        GLFWwindow* getWindow() { return window.window; };
+        bool isInitialised() { return initialised; };
+
+        void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
+        void recreatePipelines();
+
+        struct SceneUniform {
+            glm::mat4 camera;
+            glm::mat4 projection;
+            glm::mat4 projCam;
+            glm::vec4 lightPos;
+            glm::vec4 lightColour;
+            glm::vec4 cameraPos;
+        };
+
+        rutils::CommandPool tempTextureCmdPool;
+
+        // We want to use vkCmdUpdateBuffer() to update the contents of our uniform buffers. vkCmdUpdateBuffer()
+        // has a number of requirements, including the two below. See
+        // https://registry.khronos.org/vulkan/specs/latest/man/html/vkCmdUpdateBuffer.html
+        static_assert(sizeof(SceneUniform) <= 65536, "SceneUniform must be less than 65536 bytes for vkCmdUpdateBuffer");
+        static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
+
+        ShaderPaths shaderPaths;
+
+        private:
+        void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
+        void createSkybox(const rutils::CubemapPaths& paths);
+
+        World& world = World::Get();
+        entt::registry& registry = world.Registry();
+
+        DebugCamera& debugCam = DebugCamera::get();
     };
 }
 

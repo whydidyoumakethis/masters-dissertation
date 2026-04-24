@@ -1,1 +1,1 @@
-cmake -B output -S .. -G "Visual Studio 17 2022"
+cmake -B output/Debug -S .. -G "Visual Studio 17 2022" -DCMAKE_CONFIGURATION_TYPES="Debug"

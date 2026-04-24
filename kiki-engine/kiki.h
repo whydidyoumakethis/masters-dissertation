@@ -1,6 +1,16 @@
 #pragma once
 #include <Event/Event.h>
-#include <temp.h>
 #include "renderer/WindowInfo.hpp"
 #include "renderer/RenderManager.hpp"
 #include "input/InputManager.hpp"
+#include "input/InputSystem.hpp"
+#include "debugging/DebugSystem.hpp"
+#include "Engine.h"
+#include "physics/PhysicsManager.hpp"
+#include "physics/PhysicsComponents.hpp"
+#include "physics/PhysicsSystem.hpp"
+#include "interface/InterfaceSystem.hpp"
+#include "Components/MiscComponent.hpp"
+
+using namespace entt::literals;
+using namespace Kiki;
