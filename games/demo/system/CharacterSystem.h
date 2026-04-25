@@ -43,7 +43,11 @@ public:
         	}
         	if(transform){
         		transform->position = spawnPos;
-				//transform->position.y += 1.1f; // spawn a bit above the ground to avoid initial collision issues
+                float modelRotationOffset = 180.0f;
+                transform->rotation = glm::angleAxis(
+                    glm::radians(character->facingYaw + modelRotationOffset),
+                    glm::vec3(0, 1, 0)
+                );
         		transform->dirty = true;
         	}
             if(physics){
@@ -147,9 +151,11 @@ private:
 
         character.facingYaw += diff * character.rotateSpeed * dt;
 
+        float modelRotationOffset = 180.0f;
+
 		// update transform rotation to match facing direction
         transform.rotation = glm::angleAxis(
-            glm::radians(character.facingYaw),
+            glm::radians(character.facingYaw + modelRotationOffset),
             glm::vec3(0, 1, 0)
         );
         transform.dirty = true;
