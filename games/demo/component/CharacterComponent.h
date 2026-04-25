@@ -8,6 +8,17 @@ enum class CharacterState {
 //    Falling,
 //    Landing,
 };
+
+inline std::string to_string(CharacterState state) {
+    switch (state) {
+    case CharacterState::Idle:    return "Idle";
+    case CharacterState::Walking: return "Walking";
+    case CharacterState::Running: return "Running";
+    case CharacterState::Jumping: return "Jumping";
+    default:                      return "Unknown";
+    }
+}
+
 struct CharacterComponent {
     float walkSpeed = 5.0f;
     float runSpeed = 18.0f;

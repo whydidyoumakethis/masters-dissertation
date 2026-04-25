@@ -5,6 +5,8 @@
 #include <glm/glm.hpp>
 #include <volk.h>
 #include <unordered_map>
+#include <spdlog/spdlog.h>
+#include <string>
 
 #include "Animation/Skeleton.h"
 #include "Animation/Animation.h"
@@ -42,7 +44,9 @@ namespace Kiki {
             if (currentState == newState || animations.find(newState) == animations.end()) {
                 return;
             }
-
+            
+            spdlog::info("[Animation] State Changed: {} -> {}", to_string(currentState), to_string(newState));
+            
             currentState = newState;
             animator.currentTime = 0.0f; 
 
@@ -52,6 +56,9 @@ namespace Kiki {
             else {
                 animator.looping = true;
             }
+
+            
+
         }
 
         void UpdateGpuBuffer(VmaAllocator allocator) {

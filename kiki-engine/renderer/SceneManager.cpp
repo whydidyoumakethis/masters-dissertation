@@ -69,8 +69,7 @@ namespace Kiki {
             bWeights.push_back(w.x); bWeights.push_back(w.y); bWeights.push_back(w.z); bWeights.push_back(w.w);
         }
 
-        spdlog::info("Allocating Mesh -> Pos: {}, Indices: {}, Normals: {}, UVs: {}, Bones: {}, Weights: {}",
-            p.size(), indices.size(), n.size(), t.size(), bIDs.size(), bWeights.size());
+        //spdlog::info("Allocating Mesh -> Pos: {}, Indices: {}, Normals: {}, UVs: {}, Bones: {}, Weights: {}", p.size(), indices.size(), n.size(), t.size(), bIDs.size(), bWeights.size());
 
         meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, bIDs, bWeights));
 

@@ -155,17 +155,23 @@ private:
         transform.dirty = true;
     }
     void UpdateState(CharacterComponent& character, PhysicalAttributesComponent& pa) {
-        bool isMoving = glm::length(glm::vec2(
-            character.velocity.x, character.velocity.z)) > 0.1f;
+        float currentSpeed = glm::length(glm::vec2(character.velocity.x, character.velocity.z));
+        bool isMoving = glm::length(glm::vec2(character.velocity.x, character.velocity.z)) > 0.1f;
 
-        if (!pa.isGrounded) {
-            //character.state = character.velocity.y > 0
-            //    ? CharacterState::Jumping
-            //    : CharacterState::Falling;
-			character.state = CharacterState::Jumping;
+        if (character.state == CharacterState::Jumping) {
+            if (character.velocity.y <= 0.0f && pa.isGrounded) { 
+                character.state = isMoving ? CharacterState::Walking : CharacterState::Idle;
+            }
+            return;
         }
-        else if (isMoving) {
-            character.state = CharacterState::Walking;
+
+        if (isMoving) {
+            if (currentSpeed > character.walkSpeed + 1.0f) {
+                character.state = CharacterState::Running;
+            }
+            else {
+                character.state = CharacterState::Walking;
+            }
         }
         else {
             character.state = CharacterState::Idle;

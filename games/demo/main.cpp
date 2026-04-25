@@ -19,7 +19,7 @@ int main(int argc, char** argv) {
 	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level_noPlayer.glb");
 	Kiki::SceneManager::get().loadScene(std::move(scene));
 
-	Mscene characterScene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "testMan.glb");
+	Mscene characterScene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level2.glb");
 	Kiki::SceneManager::get().loadScene(std::move(characterScene));
 
 	// example of setting a custom skybox
