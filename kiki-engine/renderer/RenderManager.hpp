@@ -23,6 +23,8 @@
 #include <cstring>
 
 #include <imgui_impl_vulkan.h>
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
 
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -123,6 +125,10 @@ namespace Kiki {
         VkDescriptorSet noTextureDst;
 
         Skybox skybox;
+
+        # ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx;
+        # endif
 
         public:
         static RenderManager& get();

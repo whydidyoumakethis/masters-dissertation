@@ -20,6 +20,15 @@ set(MSDF_ATLAS_DYNAMIC_RUNTIME ON CACHE BOOL "" FORCE)
 
 set(FREETYPE_LIBRARY_TYPE STATIC CACHE INTERNAL "")
 
+option(ENABLE_TRACY "Enable Tracy for profiling" ON)
+
+if (APPLE)
+option(ENABLE_TRACY_VK "Enable Tracy for Vulkan GPU profiling" OFF)
+else()
+option(ENABLE_TRACY_VK "Enable Tracy for Vulkan GPU profiling" ON)
+endif()
+
+
 # --- Jolt Physics Configuration ---
 # Must be set before FetchContent to ensure Jolt builds with correct settings
 # Use dynamic MSVC runtime to match the rest of the engine (Fixes LNK2038)
@@ -241,6 +250,25 @@ endif()
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
+
+
+# tracy
+if (ENABLE_TRACY)
+    FetchContent_Declare(
+        tracy
+        GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
+        GIT_TAG        "v0.13.1"
+    )
+
+    set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+
+    if (ENABLE_TRACY_VK)
+        target_compile_definitions(KikiDeps INTERFACE TRACY_VK_ENABLE)
+    endif()
+
+    FetchContent_MakeAvailable(tracy)
+    target_link_libraries(KikiDeps INTERFACE Tracy::TracyClient)
+endif()
 
 target_link_libraries(KikiDeps INTERFACE 
     volk 
