@@ -1051,6 +1051,7 @@ namespace Kiki {
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
         pipelineLayouts.postprocessPipelineLayout = {};
+        pipelineLayouts.ssaoPipelineLayout = {};
 
         depthBuffer = {};
         doneLightingImage = {};
@@ -1062,6 +1063,7 @@ namespace Kiki {
         materialLayout = {};
         cubemapLayout = {};
         postProcessingLayout = {};
+        ssaoLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};

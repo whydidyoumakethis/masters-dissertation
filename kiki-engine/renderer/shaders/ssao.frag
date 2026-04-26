@@ -13,20 +13,17 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     vec4 cameraPos;
 } uScene;
 
-layout(set = 1, binding = 0) uniform sampler2D uSceneColour;
-layout(set = 1, binding = 1) uniform sampler2D gTexColour;
-layout(set = 1, binding = 2) uniform sampler2D gNormal;
-layout(set = 1, binding = 3) uniform sampler2D gRoughnessMetalness;
-layout(set = 1, binding = 4) uniform sampler2D gDepth;
+layout(set = 1, binding = 0) uniform sampler2D gNormals;
+layout(set = 1, binding = 1) uniform sampler2D gDepth;
 
-layout(location = 0) out vec4 oColor;
+layout(location = 0) out vec4 oAO;
 
 void main()
 {
     float depth = texture(gDepth, v2fTexCoord).r;
     // oColor = vec4(depth, depth, depth, 1.f); // TODO
 
-    oColor = vec4(texture(uSceneColour, v2fTexCoord).rgb, 1.f);
+    oAO = vec4(texture(gNormals, v2fTexCoord).rgb, 1.f);
 }
 
 

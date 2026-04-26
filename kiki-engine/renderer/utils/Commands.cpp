@@ -428,6 +428,12 @@ namespace rutils {
             }
         }
 
+        // ssao pass
+        {
+            ZoneScopedN("Recording SSAO pass");
+        }
+        // end ssao pass
+
 		// deferred lighting pass
 
         {
