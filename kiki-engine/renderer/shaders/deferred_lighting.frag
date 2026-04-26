@@ -68,7 +68,7 @@ void main()
     float metalness = texture(gRoughnessMetalness, v2fTexCoord).g;
     vec3 emissive = vec3(0.f);
     vec3 baseColour = texture(gTexColour, v2fTexCoord).rgb;
-    vec3 sceneAmbient = vec3(0.08f);
+    vec3 sceneAmbient = vec3(0.15f);
 
     // normals encoded in g-buffer as [0, 1], reverse this to recover normals in [-1, 1]
     vec3 encodedNormal = texture(gMappedNormal, v2fTexCoord).rgb;
@@ -92,7 +92,7 @@ void main()
     vec3 lighting =  brdfResult * lightColour * nDotLPos;
 
     float ambientOcclusion = texture(gAO, v2fTexCoord).r;
-    vec3 finalColour = emissive + (ambient(sceneAmbient, baseColour) * ambientOcclusion) + lighting;
+    vec3 finalColour = emissive + (ambient(sceneAmbient, baseColour) * (ambientOcclusion * ambientOcclusion)) + lighting;
     finalColour = clamp(finalColour, 0.f, 1.f);
 
     oColor = vec4(finalColour, 1.0);

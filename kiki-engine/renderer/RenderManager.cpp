@@ -176,6 +176,26 @@ namespace Kiki {
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
+
+            // generate 16 samples for ssao, https://learnopengl.com/Advanced-Lighting/SSAO
+            // random points on hemisphere
+            for (int i = 0; i < 16; i++) {
+                // sample([-1, 1], [-1, 1], [0, 1])
+                glm::vec3 sample(
+                    (((float)rand() / (float)RAND_MAX) * 2.f) - 1.f,
+                    (((float)rand() / (float)RAND_MAX) * 2.f) - 1.f,
+                    (float)rand() / (float)RAND_MAX
+                );
+
+                sample = glm::normalize(sample);
+                sample *= (float)rand() / (float)RAND_MAX;
+
+                // distribute more samples closer to origin
+                float scale = lerp(0.1f, 1.f, ((float)i / 16.f) * ((float)i / 16.f));
+
+                // use vec4 for alignment
+                sceneUniforms.ssaoSamples[i] = glm::vec4(sample, 0.f);
+            }
         }
     }
 
@@ -303,7 +323,6 @@ namespace Kiki {
             }
         }
 
-        SceneUniform sceneUniforms{};
         {
             ZoneScopedN("Updating scene uniforms");
 

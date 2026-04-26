@@ -131,6 +131,8 @@ namespace Kiki {
 
         Skybox skybox;
 
+        std::vector<glm::vec4> ssaoSamples;
+
         # ifdef TRACY_VK_ENABLE
         TracyVkCtx tracyVkCtx;
         # endif
@@ -170,6 +172,7 @@ namespace Kiki {
             glm::vec4 lightPos;
             glm::vec4 lightColour;
             glm::vec4 cameraPos;
+            glm::vec4 ssaoSamples[16];
         };
 
         rutils::CommandPool tempTextureCmdPool;
@@ -181,6 +184,7 @@ namespace Kiki {
         static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
 
         ShaderPaths shaderPaths;
+        SceneUniform sceneUniforms;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
