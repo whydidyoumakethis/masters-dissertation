@@ -40,6 +40,7 @@ namespace rutils {
         PipelineLayout deferredPipelineLayout;
         PipelineLayout skyboxPipelineLayout;
         PipelineLayout postprocessPipelineLayout;
+        PipelineLayout ssaoPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -49,6 +50,7 @@ namespace rutils {
 
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
     PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout);
+    PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     

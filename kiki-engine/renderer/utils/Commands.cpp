@@ -67,11 +67,9 @@ namespace rutils {
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
         VkDescriptorSet ssrDescriptors,
-        VkDescriptorSet ssaoDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
-        Image const& doneSSAOImage,
         Image const& doneSSRImage
     ) {
         // Begin recording commands
@@ -543,69 +541,6 @@ namespace rutils {
 
             vkCmdEndRendering(aCmdBuff);
         }
-		
-        {
-            ZoneScopedN("Recording SSAO pass");
-
-            #ifdef TRACY_VK_ENABLE
-            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO pass");
-            #endif
-
-            // begin ssao pass
-            // transition the image we just rendered to be sampled
-            imageBarrier(aCmdBuff, doneLightingImage.image,
-                // before
-                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                // after
-                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            );
-
-            imageBarrier(aCmdBuff, doneSSAOImage.image,
-                // before
-                VK_PIPELINE_STAGE_2_NONE,
-                VK_ACCESS_2_NONE,
-                VK_IMAGE_LAYOUT_UNDEFINED,
-                // after
-                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-            );
-
-            VkRenderingAttachmentInfo ssaoColourAttach{};
-            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            ssaoColourAttach.imageView = doneSSAOImage.view;
-            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-            VkRenderingInfo ssaoRenderInfo{};
-            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-            ssaoRenderInfo.layerCount = 1;
-            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
-
-            ssaoRenderInfo.colorAttachmentCount = 1;
-            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
-
-            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
-
-            VkDescriptorSet ssaoSets[] = {
-                aSceneDescriptors,
-                ssaoDescriptors
-            };
-
-            // draw fullscreen quad with post-processing shader
-            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
-            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
-            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
-
-            vkCmdEndRendering(aCmdBuff);
-            // end ssao pass
-        }
 
         {
             ZoneScopedN("Recording SSR pass");
@@ -616,7 +551,7 @@ namespace rutils {
 
             // begin ssr pass
             // transition the image we just rendered to be sampled
-            imageBarrier(aCmdBuff, doneSSAOImage.image,
+            imageBarrier(aCmdBuff, doneLightingImage.image,
                 // before
                 VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

@@ -21,7 +21,7 @@ namespace rutils {
         pipelines.deferred_lighting = createDeferredLightingPipeline(window, pipelineLayouts.deferredPipelineLayout.handle);
         pipelines.fxaa = createFXAAPipeline(window, pipelineLayouts.postprocessPipelineLayout.handle);
         pipelines.ssr = createSSRPipeline(window, pipelineLayouts.postprocessPipelineLayout.handle);
-        pipelines.ssao = createSSAOPipeline(window, pipelineLayouts.postprocessPipelineLayout.handle);
+        pipelines.ssao = createSSAOPipeline(window, pipelineLayouts.ssaoPipelineLayout.handle);
 
         return pipelines;
     }
@@ -132,6 +132,35 @@ namespace rutils {
             // Order must match the set = N in the shaders
             sceneLayout, // set 0
             postProcessingLayout // set 1
+        };
+
+        VkPushConstantRange pushRange{};
+        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushRange.offset = 0;
+        pushRange.size = sizeof(ObjectData);
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = sizeof(layouts)/sizeof(layouts[0]); // updated!
+        layoutInfo.pSetLayouts = layouts; // updated!
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges = &pushRange;
+
+        VkPipelineLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreatePipelineLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError( "Unable to create pipeline layout\n"
+                "vkCreatePipelineLayout() returned {}", toString(res)
+            );
+        }
+
+        return rutils::PipelineLayout(window.device, layout);
+    }
+
+    PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout) {
+        VkDescriptorSetLayout layouts[] = {
+            // Order must match the set = N in the shaders
+            sceneLayout, // set 0
+            ssaoLayout // set 1
         };
 
         VkPushConstantRange pushRange{};

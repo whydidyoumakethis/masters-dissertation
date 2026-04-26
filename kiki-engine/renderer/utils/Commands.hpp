@@ -31,11 +31,9 @@ namespace rutils {
 		VkDescriptorSet deferredLightingDescriptors,
 		VkDescriptorSet ffxaDescriptors,
 		VkDescriptorSet ssrDescriptors,
-		VkDescriptorSet ssaoDescriptors,
 		VkDescriptorSet noTexture,
 		Kiki::Skybox const& skybox,
 		Image const& doneLightingImage,
-		Image const& doneSSAOImage,
 		Image const& doneSSRImage
 	);
 

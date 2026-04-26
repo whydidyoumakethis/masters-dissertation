@@ -185,6 +185,34 @@ namespace rutils {
         return DescriptorSetLayout(window.device, layout);
     }
 
+    DescriptorSetLayout createSSAODescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[2]{};
+
+        // normals
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // depth buffer
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors, std::uint32_t aMaxSets) {
         VkDescriptorPoolSize const pools[] = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, aMaxDescriptors },
@@ -379,5 +407,35 @@ namespace rutils {
         desc[5].pImageInfo = &mappedNormalsInfo;
 
         vkUpdateDescriptorSets(window.device, 6, desc, 0, nullptr);
+    }
+
+    void initialiseSSAODescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoDescriptors) {
+        VkWriteDescriptorSet desc[2]{};
+
+        VkDescriptorImageInfo normalsInfo{};
+        normalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        normalsInfo.imageView = gbuffers.normals.view;
+        normalsInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo depthInfo{};
+        depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        depthInfo.imageView = depthBuffer.view;
+        depthInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = ssaoDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &normalsInfo;
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = ssaoDescriptors;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &depthInfo;
+
+        vkUpdateDescriptorSets(window.device, 2, desc, 0, nullptr);
     }
 }

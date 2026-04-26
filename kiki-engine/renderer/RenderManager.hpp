@@ -107,6 +107,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout sceneLayout;
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
+        rutils::DescriptorSetLayout ssaoLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
         VkDescriptorSet fxaaDescriptors;
@@ -115,7 +116,6 @@ namespace Kiki {
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
-        rutils::Image doneSSAOImage;
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;
