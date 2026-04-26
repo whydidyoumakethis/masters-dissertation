@@ -82,7 +82,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[6]{};
+        VkDescriptorSetLayoutBinding bindings[7]{};
 
         // base colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -119,6 +119,12 @@ namespace rutils {
         bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[5].descriptorCount = 1;
         bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // ambient occlusion
+        bindings[6].binding = 6;
+        bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[6].descriptorCount = 1;
+        bindings[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -254,7 +260,7 @@ namespace rutils {
     }
 
     void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler) {
-        VkWriteDescriptorSet desc[6]{};
+        VkWriteDescriptorSet desc[7]{};
 
         VkDescriptorImageInfo texColourInfo{};
         texColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -285,6 +291,11 @@ namespace rutils {
         depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         depthInfo.imageView = depthBuffer.view;
         depthInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo ambientOcclusionInfo{};
+        ambientOcclusionInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ambientOcclusionInfo.imageView = gbuffers.ssao.view;
+        ambientOcclusionInfo.sampler = sampler.handle;
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = deferredLightingDescriptors;
@@ -328,7 +339,14 @@ namespace rutils {
         desc[5].descriptorCount = 1;
         desc[5].pImageInfo = &skyboxInfo;
 
-        vkUpdateDescriptorSets(window.device, 6, desc, 0, nullptr);
+        desc[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[6].dstSet = deferredLightingDescriptors;
+        desc[6].dstBinding = 6;
+        desc[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[6].descriptorCount = 1;
+        desc[6].pImageInfo = &ambientOcclusionInfo;
+
+        vkUpdateDescriptorSets(window.device, 7, desc, 0, nullptr);
     }
 
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors) {

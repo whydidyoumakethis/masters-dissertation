@@ -16,14 +16,14 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
 layout(set = 1, binding = 0) uniform sampler2D gNormals;
 layout(set = 1, binding = 1) uniform sampler2D gDepth;
 
-layout(location = 0) out vec4 oAO;
+layout(location = 0) out float oAO;
 
 void main()
 {
     float depth = texture(gDepth, v2fTexCoord).r;
     // oColor = vec4(depth, depth, depth, 1.f); // TODO
 
-    oAO = vec4(texture(gNormals, v2fTexCoord).rgb, 1.f);
+    oAO = 1.f;
 }
 
 

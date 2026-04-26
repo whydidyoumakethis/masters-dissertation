@@ -64,6 +64,7 @@ namespace rutils {
         VkBuffer aSceneUBO,
         Kiki::RenderManager::SceneUniform const& aSceneUniform,
         VkDescriptorSet aSceneDescriptors,
+        VkDescriptorSet ssaoDescriptors,
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
         VkDescriptorSet ssrDescriptors,
@@ -428,14 +429,6 @@ namespace rutils {
             }
         }
 
-        // ssao pass
-        {
-            ZoneScopedN("Recording SSAO pass");
-        }
-        // end ssao pass
-
-		// deferred lighting pass
-
         {
             ZoneScopedN("G-buffer pass to lighting pass barriers");
 
@@ -499,6 +492,72 @@ namespace rutils {
             );
         }
 
+        {
+            // ssao pass
+            ZoneScopedN("Recording SSAO pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO pass");
+            #endif
+
+            imageBarrier(aCmdBuff, gbuffers.ssao.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo ssaoColourAttach{};
+            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaoColourAttach.imageView = gbuffers.ssao.view;
+            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+
+            VkRenderingInfo ssaoRenderInfo{};
+            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaoRenderInfo.layerCount = 1;
+            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            ssaoRenderInfo.colorAttachmentCount = 1;
+            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+            VkDescriptorSet ssaoSets[] = {
+                aSceneDescriptors,
+                ssaoDescriptors
+            };
+
+            // draw fullscreen quad with ssao shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.ssao.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+
+            // end ssao pass
+        }
+
+        // deferred lighting pass
         VkRenderingAttachmentInfo lightingAttach{};
 		lightingAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
 		lightingAttach.imageView = doneLightingImage.view;

@@ -202,7 +202,7 @@ namespace Kiki {
             {
                 ZoneScopedN("Initialising descriptor sets");
 
-                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+                initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
                 initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
@@ -329,6 +329,7 @@ namespace Kiki {
                 sceneUBO.buffer,
                 sceneUniforms,
                 sceneDescriptors,
+                ssaoDescriptors,
                 deferredLightingDescriptors,
                 fxaaDescriptors,
                 ssrDescriptors,
