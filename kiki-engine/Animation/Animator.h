@@ -18,6 +18,10 @@ namespace Kiki {
         std::vector<glm::mat4> finalMatrices;
 
         void Update(float dt, const Skeleton& skeleton, const Animation& animation);
+
+        void UpdateBlended(float dt, float& prevTime, const Skeleton& skeleton,
+            const Animation& prevAnim, const Animation& currentAnim,
+            float blendFactor);
     };
 
 }

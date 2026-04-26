@@ -91,4 +91,82 @@ namespace Kiki
             finalMatrices[i] = skeleton.globalInverseTransform * globalMatrices[i] * skeleton.bones[i].inverseBind;
         }
     }
+
+    void Animator::UpdateBlended(float dt, float& prevTime, const Skeleton& skeleton,
+        const Animation& prevAnim, const Animation& currentAnim,
+        float blendFactor)
+    {
+        currentTime += dt;
+        prevTime += dt;
+
+        if (looping) {
+            while (currentTime > currentAnim.duration && currentAnim.duration > 0) currentTime -= currentAnim.duration;
+        }
+        else {
+            if (currentTime > currentAnim.duration) currentTime = currentAnim.duration;
+        }
+
+        while (prevTime > prevAnim.duration && prevAnim.duration > 0) prevTime -= prevAnim.duration;
+
+        size_t boneCount = skeleton.bones.size();
+        localMatrices.resize(boneCount);
+        globalMatrices.resize(boneCount);
+        finalMatrices.resize(boneCount);
+
+        // --- 1. caculate mixed localMatrices ---
+        for (size_t i = 0; i < boneCount; i++) {
+            const BoneTrack& prevTrack = prevAnim.tracks[i];
+            const BoneTrack& currTrack = currentAnim.tracks[i];
+
+            // get old animation's SRT
+            glm::vec3 pTrans = glm::vec3(0.0f);
+            glm::quat pRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            glm::vec3 pScale = glm::vec3(1.0f);
+
+            if (!prevTrack.keyframes.empty()) {
+                Keyframe pk = SampleTrack(prevTrack, prevTime);
+                pTrans = pk.translation; pRot = pk.rotation; pScale = pk.scale;
+            }
+
+            // get new animation's SRT
+            glm::vec3 cTrans = glm::vec3(0.0f);
+            glm::quat cRot = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
+            glm::vec3 cScale = glm::vec3(1.0f);
+
+            if (!currTrack.keyframes.empty()) {
+                Keyframe ck = SampleTrack(currTrack, currentTime);
+                cTrans = ck.translation; cRot = ck.rotation; cScale = ck.scale;
+            }
+
+            if (prevTrack.keyframes.empty() && currTrack.keyframes.empty()) {
+                localMatrices[i] = skeleton.bones[i].localBindTransform;
+            }
+            else {
+                // maths thing about blending......
+                glm::vec3 blendedTrans = glm::mix(pTrans, cTrans, blendFactor);
+                glm::vec3 blendedScale = glm::mix(pScale, cScale, blendFactor);
+                glm::quat blendedRot = glm::slerp(pRot, cRot, blendFactor);
+                blendedRot = glm::normalize(blendedRot); 
+
+				// new mixed local matrix
+                localMatrices[i] = ComposeTransform(blendedTrans, blendedRot, blendedScale);
+            }
+        }
+
+        // --- 2. local → global ---
+        for (size_t i = 0; i < boneCount; i++) {
+            int parent = skeleton.bones[i].parentIndex;
+            if (parent < 0) {
+                globalMatrices[i] = localMatrices[i];
+            }
+            else {
+                globalMatrices[i] = globalMatrices[parent] * localMatrices[i];
+            }
+        }
+
+        // --- 3. global * inverseBind ---
+        for (size_t i = 0; i < boneCount; i++) {
+            finalMatrices[i] = skeleton.globalInverseTransform * globalMatrices[i] * skeleton.bones[i].inverseBind;
+        }
+    }
 }

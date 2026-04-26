@@ -40,12 +40,32 @@ namespace Kiki {
         AnimationComponent(const AnimationComponent&) = delete;
         AnimationComponent& operator=(const AnimationComponent&) = delete;
 
+		// for blending
+        CharacterState previousState = CharacterState::Idle;
+		float blendDuration = 0.2f;    // change this to adjust how long the blending lasts
+        float blendTimer = 0.0f;       
+        bool isBlending = false;       
+        float previousPlaybackTime = 0.0f;
+
         void ChangeState(CharacterState newState) {
             if (currentState == newState || animations.find(newState) == animations.end()) {
                 return;
             }
-            
+
             spdlog::info("[Animation] State Changed: {} -> {}", to_string(currentState), to_string(newState));
+            
+            if (animator.currentTime == 0.0f && !isBlending && previousState == CharacterState::Idle) {
+                currentState = newState;
+            }
+            else {
+                previousState = currentState;
+                currentState = newState;
+                isBlending = true;
+                blendTimer = 0.0f;
+                previousPlaybackTime = animator.currentTime;
+            }
+
+            
             
             currentState = newState;
             animator.currentTime = 0.0f; 
