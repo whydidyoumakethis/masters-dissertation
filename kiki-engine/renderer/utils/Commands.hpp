@@ -16,6 +16,9 @@ namespace rutils {
 
     void recordCommands(
 		VkCommandBuffer,
+		# ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx,
+		# endif
 		Pipelines const&,
 		PipelineLayouts const&,
 		ImageAndView const& swapchainImage,

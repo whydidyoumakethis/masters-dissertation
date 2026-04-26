@@ -16,6 +16,8 @@
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <imgui_impl_glfw.h>
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
 
 
 namespace Kiki {
@@ -103,13 +105,16 @@ namespace Kiki {
             constexpr auto sceneNumSets = sizeof(sceneDesc)/sizeof(sceneDesc[0]);
             vkUpdateDescriptorSets( window.device, sceneNumSets, sceneDesc, 0, nullptr );
 
-
             for (std::size_t i = 0; i < window.swapImages.size(); i++) {
                 commandBuffers.emplace_back(rutils::allocCommandBuffer(window, commandPool.handle));
                 frameDone.emplace_back(rutils::createFence(window.device, VK_FENCE_CREATE_SIGNALED_BIT));
                 imageAvailable.emplace_back(rutils::createSemaphore(window.device));
                 renderFinished.emplace_back(rutils::createSemaphore(window.device));
             }
+
+            # ifdef TRACY_VK_ENABLE
+            tracyVkCtx = TracyVkContext(window.physicalDevice, window.device, window.graphicsQueue, commandBuffers[0]);
+            # endif
 
             // Create null texture
             stbi_set_flip_vertically_on_load(1);
@@ -167,31 +172,43 @@ namespace Kiki {
     }
 
     void RenderManager::nextFrame() {
+        ZoneScoped;
         // glfwPollEvents(); called in input manager
         
         if (recreateSwapchain) {
+            ZoneScopedN("Recreate swapchain");
+
             // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
             // to finish processing.
             vkDeviceWaitIdle(window.device);
 
             // Recreate resources
-            rutils::recreateSwapchain(window);
+            {
+                ZoneScopedN("Creating resources");
 
-            pipelines = rutils::createAllPipelines(window, pipelineLayouts);
+                rutils::recreateSwapchain(window);
+                pipelines = rutils::createAllPipelines(window, pipelineLayouts);
+                depthBuffer = rutils::createDepthBuffer(window, allocator);
+                gbuffers = rutils::createAllGBufferImages(window, allocator);
+            }
 
-            depthBuffer = rutils::createDepthBuffer(window, allocator);
-            
-            gbuffers = rutils::createAllGBufferImages(window, allocator);
-            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+            {
+                ZoneScopedN("Creating post-processing images");
 
-            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
-            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
-            doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
+                doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+                doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+                doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
+            }
 
-            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
+            {
+                ZoneScopedN("Initialising descriptor sets");
+
+                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
+                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
+            }
 
             recreateSwapchain = false;
         }
@@ -203,73 +220,89 @@ namespace Kiki {
         // Make sure that the frame resources are no longer in use
         assert(frameIndex < frameDone.size());
 
-        if (auto const res = vkWaitForFences(window.device, 1, &frameDone[frameIndex].handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Unable to wait for frame fence {}\n"
-                "vkWaitForFences() returned {}", frameIndex, rutils::toString(res)
-            );
+        {
+            ZoneScopedN("Waiting for frame fences");
+
+            if (auto const res = vkWaitForFences(window.device, 1, &frameDone[frameIndex].handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
+                throw Kiki::FatalError( "Unable to wait for frame fence {}\n"
+                    "vkWaitForFences() returned {}", frameIndex, rutils::toString(res)
+                );
+            }
         }
 
         // Acquire next swap chain image
         assert(frameIndex < imageAvailable.size());
 
         std::uint32_t imageIndex = 0;
-        auto const acquireRes = vkAcquireNextImageKHR(
-            window.device,
-            window.swapchain,
-            std::numeric_limits<std::uint64_t>::max(),
-            imageAvailable[frameIndex].handle,
-            VK_NULL_HANDLE,
-            &imageIndex
-        );
 
-        if (VK_ERROR_OUT_OF_DATE_KHR == acquireRes) {
-            // This occurs e.g., when the window has been resized. In this case we need to recreate the swap chain to
-            // match the new dimensions. Any resources that directly depend on the swap chain need to be recreated
-            // as well. While rare, re-creating the swap chain may give us a different image format, which we should
-            // handle appropriately.
-            //
-            // In both cases, we set the flag that the swap chain has to be re-created and jump to the top of the loop.
-            // Technically, with the VK SUBOPTIMAL KHR return code, we could continue rendering with the
-            // current swap chain (unlike VK ERROR OUT OF DATE KHR, which does require us to recreate the
-            // swap chain).
+        {
+            ZoneScopedN("Acquiring next image");
 
-            recreateSwapchain = true;
-
-            // We won’t render a frame this time around. Consequently, no commands were submitted for execution
-            // and the associated fence won’t be signalled. Stepping back one frame avoids this problem.
-            --frameIndex;
-            frameIndex %= commandBuffers.size();
-
-#           ifndef NDEBUG
-            ImGui::EndFrame();
-#           endif
-
-            return;
-        }
-
-        if (acquireRes == VK_SUBOPTIMAL_KHR) {
-            recreateSwapchain = true;
-        }
-        else if (VK_SUCCESS != acquireRes) {
-            throw Kiki::FatalError( "Unable to acquire next swapchain image\n"
-                "vkAcquireNextImageKHR() returned {}", rutils::toString(acquireRes)
+            auto const acquireRes = vkAcquireNextImageKHR(
+                window.device,
+                window.swapchain,
+                std::numeric_limits<std::uint64_t>::max(),
+                imageAvailable[frameIndex].handle,
+                VK_NULL_HANDLE,
+                &imageIndex
             );
+
+            if (VK_ERROR_OUT_OF_DATE_KHR == acquireRes) {
+                // This occurs e.g., when the window has been resized. In this case we need to recreate the swap chain to
+                // match the new dimensions. Any resources that directly depend on the swap chain need to be recreated
+                // as well. While rare, re-creating the swap chain may give us a different image format, which we should
+                // handle appropriately.
+                //
+                // In both cases, we set the flag that the swap chain has to be re-created and jump to the top of the loop.
+                // Technically, with the VK SUBOPTIMAL KHR return code, we could continue rendering with the
+                // current swap chain (unlike VK ERROR OUT OF DATE KHR, which does require us to recreate the
+                // swap chain).
+
+                recreateSwapchain = true;
+
+                // We won’t render a frame this time around. Consequently, no commands were submitted for execution
+                // and the associated fence won’t be signalled. Stepping back one frame avoids this problem.
+                --frameIndex;
+                frameIndex %= commandBuffers.size();
+
+#               ifndef NDEBUG
+                    ImGui::EndFrame();
+#               endif
+
+                return;
+            }
+
+            if (acquireRes == VK_SUBOPTIMAL_KHR) {
+                recreateSwapchain = true;
+            }
+            else if (VK_SUCCESS != acquireRes) {
+                throw Kiki::FatalError( "Unable to acquire next swapchain image\n"
+                    "vkAcquireNextImageKHR() returned {}", rutils::toString(acquireRes)
+                );
+            }
         }
 
-        // Reset fence
-        // Do this only after AcquireNextImage(), so that we can wait on the same fence again in case the swapchain
-        // had to be re-created.
-        
-        if(auto const res = vkResetFences( window.device, 1, &frameDone[frameIndex].handle); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Unable to reset frame fence {}\n"
-                "vkResetFences() returned {}", frameIndex, rutils::toString(res)
-            );
+        {
+            ZoneScopedN("Resetting fence");
+
+            // Reset fence
+            // Do this only after AcquireNextImage(), so that we can wait on the same fence again in case the swapchain
+            // had to be re-created.
+            if(auto const res = vkResetFences( window.device, 1, &frameDone[frameIndex].handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError( "Unable to reset frame fence {}\n"
+                    "vkResetFences() returned {}", frameIndex, rutils::toString(res)
+                );
+            }
         }
 
-        // Record and submit commands for this frame
-        // Prepare data for this frame
         SceneUniform sceneUniforms{};
-        updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
+        {
+            ZoneScopedN("Updating scene uniforms");
+
+            // Record and submit commands for this frame
+            // Prepare data for this frame
+            updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
+        }
 
         // std::cout << sceneUniforms.lightColour.r << std::endl;
     
@@ -281,37 +314,48 @@ namespace Kiki {
 
         assert(std::size_t(frameIndex) < commandBuffers.size());
 
-        rutils::recordCommands(
-            commandBuffers[frameIndex],
-            pipelines,
-            pipelineLayouts,
-            swapchainColourTarget,
-            depthBuffer,
-            gbuffers,
-            window.swapchainExtent,
-            sceneUBO.buffer,
-            sceneUniforms,
-            sceneDescriptors,
-            deferredLightingDescriptors,
-            fxaaDescriptors,
-            ssrDescriptors,
-            ssaoDescriptors,
-            noTextureDst,
-            skybox,
-            doneLightingImage,
-            doneSSAOImage,
-            doneSSRImage
-        );
+        {
+            ZoneScopedN("Recording commands");
+
+            rutils::recordCommands(
+                commandBuffers[frameIndex],
+                # ifdef TRACY_VK_ENABLE
+                tracyVkCtx,
+                # endif
+                pipelines,
+                pipelineLayouts,
+                swapchainColourTarget,
+                depthBuffer,
+                gbuffers,
+                window.swapchainExtent,
+                sceneUBO.buffer,
+                sceneUniforms,
+                sceneDescriptors,
+                deferredLightingDescriptors,
+                fxaaDescriptors,
+                ssrDescriptors,
+                ssaoDescriptors,
+                noTextureDst,
+                skybox,
+                doneLightingImage,
+                doneSSAOImage,
+                doneSSRImage
+            );
+        }
 
         assert(std::size_t(frameIndex) < renderFinished.size());
 
-        rutils::submitCommands(
-            window,
-            commandBuffers[frameIndex],
-            frameDone[frameIndex].handle,
-            imageAvailable[frameIndex].handle,
-            renderFinished[frameIndex].handle
-        );
+        {
+            ZoneScopedN("Submitting commands");
+
+            rutils::submitCommands(
+                window,
+                commandBuffers[frameIndex],
+                frameDone[frameIndex].handle,
+                imageAvailable[frameIndex].handle,
+                renderFinished[frameIndex].handle
+            );
+        }
 
         // Present the results
         // https://registry.khronos.org/vulkan/specs/latest/man/html/VkPresentInfoKHR.html
@@ -324,16 +368,22 @@ namespace Kiki {
         presentInfo.pImageIndices = &imageIndex;
         presentInfo.pResults = nullptr;
 
-        auto const presentRes = vkQueuePresentKHR(window.presentQueue, &presentInfo);
+        {
+            ZoneScopedN("Presenting results");
 
-        if (VK_SUBOPTIMAL_KHR == presentRes || VK_ERROR_OUT_OF_DATE_KHR == presentRes) {
-            recreateSwapchain = true;
+            auto const presentRes = vkQueuePresentKHR(window.presentQueue, &presentInfo);
+
+            if (VK_SUBOPTIMAL_KHR == presentRes || VK_ERROR_OUT_OF_DATE_KHR == presentRes) {
+                recreateSwapchain = true;
+            }
+            else if (VK_SUCCESS != presentRes) {
+                throw Kiki::FatalError( "Unable present swapchain image {}\n"
+                    "vkQueuePresentKHR() returned {}", imageIndex, rutils::toString(presentRes)
+                );
+            }
         }
-        else if (VK_SUCCESS != presentRes) {
-            throw Kiki::FatalError( "Unable present swapchain image {}\n"
-                "vkQueuePresentKHR() returned {}", imageIndex, rutils::toString(presentRes)
-            );
-        }
+
+        FrameMark;
     }
 
     Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents) {
@@ -960,6 +1010,10 @@ namespace Kiki {
         ImGui_ImplGlfw_Shutdown();
         ImGui::DestroyContext();
         #endif
+
+        # ifdef TRACY_VK_ENABLE
+        TracyVkDestroy(tracyVkCtx);
+        # endif
 
         skybox = {};
 
