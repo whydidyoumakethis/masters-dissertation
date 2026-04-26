@@ -65,9 +65,11 @@ namespace rutils {
         Kiki::RenderManager::SceneUniform const& aSceneUniform,
         VkDescriptorSet aSceneDescriptors,
         VkDescriptorSet ssaoDescriptors,
+        VkDescriptorSet ssaoHBlurDescriptors,
+		VkDescriptorSet ssaoBlurredDescriptors,
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
-        VkDescriptorSet ssrDescriptors,
+		VkDescriptorSet ssrDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
@@ -539,6 +541,12 @@ namespace rutils {
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
 
+            SSAOSettings ssaoSettings;
+            ssaoSettings.width = aImageExtent.width;
+            ssaoSettings.height = aImageExtent.height;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             vkCmdEndRendering(aCmdBuff);
@@ -556,6 +564,131 @@ namespace rutils {
 
             // end ssao pass
         }
+
+        // ssao horizontal blur pass
+        {
+            ZoneScopedN("Recording SSAO horizontal blur pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO horizontal blur pass");
+            #endif
+
+            imageBarrier(aCmdBuff, gbuffers.ssao_hblur.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo ssaoColourAttach{};
+            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaoColourAttach.imageView = gbuffers.ssao_hblur.view;
+            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+
+            VkRenderingInfo ssaoRenderInfo{};
+            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaoRenderInfo.layerCount = 1;
+            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            ssaoRenderInfo.colorAttachmentCount = 1;
+            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+            VkDescriptorSet ssaoSets[] = {
+                ssaoHBlurDescriptors
+            };
+
+            // draw fullscreen quad with ssao shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_hblur.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.ssao_hblur.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
+
+        // ssao vertical blur pass
+        {
+            ZoneScopedN("Recording SSAO vertical blur pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO vertical blur pass");
+            #endif
+
+            imageBarrier(aCmdBuff, gbuffers.ssao_blurred.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo ssaoColourAttach{};
+            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaoColourAttach.imageView = gbuffers.ssao_blurred.view;
+            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+
+            VkRenderingInfo ssaoRenderInfo{};
+            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaoRenderInfo.layerCount = 1;
+            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            ssaoRenderInfo.colorAttachmentCount = 1;
+            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+            VkDescriptorSet ssaoSets[] = {
+                ssaoBlurredDescriptors
+            };
+
+            // draw fullscreen quad with ssao shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_blurred.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.ssao_blurred.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
+
 
         // deferred lighting pass
         VkRenderingAttachmentInfo lightingAttach{};

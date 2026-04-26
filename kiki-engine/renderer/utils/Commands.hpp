@@ -29,6 +29,8 @@ namespace rutils {
 		Kiki::RenderManager::SceneUniform const&,
 		VkDescriptorSet aSceneDescriptors,
 		VkDescriptorSet ssaoDescriptors,
+		VkDescriptorSet ssaoHBlurDescriptors,
+		VkDescriptorSet ssaoBlurredDescriptors,
 		VkDescriptorSet deferredLightingDescriptors,
 		VkDescriptorSet ffxaDescriptors,
 		VkDescriptorSet ssrDescriptors,

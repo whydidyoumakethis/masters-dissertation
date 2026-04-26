@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
   	auto& world = World::Get();
 	auto& sceneManager = Kiki::SceneManager::get();
 
-	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "sam_test.glb");
+	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb");
 	Kiki::SceneManager::get().loadScene(std::move(scene));
 
 	// example of setting a custom skybox

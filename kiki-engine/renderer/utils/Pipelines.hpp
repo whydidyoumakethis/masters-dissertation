@@ -24,6 +24,11 @@ namespace rutils {
         // w = thicknessTolerance, float
     };
 
+    struct SSAOSettings {
+        std::uint32_t width;
+        std::uint32_t height;
+    };
+
     struct Pipelines {
         rutils::Pipeline pbr;
         rutils::Pipeline pbr_alpha;
@@ -33,6 +38,8 @@ namespace rutils {
         rutils::Pipeline fxaa;
         rutils::Pipeline ssr;
         rutils::Pipeline ssao;
+        rutils::Pipeline ssao_hblur;
+        rutils::Pipeline ssao_blurred;
     };
 
     struct PipelineLayouts {
@@ -41,6 +48,7 @@ namespace rutils {
         PipelineLayout skyboxPipelineLayout;
         PipelineLayout postprocessPipelineLayout;
         PipelineLayout ssaoPipelineLayout;
+        PipelineLayout ssaoBlurPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -51,6 +59,7 @@ namespace rutils {
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
     PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout);
     PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout);
+    PipelineLayout createSSAOBlurPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaoBlurLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
@@ -60,6 +69,7 @@ namespace rutils {
     Pipeline createFXAAPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSRPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSAOPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSAOBlurPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout, int direction);
 }
 
 #endif

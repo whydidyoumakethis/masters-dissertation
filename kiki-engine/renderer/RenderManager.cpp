@@ -53,12 +53,14 @@ namespace Kiki {
 
             postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
             ssaoLayout = rutils::createSSAODescriptorLayout(window);
+            ssaoBlurredLayout = rutils::createSSAOBlurredDescriptorLayout(window);
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
             pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
             pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
             pipelineLayouts.ssaoPipelineLayout = rutils::createSSAOPipelineLayout(window, sceneLayout.handle, ssaoLayout.handle);
+            pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -76,6 +78,12 @@ namespace Kiki {
 
             ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoLayout.handle);
             initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
+
+            ssaoHBlurDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoBlurredLayout.handle);
+            initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
+
+            ssaoBlurredDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoBlurredLayout.handle);
+            initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
 
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
@@ -203,6 +211,8 @@ namespace Kiki {
                 ZoneScopedN("Initialising descriptor sets");
 
                 initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
+                initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
+                initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
                 initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
@@ -330,6 +340,8 @@ namespace Kiki {
                 sceneUniforms,
                 sceneDescriptors,
                 ssaoDescriptors,
+                ssaoHBlurDescriptors,
+                ssaoBlurredDescriptors,
                 deferredLightingDescriptors,
                 fxaaDescriptors,
                 ssrDescriptors,
@@ -1047,12 +1059,15 @@ namespace Kiki {
         pipelines.fxaa = {};
         pipelines.ssr = {};
         pipelines.ssao = {};
+        pipelines.ssao_hblur = {};
+        pipelines.ssao_blurred = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
         pipelineLayouts.postprocessPipelineLayout = {};
         pipelineLayouts.ssaoPipelineLayout = {};
+        pipelineLayouts.ssaoBlurPipelineLayout = {};
 
         depthBuffer = {};
         doneLightingImage = {};
@@ -1065,6 +1080,7 @@ namespace Kiki {
         cubemapLayout = {};
         postProcessingLayout = {};
         ssaoLayout = {};
+        ssaoBlurredLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};

@@ -72,6 +72,8 @@ namespace Kiki {
         std::filesystem::path fxaa_f = "fxaa.frag.spv";
         std::filesystem::path ssr_f = "ssr.frag.spv";
         std::filesystem::path ssao_f = "ssao.frag.spv";
+        std::filesystem::path ssao_hblur_f = "ssao_hblur.frag.spv";
+        std::filesystem::path ssao_vblur_f = "ssao_vblur.frag.spv";
     };
 
     class RenderManager {
@@ -108,11 +110,14 @@ namespace Kiki {
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
         rutils::DescriptorSetLayout ssaoLayout;
+        rutils::DescriptorSetLayout ssaoBlurredLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
         VkDescriptorSet fxaaDescriptors;
         VkDescriptorSet ssrDescriptors;
         VkDescriptorSet ssaoDescriptors;
+        VkDescriptorSet ssaoHBlurDescriptors;
+        VkDescriptorSet ssaoBlurredDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;

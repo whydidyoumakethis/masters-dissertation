@@ -635,6 +635,8 @@ namespace rutils {
         gbuffers.roughnessMetalness = createGBufferImage(window, allocator, VK_FORMAT_R8G8_UNORM);
         gbuffers.mappedNormals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
         gbuffers.ssao = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
+        gbuffers.ssao_hblur = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
+        gbuffers.ssao_blurred = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
 
         return gbuffers;
     }
