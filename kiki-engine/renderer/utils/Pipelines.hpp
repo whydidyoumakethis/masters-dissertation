@@ -69,7 +69,8 @@ namespace rutils {
     Pipeline createFXAAPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSRPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSAOPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
-    Pipeline createSSAOBlurPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout, int direction);
+    Pipeline createSSAOHBlurPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSAOBlurredPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 
 #endif
