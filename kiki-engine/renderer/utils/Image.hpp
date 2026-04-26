@@ -35,6 +35,9 @@ namespace rutils {
 		rutils::Image normals;
 		rutils::Image roughnessMetalness;
 		rutils::Image mappedNormals;
+		rutils::Image ssao;
+		rutils::Image ssao_hblur;
+		rutils::Image ssao_blurred;
 	};
 
 	struct CubemapPaths {

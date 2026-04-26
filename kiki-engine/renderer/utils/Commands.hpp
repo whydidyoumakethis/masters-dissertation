@@ -28,14 +28,15 @@ namespace rutils {
 		VkBuffer aSceneUBO,
 		Kiki::RenderManager::SceneUniform const&,
 		VkDescriptorSet aSceneDescriptors,
+		VkDescriptorSet ssaoDescriptors,
+		VkDescriptorSet ssaoHBlurDescriptors,
+		VkDescriptorSet ssaoBlurredDescriptors,
 		VkDescriptorSet deferredLightingDescriptors,
 		VkDescriptorSet ffxaDescriptors,
 		VkDescriptorSet ssrDescriptors,
-		VkDescriptorSet ssaoDescriptors,
 		VkDescriptorSet noTexture,
 		Kiki::Skybox const& skybox,
 		Image const& doneLightingImage,
-		Image const& doneSSAOImage,
 		Image const& doneSSRImage
 	);
 

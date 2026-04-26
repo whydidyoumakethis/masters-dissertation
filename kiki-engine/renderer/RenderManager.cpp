@@ -52,11 +52,15 @@ namespace Kiki {
             );
 
             postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
+            ssaoLayout = rutils::createSSAODescriptorLayout(window);
+            ssaoBlurredLayout = rutils::createSSAOBlurredDescriptorLayout(window);
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
             pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
             pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
+            pipelineLayouts.ssaoPipelineLayout = rutils::createSSAOPipelineLayout(window, sceneLayout.handle, ssaoLayout.handle);
+            pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -67,24 +71,28 @@ namespace Kiki {
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
-            doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
             createSkybox(skybox.paths);
 
+            ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoLayout.handle);
+            initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
+
+            ssaoHBlurDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoBlurredLayout.handle);
+            initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
+
+            ssaoBlurredDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoBlurredLayout.handle);
+            initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
+
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
             initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
 
-            ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
-
             ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
 
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
-
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -168,6 +176,26 @@ namespace Kiki {
 
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
+
+            // generate 16 samples for ssao, https://learnopengl.com/Advanced-Lighting/SSAO
+            // random points on hemisphere
+            for (int i = 0; i < 16; i++) {
+                // sample([-1, 1], [-1, 1], [0, 1])
+                glm::vec3 sample(
+                    (((float)rand() / (float)RAND_MAX) * 2.f) - 1.f,
+                    (((float)rand() / (float)RAND_MAX) * 2.f) - 1.f,
+                    (float)rand() / (float)RAND_MAX
+                );
+
+                sample = glm::normalize(sample);
+                sample *= (float)rand() / (float)RAND_MAX;
+
+                // distribute more samples closer to origin
+                float scale = lerp(0.1f, 1.f, ((float)i / 16.f) * ((float)i / 16.f));
+
+                // use vec4 for alignment
+                sceneUniforms.ssaoSamples[i] = glm::vec4(sample, 0.f);
+            }
         }
     }
 
@@ -197,16 +225,16 @@ namespace Kiki {
 
                 doneLightingImage = rutils::createPostProcessingImage(window, allocator);
                 doneSSRImage = rutils::createPostProcessingImage(window, allocator);
-                doneSSAOImage = rutils::createPostProcessingImage(window, allocator);
             }
 
             {
                 ZoneScopedN("Initialising descriptor sets");
 
+                initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
+                initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
+                initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
                 initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
-                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
-                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssaoDescriptors);
-                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSAOImage, sampler, ssrDescriptors);
+                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
             }
 
@@ -295,7 +323,6 @@ namespace Kiki {
             }
         }
 
-        SceneUniform sceneUniforms{};
         {
             ZoneScopedN("Updating scene uniforms");
 
@@ -331,14 +358,15 @@ namespace Kiki {
                 sceneUBO.buffer,
                 sceneUniforms,
                 sceneDescriptors,
+                ssaoDescriptors,
+                ssaoHBlurDescriptors,
+                ssaoBlurredDescriptors,
                 deferredLightingDescriptors,
                 fxaaDescriptors,
                 ssrDescriptors,
-                ssaoDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
-                doneSSAOImage,
                 doneSSRImage
             );
         }
@@ -1050,16 +1078,19 @@ namespace Kiki {
         pipelines.fxaa = {};
         pipelines.ssr = {};
         pipelines.ssao = {};
+        pipelines.ssao_hblur = {};
+        pipelines.ssao_blurred = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
         pipelineLayouts.postprocessPipelineLayout = {};
+        pipelineLayouts.ssaoPipelineLayout = {};
+        pipelineLayouts.ssaoBlurPipelineLayout = {};
 
         depthBuffer = {};
         doneLightingImage = {};
         doneSSRImage = {};
-        doneSSAOImage = {};
         sceneUBO = {};
 
         gBufferLayout = {};
@@ -1067,6 +1098,8 @@ namespace Kiki {
         materialLayout = {};
         cubemapLayout = {};
         postProcessingLayout = {};
+        ssaoLayout = {};
+        ssaoBlurredLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};

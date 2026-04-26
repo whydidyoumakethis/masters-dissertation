@@ -72,6 +72,8 @@ namespace Kiki {
         std::filesystem::path fxaa_f = "fxaa.frag.spv";
         std::filesystem::path ssr_f = "ssr.frag.spv";
         std::filesystem::path ssao_f = "ssao.frag.spv";
+        std::filesystem::path ssao_hblur_f = "ssao_hblur.frag.spv";
+        std::filesystem::path ssao_vblur_f = "ssao_vblur.frag.spv";
     };
 
     class RenderManager {
@@ -107,15 +109,18 @@ namespace Kiki {
         rutils::DescriptorSetLayout sceneLayout;
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
+        rutils::DescriptorSetLayout ssaoLayout;
+        rutils::DescriptorSetLayout ssaoBlurredLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
         VkDescriptorSet fxaaDescriptors;
         VkDescriptorSet ssrDescriptors;
         VkDescriptorSet ssaoDescriptors;
+        VkDescriptorSet ssaoHBlurDescriptors;
+        VkDescriptorSet ssaoBlurredDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
-        rutils::Image doneSSAOImage;
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;
@@ -125,6 +130,8 @@ namespace Kiki {
         VkDescriptorSet noTextureDst;
 
         Skybox skybox;
+
+        std::vector<glm::vec4> ssaoSamples;
 
         # ifdef TRACY_VK_ENABLE
         TracyVkCtx tracyVkCtx;
@@ -165,6 +172,7 @@ namespace Kiki {
             glm::vec4 lightPos;
             glm::vec4 lightColour;
             glm::vec4 cameraPos;
+            glm::vec4 ssaoSamples[16];
         };
 
         rutils::CommandPool tempTextureCmdPool;
@@ -176,6 +184,7 @@ namespace Kiki {
         static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
 
         ShaderPaths shaderPaths;
+        SceneUniform sceneUniforms;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
