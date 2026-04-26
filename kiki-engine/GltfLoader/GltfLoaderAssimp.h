@@ -161,7 +161,9 @@ enum class MmiscTags {
 	NONE,
 	FLOOR,
 	LAVA,
-	ITEM,
+	SPEED_BOOST,
+	DOUBLE_JUMP,
+	DASH,
 	TRIGGER,
 	PLAYER,
 	GOAL,
@@ -312,7 +314,9 @@ namespace Kiki {
 
 			if (s == "floor")   return MmiscTags::FLOOR;
 			if (s == "lava")    return MmiscTags::LAVA;
-			if (s == "item")    return MmiscTags::ITEM;
+			if (s == "speed_boost") return MmiscTags::SPEED_BOOST;
+			if (s == "double_jump") return MmiscTags::DOUBLE_JUMP;
+			if (s == "dash") return MmiscTags::DASH;
 			if (s == "trigger") return MmiscTags::TRIGGER;
 			if (s == "player")  return MmiscTags::PLAYER;
 			if (s == "goal")    return MmiscTags::GOAL;
@@ -388,6 +392,10 @@ namespace Kiki {
 				emptyInstance.colliderType = McolliderType::NONE; // Default to no collider for empty instances
 				emptyInstance.miscTag = miscTag;
 				std::cout << "Empty instance for node " << node->mName.C_Str() << " with misc tag: " << static_cast<int>(miscTag) << std::endl;
+				std::cout << "Transform for empty instance: " << std::endl;
+				for (int i = 0; i < 4; i++) {
+					std::cout << worldTransform[i][0] << " " << worldTransform[i][1] << " " << worldTransform[i][2] << " " << worldTransform[i][3] << std::endl;
+				}
 				out.emptyInstances.push_back(emptyInstance);
 			}
 
