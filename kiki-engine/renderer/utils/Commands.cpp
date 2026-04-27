@@ -933,16 +933,18 @@ vkCmdEndRendering(aCmdBuff);
             if (registry.all_of<BackgroundComponent>(e)) {
                 auto& backgroundComponent = registry.get<BackgroundComponent>(e);
 
-                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
+                if (backgroundComponent.vertices.buffer != VK_NULL_HANDLE) {
+                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
 
-                VkDeviceSize offsets[1]{};
-                vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &backgroundComponent.vertices.buffer, offsets);
-                vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    VkDeviceSize offsets[1]{};
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &backgroundComponent.vertices.buffer, offsets);
+                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-                ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)));
-                vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
-                
-                vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                    ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)));
+                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+                    
+                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                }
             }
 
             if (registry.all_of<TextComponent>(e)) {

@@ -88,7 +88,7 @@ namespace Kiki {
                 stbrp_init_target(&context, font.atlasSize, font.atlasSize, nodes.data(), nodes.size());
                 stbrp_pack_rects(&context, packingRects.data(), packingRects.size());
 
-                std::vector<uint8_t> atlas(font.atlasSize * font.atlasSize * 3, 0);
+                std::vector<uint8_t> atlas(font.atlasSize * font.atlasSize * 4, 0);
 
                 for (int i = 0; i < packingRects.size(); i++) {
                     if (!packingRects[i].was_packed)
@@ -97,11 +97,12 @@ namespace Kiki {
                     for (int x = 0; x < tempGlyphs[i].bitmap.width(); x++) {
                         for (int y = 0; y < tempGlyphs[i].bitmap.height(); y++) {
                             auto pixel = tempGlyphs[i].bitmap(x, y);
-                            int index = ((packingRects[i].x + x) + (packingRects[i].y + y) * font.atlasSize) * 3;
+                            int index = ((packingRects[i].x + x) + (packingRects[i].y + y) * font.atlasSize) * 4;
 
                             atlas[index] = (uint8_t) std::clamp(pixel[0] * 255.0f, 0.0f, 255.0f);
                             atlas[index + 1] = (uint8_t) std::clamp(pixel[1] * 255.0f, 0.0f, 255.0f);
                             atlas[index + 2] = (uint8_t) std::clamp(pixel[2] * 255.0f, 0.0f, 255.0f);
+                            atlas[index + 3] = (uint8_t) 1.0f;
                         }
                     }
 

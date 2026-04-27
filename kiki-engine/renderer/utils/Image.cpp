@@ -274,7 +274,7 @@ namespace rutils {
 
     Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator) {
         // Create staging buffer and copy image data to it
-        auto const sizeInBytes = atlasSize * atlasSize * sizeof(uint8_t) * 3;
+        auto const sizeInBytes = atlasSize * atlasSize * sizeof(uint8_t) * 4;
 
         auto staging = createBuffer(aAllocator, sizeInBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
 
@@ -289,7 +289,7 @@ namespace rutils {
         vmaUnmapMemory(aAllocator.allocator, staging.allocation);
 
         // Create image
-        Image ret = createFontAtlasTexture(aAllocator, atlasSize, atlasSize, VK_FORMAT_R8G8B8_UNORM, aContext,
+        Image ret = createFontAtlasTexture(aAllocator, atlasSize, atlasSize, VK_FORMAT_R8G8B8A8_UNORM, aContext,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT); //TODO
 
         // Create command buffer for data upload and begin recording
