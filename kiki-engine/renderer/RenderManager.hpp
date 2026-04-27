@@ -74,6 +74,7 @@ namespace Kiki {
         std::filesystem::path ssao_f = "ssao.frag.spv";
         std::filesystem::path ssao_hblur_f = "ssao_hblur.frag.spv";
         std::filesystem::path ssao_vblur_f = "ssao_vblur.frag.spv";
+        std::filesystem::path tonemap_f = "tonemap.frag.spv";
     };
 
     class RenderManager {
@@ -111,6 +112,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout cubemapLayout;
         rutils::DescriptorSetLayout ssaoLayout;
         rutils::DescriptorSetLayout ssaoBlurredLayout;
+        rutils::DescriptorSetLayout tonemapLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
         VkDescriptorSet fxaaDescriptors;
@@ -118,9 +120,11 @@ namespace Kiki {
         VkDescriptorSet ssaoDescriptors;
         VkDescriptorSet ssaoHBlurDescriptors;
         VkDescriptorSet ssaoBlurredDescriptors;
+        VkDescriptorSet tonemapDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
+        rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;

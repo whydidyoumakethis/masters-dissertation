@@ -40,6 +40,7 @@ namespace rutils {
         rutils::Pipeline ssao;
         rutils::Pipeline ssao_hblur;
         rutils::Pipeline ssao_blurred;
+        rutils::Pipeline tonemap;
     };
 
     struct PipelineLayouts {
@@ -49,6 +50,7 @@ namespace rutils {
         PipelineLayout postprocessPipelineLayout;
         PipelineLayout ssaoPipelineLayout;
         PipelineLayout ssaoBlurPipelineLayout;
+        PipelineLayout tonemapPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -60,6 +62,7 @@ namespace rutils {
     PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout);
     PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout);
     PipelineLayout createSSAOBlurPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaoBlurLayout);
+    PipelineLayout createTonemapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout tonemapLayout);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
@@ -71,6 +74,7 @@ namespace rutils {
     Pipeline createSSAOPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSAOHBlurPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSAOBlurredPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createTonemapPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 }
 
 #endif

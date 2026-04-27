@@ -34,10 +34,12 @@ namespace rutils {
 		VkDescriptorSet deferredLightingDescriptors,
 		VkDescriptorSet ffxaDescriptors,
 		VkDescriptorSet ssrDescriptors,
+		VkDescriptorSet tonemapDescriptors,
 		VkDescriptorSet noTexture,
 		Kiki::Skybox const& skybox,
 		Image const& doneLightingImage,
-		Image const& doneSSRImage
+		Image const& doneSSRImage,
+		Image const& doneTonemapImage
 	);
 
 	void submitCommands(

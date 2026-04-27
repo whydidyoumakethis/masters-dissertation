@@ -79,6 +79,7 @@ namespace rutils {
 
 	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator);
 	Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator);
+	Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator);
 	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator);
 	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format);
 }
