@@ -914,12 +914,12 @@ vkCmdEndRendering(aCmdBuff);
     #       endif
             // end imgui pass
 
-            vkCmdEndRendering(aCmdBuff);
+            //vkCmdEndRendering(aCmdBuff);
             // end fxaa pass
         }
 
         // TODO: ui pass should go here, after fxaa :)
-        vkCmdBeginRendering(aCmdBuff, &renderInfo);
+        //vkCmdBeginRendering(aCmdBuff, &renderInfo);
 
         // UI PASS: TODO check in right place after merge
         vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle );
