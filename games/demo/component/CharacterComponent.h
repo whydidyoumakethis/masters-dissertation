@@ -22,7 +22,7 @@ inline std::string to_string(CharacterState state) {
 struct CharacterComponent {
     float walkSpeed = 5.0f;
     float runSpeed = 18.0f;
-    float jumpForce = 50.0f;
+    float jumpForce = 15.0f;
 	float rotateSpeed = 10.0f; // character rotation speed (for interpolating facing direction)
 
     CharacterState state = CharacterState::Idle;
