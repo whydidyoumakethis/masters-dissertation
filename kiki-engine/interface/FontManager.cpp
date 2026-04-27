@@ -128,7 +128,7 @@ namespace Kiki {
                 fonts.emplace(key, std::move(font));
             }
         }
-
+      
         return key;
     }
 

@@ -10,6 +10,7 @@
 #include "utils/Image.hpp"
 #include "../logging/FatalError.hpp"
 #include "SceneManager.hpp"
+#include "Animation/AnimationComponent.h"
 #include "Components/BackgroundComponent.hpp"
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
@@ -41,6 +42,8 @@ namespace Kiki {
             materialLayout = rutils::createMaterialDescriptorLayout(window);
             gBufferLayout = rutils::createGBufferDescriptorLayout(window);
             cubemapLayout = rutils::createCubemapDescriptorLayout(window);
+            animationLayout = rutils::createAnimationDescriptorLayout(window);
+
 
             interfaceLayout = rutils::createInterfaceDescriptorLayout(window);
             textLayout = rutils::createInterfaceTextDescriptorLayout(window);
@@ -65,14 +68,31 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
             );
 
+            
+            constexpr uint32_t MAX_BONES = 100;
+            VkDeviceSize dummyBufferSize = sizeof(glm::mat4) * MAX_BONES;
+
+            dummyAnimationBuffer = rutils::createBuffer(
+                allocator,
+                dummyBufferSize,
+                VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+            );
+
+            std::vector<glm::mat4> identityBones(MAX_BONES, glm::mat4(1.0f));
+            void* mappedData = nullptr;
+            vmaMapMemory(allocator.allocator, dummyAnimationBuffer.allocation, &mappedData);
+            std::memcpy(mappedData, identityBones.data(), dummyBufferSize);
+            vmaUnmapMemory(allocator.allocator, dummyAnimationBuffer.allocation);
+
             postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
             ssaoLayout = rutils::createSSAODescriptorLayout(window);
             ssaoBlurredLayout = rutils::createSSAOBlurredDescriptorLayout(window);
             tonemapLayout = rutils::createTonemapDescriptorLayout(window);
 
-            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
-            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
-            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
+            pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle, animationLayout.handle);
+            pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle, animationLayout.handle);
+            pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle, animationLayout.handle);
             pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
             pipelineLayouts.ssaoPipelineLayout = rutils::createSSAOPipelineLayout(window, sceneLayout.handle, ssaoLayout.handle);
             pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
@@ -84,6 +104,8 @@ namespace Kiki {
             tempTextureCmdPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT);
 
             descriptorPool = rutils::createDescriptorPool(window);
+
+
 
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
@@ -218,6 +240,22 @@ namespace Kiki {
             constexpr auto numSets = sizeof(desc)/sizeof(desc[0]);
             vkUpdateDescriptorSets(window.device, numSets, desc, 0, nullptr);
 
+            dummyAnimationDesc = rutils::allocDescSet(window, descriptorPool.handle, animationLayout.handle);
+
+            VkDescriptorBufferInfo dummyBufferInfo{};
+            dummyBufferInfo.buffer = dummyAnimationBuffer.buffer;
+            dummyBufferInfo.offset = 0;
+            dummyBufferInfo.range = dummyBufferSize;
+
+            VkWriteDescriptorSet dummyWrite{};
+            dummyWrite.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            dummyWrite.dstSet = dummyAnimationDesc;
+            dummyWrite.dstBinding = 0;
+            dummyWrite.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+            dummyWrite.descriptorCount = 1;
+            dummyWrite.pBufferInfo = &dummyBufferInfo;
+
+            vkUpdateDescriptorSets(window.device, 1, &dummyWrite, 0, nullptr);
             // generate 16 samples for ssao, https://learnopengl.com/Advanced-Lighting/SSAO
             // random points on hemisphere
             for (int i = 0; i < 16; i++) {
@@ -528,7 +566,8 @@ namespace Kiki {
                 interfaceUBO.buffer,
                 interfaceUniform,
                 interfaceDescriptors,
-                interfaceIndices.buffer
+                interfaceIndices.buffer,
+                dummyAnimationDesc
             );
         }
 
@@ -575,11 +614,13 @@ namespace Kiki {
         FrameMark;
     }
 
-    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents) {
+    Mesh RenderManager::allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents, std::vector<int> boneIDs, std::vector<float> weights) {
         int posSize = positions.size() * sizeof(float);
         int indSize = indices.size() * sizeof (std::uint32_t);
         int texSize = texCoords.size() * sizeof(float);
         int normalsSize = normals.size() * sizeof(float);
+        int boneSize = boneIDs.size() * sizeof(int);
+        int weightsSize = weights.size() * sizeof(float);
         int tangentsSize = tangents.size() * sizeof(float);
 
         // Create on GPU vertex buffer
@@ -618,6 +659,18 @@ namespace Kiki {
             VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
         );
 
+        rutils::Buffer boneIDsGPU = rutils::createBuffer(
+            allocator, boneSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+        );
+
+        rutils::Buffer weightsGPU = rutils::createBuffer(
+            allocator, weightsSize,
+            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+            0, VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE
+         );
+
         // Create on GPU tangent buffer
         rutils::Buffer tangentsGPU = rutils::createBuffer(
             allocator,
@@ -653,6 +706,16 @@ namespace Kiki {
             allocator,
             normalsSize,
             VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer boneStaging = rutils::createBuffer(
+            allocator, boneSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+
+        rutils::Buffer weightStaging = rutils::createBuffer(
+            allocator, weightsSize, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
             VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
         );
 
@@ -698,6 +761,16 @@ namespace Kiki {
         }
         std::memcpy(normalsPtr, normals.data(), normalsSize);
         vmaUnmapMemory(allocator.allocator, normalsStaging.allocation);
+
+        void* bonePtr = nullptr;
+        vmaMapMemory(allocator.allocator, boneStaging.allocation, &bonePtr);
+        std::memcpy(bonePtr, boneIDs.data(), boneSize);
+        vmaUnmapMemory(allocator.allocator, boneStaging.allocation);
+
+        void* weightPtr = nullptr;
+        vmaMapMemory(allocator.allocator, weightStaging.allocation, &weightPtr);
+        std::memcpy(weightPtr, weights.data(), weightsSize);
+        vmaUnmapMemory(allocator.allocator, weightStaging.allocation);
 
         void* tangentsPtr = nullptr;
         if (auto const res = vmaMapMemory(allocator.allocator, tangentsStaging.allocation, &tangentsPtr); res != VK_SUCCESS) {
@@ -785,6 +858,20 @@ namespace Kiki {
             VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
         );
 
+        VkBufferCopy bcopy{};
+        bcopy.size = boneSize;
+        vkCmdCopyBuffer(uploadCmd, boneStaging.buffer, boneIDsGPU.buffer, 1, &bcopy);
+        rutils::bufferBarrier(uploadCmd, boneIDsGPU.buffer,
+            VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
+        VkBufferCopy wcopy{};
+        wcopy.size = weightsSize;
+        vkCmdCopyBuffer(uploadCmd, weightStaging.buffer, weightsGPU.buffer, 1, &wcopy);
+        rutils::bufferBarrier(uploadCmd, weightsGPU.buffer,
+            VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
         VkBufferCopy tancopy{};
         tancopy.size = tangentsSize;
 
@@ -815,6 +902,7 @@ namespace Kiki {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
+
         if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
             throw FatalError( "Unable to submit command buffer to queue\n"
                 "vkQueueSubmit2() returned {}", rutils::toString(res)
@@ -832,7 +920,52 @@ namespace Kiki {
             );
         }
 
-        return Mesh(std::move(vertexPosGPU), std::move(texCoordsGPU), std::move(normalsGPU), std::move(indexGPU), std::move(tangentsGPU), positions.size() / 3, indices.size());
+        return Mesh{
+        std::move(vertexPosGPU),
+        std::move(texCoordsGPU),
+        std::move(normalsGPU),
+        std::move(indexGPU),
+        std::move(tangentsGPU),
+        std::move(boneIDsGPU), 
+        std::move(weightsGPU), 
+        static_cast<std::uint32_t>(positions.size() / 3),
+        static_cast<std::uint32_t>(indices.size())
+        };
+    }
+
+    rutils::Buffer RenderManager::allocateAnimationBuffer() {
+        constexpr uint32_t MAX_BONES = 100;
+        VkDeviceSize bufferSize = sizeof(glm::mat4) * MAX_BONES;
+
+        return rutils::createBuffer(
+            allocator,
+            bufferSize,
+            VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+            VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
+        );
+    }
+
+    VkDescriptorSet RenderManager::allocateAnimationDescriptorSet(const rutils::Buffer& buffer) {
+        constexpr uint32_t MAX_BONES = 100;
+
+        VkDescriptorSet descSet = rutils::allocDescSet(window, descriptorPool.handle, animationLayout.handle);
+
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = buffer.buffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(glm::mat4) * MAX_BONES;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = descSet;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, &write, 0, nullptr);
+
+        return descSet;
     }
 
     Mesh RenderManager::allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices) {
@@ -987,8 +1120,10 @@ namespace Kiki {
     }
 
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {
+        //  width / height
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
-        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        // roughWidth / roughHeight
+        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
         rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
 
         VkDescriptorImageInfo textureInfo[3]{};
@@ -1317,6 +1452,16 @@ namespace Kiki {
         vkDeviceWaitIdle(window.device);
 
         auto& registry = World::Get().Registry();
+        auto view = registry.view<Kiki::AnimationComponent>();
+
+        for (auto entity : view) {
+            auto& animComp = registry.get<Kiki::AnimationComponent>(entity);
+            if (animComp.boneMatrixBuffer.buffer != VK_NULL_HANDLE) {
+                vmaDestroyBuffer(allocator.allocator, animComp.boneMatrixBuffer.buffer, animComp.boneMatrixBuffer.allocation);
+                animComp.boneMatrixBuffer.buffer = VK_NULL_HANDLE;
+            }
+        }
+
         auto bgView = registry.view<BackgroundComponent>();
 
         for (auto [e, comp] : bgView.each()) {
@@ -1331,6 +1476,7 @@ namespace Kiki {
 
         FontManager::get().shutdown();
         SceneManager::get().shutdown();
+        dummyAnimationBuffer = {};
 
         #ifndef NDEBUG
         ImGui_ImplVulkan_Shutdown();
@@ -1346,6 +1492,7 @@ namespace Kiki {
 
         noTextureDst = {};
         noTexture = {};
+        dummyAnimationDesc = {};
         noNormalMap = {};
 
         gbuffers = {};
@@ -1406,6 +1553,7 @@ namespace Kiki {
         materialLayout = {};
         cubemapLayout = {};
         postProcessingLayout = {};
+        animationLayout = {};
         ssaoLayout = {};
         ssaoBlurredLayout = {};
         tonemapLayout = {};

@@ -97,8 +97,6 @@ FetchContent_Declare(
     GIT_TAG        "v1.17.0"
 )
 
-
-
 FetchContent_MakeAvailable(
     JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog 
 )
