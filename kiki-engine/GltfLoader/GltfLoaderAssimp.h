@@ -508,18 +508,17 @@ namespace Kiki {
 					light.direction = glm::normalize(glm::vec3(worldDir));
 				}
 
-				std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
-				std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
+				// std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
+				// std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
 
-				std::cout << "Light " << light.name << " type: " <<
-				(light.type == MlightType::POINT ? "POINT" : light.type == MlightType::DIRECTIONAL ? "DIRECTIONAL" : light.type == MlightType::SPOT ? "SPOT" : "UNKNOWN")
-				<< std::endl;
+				// std::cout << "Light " << light.name << " type: " <<
+				// (light.type == MlightType::POINT ? "POINT" : light.type == MlightType::DIRECTIONAL ? "DIRECTIONAL" : light.type == MlightType::SPOT ? "SPOT" : "UNKNOWN")
+				// << std::endl;
 
-				std::cout << "Light " << light.name << " direction: " << light.direction.x << ", " << light.direction.y << ", " << light.direction.z << std::endl;
+				// std::cout << "Light " << light.name << " direction: " << light.direction.x << ", " << light.direction.y << ", " << light.direction.z << std::endl;
 				light.color = rawcolor;
 				out.lights.push_back(light);
 			}
-
 		}
 
 		static Mscene loadScene(const std::filesystem::path& path){

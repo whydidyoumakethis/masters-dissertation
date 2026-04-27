@@ -1,5 +1,7 @@
 #version 450
 
+#define MAX_LIGHTS 32
+
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : require
 
@@ -11,9 +13,11 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     mat4 camera;
     mat4 projection;
     mat4 projCam;
-    vec4 lightPos;
-    vec4 lightColour;
+    vec4 lightPos[MAX_LIGHTS];
+    vec4 lightColour[MAX_LIGHTS]; // w is intensity
+    vec4 numLights;
     vec4 cameraPos;
+    vec4 ssaoSamples[16];
 } uScene;
 
 layout(set = 1, binding = 0) uniform sampler2D gTexColour;
@@ -77,19 +81,25 @@ void main()
     // vector pointing towards the camera
     vec3 viewDirection = normalize(uScene.cameraPos.xyz - worldSpace);
 
-    vec3 lightColour = uScene.lightColour.xyz;
-    vec3 lightPos = uScene.lightPos.xyz;
+    vec3 lighting = vec3(0.f);
+    // TODO: lights[0] will always be directional
+    // so use its position as a direction instead
 
-    // vector pointing towards the light
-    vec3 lightDirection = normalize(lightPos - worldSpace);
+    for (int i = 0; i < uScene.numLights[0]; i++) {
+        vec3 lightColour = uScene.lightColour[i].xyz;
+        vec3 lightPos = uScene.lightPos[i].xyz;
 
-    // half vector from the light and view directions
-    vec3 halfVector = normalize(lightDirection + viewDirection);
+        // vector pointing towards the light
+        vec3 lightDirection = normalize(lightPos - worldSpace);
 
-    float nDotLPos = max(dot(normal, lightDirection), 0.05f);
+        // half vector from the light and view directions
+        vec3 halfVector = normalize(lightDirection + viewDirection);
 
-    vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
-    vec3 lighting =  brdfResult * lightColour * nDotLPos;
+        float nDotLPos = max(dot(normal, lightDirection), 0.05f);
+
+        vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
+        lighting += brdfResult * lightColour * nDotLPos;
+    }
 
     float ambientOcclusion = texture(gAO, v2fTexCoord).r;
     vec3 finalColour = emissive + (ambient(sceneAmbient, baseColour) * (ambientOcclusion * ambientOcclusion)) + lighting;

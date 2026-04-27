@@ -233,6 +233,47 @@ namespace Kiki {
     void SceneManager::loadScene(Mscene scene) {
         // TEMP SOLUTION
 
+        // // renderLights[0] must be directional
+        // if (RenderManager::get().lights.size() == 0) {
+        //     for (size_t i = 0; i < scene.lights.size(); i++) {
+        //         if (scene.lights[i].type == MlightType::DIRECTIONAL) {
+        //             Light rLight;
+        //             rLight.colour = glm::vec4(scene.lights[i].color, 1.f);
+        //             rLight.position = glm::vec4(scene.lights[i].direction, 1.f);
+        //             RenderManager::get().lights.emplace_back(rLight);
+        //         }
+        //     }
+        // }
+
+        // // force one directional light
+        // if (RenderManager::get().lights.size() == 0) {
+        //     Light rLight;
+        //     rLight.colour = glm::vec4(1.f, 1.f, 1.f, 1.f);
+        //     rLight.position = glm::vec4(0.f, -1.f, 0.f, 1.f);
+        //     RenderManager::get().lights.emplace_back(rLight);
+        // }
+
+        // push point lights
+        for (size_t i = 0; i < scene.lights.size(); i++) {
+            if (scene.lights[i].type == MlightType::POINT) {
+                Light rLight;
+                rLight.colour = glm::vec4(scene.lights[i].color, 1.f);
+                rLight.position = glm::vec4(scene.lights[i].position, 1.f);
+
+                rLight.colour.w = max(max(rLight.colour.x, rLight.colour.y), rLight.colour.z);
+                rLight.colour.x /= 54351.4f;
+                rLight.colour.y /= 54351.4f;
+                rLight.colour.z /= 54351.4f;
+                rLight.colour.w /= 54351.4f;
+
+                std::cout << "Point light:" << std::endl;
+                std::cout << "Colour " << rLight.colour.x << ", " << rLight.colour.y << ", " << rLight.colour.z << ", " << rLight.colour.w << " " << std::endl;
+                std::cout << "Position " << rLight.position.x << ", " << rLight.position.y << ", " << rLight.position.z << ", " << rLight.position.w << " " << std::endl;
+
+                RenderManager::get().lights.emplace_back(rLight);
+            }
+        }
+
         for (int i = 0; i < scene.instances.size(); i++) {
            auto model = World::Get().CreateEntity();
             auto& registry = World::Get().Registry();

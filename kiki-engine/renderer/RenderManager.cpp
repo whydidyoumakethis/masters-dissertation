@@ -1341,8 +1341,17 @@ namespace Kiki {
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
-        aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
-        aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
+        for (int i = 0; i < lights.size(); i++) {
+            // std::cout << i << std::endl;
+            aSceneUniforms.lightPos[i] = lights[i].position;
+            // std::cout << aSceneUniforms.lightPos[i].x << " " << aSceneUniforms.lightPos[i].y << " " << aSceneUniforms.lightPos[i].z << " " << aSceneUniforms.lightPos[i].w << std::endl;
+
+            aSceneUniforms.lightColour[i] = lights[i].colour;
+            // std::cout << aSceneUniforms.lightColour[i].x << " " << aSceneUniforms.lightColour[i].y << " " << aSceneUniforms.lightColour[i].z << " " << aSceneUniforms.lightColour[i].w << std::endl;
+        }
+
+        aSceneUniforms.numLights[0] = lights.size();
+
         aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
 

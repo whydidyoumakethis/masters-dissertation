@@ -61,6 +61,11 @@ namespace Kiki {
         rutils::CubemapPaths paths;
     };
 
+    struct Light {
+        glm::vec4 position;
+        glm::vec4 colour;
+    };
+
     struct WindowExtent {
         uint32_t width;
         uint32_t height;
@@ -162,7 +167,7 @@ namespace Kiki {
         # endif
 
         public:
-
+        std::vector<Light> lights;
 
         rutils::Allocator allocator;
         static RenderManager& get();
@@ -212,8 +217,9 @@ namespace Kiki {
             glm::mat4 camera;
             glm::mat4 projection;
             glm::mat4 projCam;
-            glm::vec4 lightPos;
-            glm::vec4 lightColour;
+            glm::vec4 lightPos[32];
+            glm::vec4 lightColour[32];
+            glm::vec4 numLights;
             glm::vec4 cameraPos;
             glm::vec4 ssaoSamples[16];
         };
