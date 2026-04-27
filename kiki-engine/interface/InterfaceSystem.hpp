@@ -6,6 +6,8 @@
 #include "FontManager.hpp"
 #include "TextureManager.hpp"
 #include "RenderManager.hpp"
+#include "MessageCenter.h"
+#include "InputManager.hpp"
 
 namespace Kiki {
     struct ScaleVec2D {
@@ -19,11 +21,19 @@ namespace Kiki {
         float absoluteY;
     };
 
+    enum ButtonState {
+        NONE,
+        HOVER,
+        BUTTON_DOWN
+    };
+
     class InterfaceSystem : public System {
         private:
         FontManager& fontManager = FontManager::get();
         TextureManager& textureManager = TextureManager::get();
         RenderManager& renderManager = RenderManager::get();
+        MessageCenter& messageCenter = MessageCenter::Get();
+        InputManager& inputManager = InputManager::get();
 
         World& world = World::Get();
         entt::registry& registry = world.Registry();

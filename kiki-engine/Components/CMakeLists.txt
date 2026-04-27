@@ -14,4 +14,5 @@ target_sources(kiki
       BackgroundComponent.hpp
       TextComponent.hpp
       RoughnessMetallicFactorComponent.hpp
+      ButtonComponent.hpp
 )
