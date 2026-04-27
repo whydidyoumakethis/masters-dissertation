@@ -25,6 +25,9 @@ namespace rutils {
     void initialiseSSAOHBlurDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoHBlurDescriptors);
     void initialiseSSAOBlurredDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoBlurredDescriptors);
     void initialiseTonemapDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Sampler& sampler, VkDescriptorSet& tonemapDescriptors);
+
+    DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window);
 }
 
 #endif

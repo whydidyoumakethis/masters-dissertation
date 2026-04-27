@@ -245,6 +245,19 @@ if(MSVC)
     )
 endif()
 
+set(HB_HAVE_FREETYPE OFF CACHE BOOL "" FORCE)
+set(HB_HAVE_GLIB OFF CACHE BOOL "" FORCE)
+set(HB_HAVE_ICU OFF CACHE BOOL "" FORCE)
+set(HB_BUILD_UTILS OFF CACHE BOOL "" FORCE)
+set(HB_BUILD_SUBSET ON CACHE BOOL "" FORCE) 
+
+FetchContent_Declare(
+    harfbuzz
+    GIT_REPOSITORY https://github.com/harfbuzz/harfbuzz.git
+    GIT_TAG        8.3.0  
+)
+FetchContent_MakeAvailable(harfbuzz)
+
 # set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 # -------- Create an interface library to propagate dependencies --------
@@ -282,6 +295,7 @@ target_link_libraries(KikiDeps INTERFACE
     freetype
     msdfgen::msdfgen
     msdfgen::msdfgen-ext
+    harfbuzz
 )
 
 target_include_directories(KikiDeps INTERFACE 

@@ -29,6 +29,10 @@ namespace rutils {
         std::uint32_t height;
     };
 
+    struct ShapeData {
+        glm::vec4 colour;
+    };
+
     struct Pipelines {
         rutils::Pipeline pbr;
         rutils::Pipeline pbr_alpha;
@@ -41,6 +45,8 @@ namespace rutils {
         rutils::Pipeline ssao_hblur;
         rutils::Pipeline ssao_blurred;
         rutils::Pipeline tonemap;
+        rutils::Pipeline interfaceShape;
+        rutils::Pipeline interfaceText;
     };
 
     struct PipelineLayouts {
@@ -51,6 +57,8 @@ namespace rutils {
         PipelineLayout ssaoPipelineLayout;
         PipelineLayout ssaoBlurPipelineLayout;
         PipelineLayout tonemapPipelineLayout;
+        PipelineLayout interfaceShapeLayout;
+        PipelineLayout interfaceTextLayout;
     };
 
     Pipelines createAllPipelines(
@@ -63,6 +71,7 @@ namespace rutils {
     PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout);
     PipelineLayout createSSAOBlurPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaoBlurLayout);
     PipelineLayout createTonemapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout tonemapLayout);
+    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
@@ -75,6 +84,8 @@ namespace rutils {
     Pipeline createSSAOHBlurPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSAOBlurredPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createTonemapPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+
+    Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
 
 #endif

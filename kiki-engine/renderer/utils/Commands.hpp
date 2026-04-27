@@ -15,32 +15,33 @@ namespace rutils {
     VkCommandBuffer allocCommandBuffer(VulkanWindow const& window, VkCommandPool pool);
 
     void recordCommands(
-		VkCommandBuffer,
-		# ifdef TRACY_VK_ENABLE
+        VkCommandBuffer aCmdBuff,
+# ifdef TRACY_VK_ENABLE
         TracyVkCtx tracyVkCtx,
 		# endif
-		Pipelines const&,
-		PipelineLayouts const&,
-		ImageAndView const& swapchainImage,
-		Image const& aDepthAttach,
-		GBuffers& gbuffers,
-		VkExtent2D const&,
-		VkBuffer aSceneUBO,
-		Kiki::RenderManager::SceneUniform const&,
-		VkDescriptorSet aSceneDescriptors,
-		VkDescriptorSet ssaoDescriptors,
-		VkDescriptorSet ssaoHBlurDescriptors,
-		VkDescriptorSet ssaoBlurredDescriptors,
-		VkDescriptorSet deferredLightingDescriptors,
-		VkDescriptorSet ffxaDescriptors,
-		VkDescriptorSet ssrDescriptors,
-		VkDescriptorSet tonemapDescriptors,
-		VkDescriptorSet noTexture,
-		Kiki::Skybox const& skybox,
-		Image const& doneLightingImage,
-		Image const& doneSSRImage,
-		Image const& doneTonemapImage
-	);
+        Pipelines const&,
+        PipelineLayouts const&,
+        ImageAndView const& swapchainImage,
+        Image const& aDepthAttach,
+        GBuffers& gbuffers,
+        VkExtent2D const&,
+        VkBuffer aSceneUBO,
+        Kiki::RenderManager::SceneUniform const&,
+        VkDescriptorSet aSceneDescriptors,
+        VkDescriptorSet ssaoDescriptors,
+        VkDescriptorSet ssaoHBlurDescriptors,
+        VkDescriptorSet ssaoBlurredDescriptors,
+        VkDescriptorSet deferredLightingDescriptors,
+        VkDescriptorSet ffxaDescriptors,
+        VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet noTexture,
+        Kiki::Skybox const& skybox,
+        Image const& doneLightingImage,
+        Image const& doneSSRImage,
+        Image const& doneTonemapImage,
+        VkBuffer interfaceUBO, Kiki::RenderManager::InterfaceUniform const& interfaceUniform, VkDescriptorSet interfaceDescriptors, VkBuffer interfaceIndexBuffer
+    );
 
 	void submitCommands(
 		VulkanWindow const&,

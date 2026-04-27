@@ -554,4 +554,49 @@ namespace rutils {
 
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
     }
+
+    DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+        bindings[0].binding = 0; // number must match the index of the corresponding
+        // binding = N declaration in the shader(s)!
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n"
+                "vkCreateDescriptorSetLayout() returned {}", toString(res)
+            );
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // msdf
+        bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // different to create_scene_descriptor_layout
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", rutils::toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
 }

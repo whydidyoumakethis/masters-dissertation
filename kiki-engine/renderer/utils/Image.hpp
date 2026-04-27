@@ -51,6 +51,8 @@ namespace rutils {
 
 
 	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+	Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator);
+	Image createFontAtlasTexture(Allocator const& aAllocator, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat aFormat, VulkanWindow const& window, VkImageUsageFlags aUsage);
 
 	Image createImageTexture(
 		Allocator const&,
@@ -65,6 +67,7 @@ namespace rutils {
 	);
 
     Sampler createSampler(VulkanWindow const&, bool isCubemapSampler = false);
+	Sampler createFontSampler(VulkanWindow const&);
 
 	Image loadCubemapTexture(
 		std::array<stbi_uc*, 6> faces,
