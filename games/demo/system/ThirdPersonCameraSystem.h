@@ -27,11 +27,13 @@ public:
 		}
 	}
 	void OnStart() override {
-		auto objects = World::Get().Query< CharacterComponent >();
+		auto objects = World::Get().Query<CharacterComponent, PhysicalAttributesComponent>();
+
 		if (auto tpcc = World::Get().GetComponent<ThirdPersonCameraComponent>(camera.camera)) {
-			// if consider mutiple characters, we can add a condition to determine which character to follow, for now we just follow the first one we find
-			for (auto [entity, i] : objects.each()) {
+			for (auto [entity, chara, phys] : objects.each()) {
 				tpcc->followTarget = entity;
+				spdlog::info("Camera follow target locked to entity ID: {}", (uint32_t)entity);
+				break;
 			}
 		}
 		World::Get().GetComponent<CameraComponent>(camera.camera)->isMain = true;

@@ -9,8 +9,10 @@
 #include <stb_image.h>
 #include <Components/ColourComponent.hpp>
 #include <assimp/GltfMaterial.h>
+#include "Animation/Skeleton.h"
+#include "Animation/AnimationLoader.h"
 
-#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals
+#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals | aiProcess_LimitBoneWeights
 
 using namespace std;
 struct Mmesh {
@@ -19,7 +21,11 @@ struct Mmesh {
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
-	int matIndex = 0;
+
+	std::vector<glm::ivec4> boneIDs;
+	std::vector<glm::vec4> weights;
+
+	int matIndex;
 
 	std::vector<glm::vec4> tangents;
 	std::vector<glm::vec3> bitangents;
@@ -199,12 +205,35 @@ struct Mscene {
 	std::vector<Mtexture> textures;
 	std::vector<Mlights> lights;
 	glm::mat4 worldTransform;
+	// === 新增：用于存储动画和骨骼数据 ===
+	std::unique_ptr<Kiki::Skeleton> skeleton = nullptr;
+	std::map<std::string, std::unique_ptr<Kiki::Animation>> animations;
+	bool hasAnimations = false;
 };
 
 namespace Kiki {
 	class GltfLoaderAssimp {
 	public:
-		static Mmesh loadMesh(const std::filesystem::path& path, int index) {
+		static void AddBoneData(
+			glm::ivec4& ids,
+			glm::vec4& weights,
+			int boneID,
+			float weight
+		) {
+			for (int i = 0; i < 4; i++) {
+				if (weights[i] == 0.0f) {
+					ids[i] = boneID;
+					weights[i] = weight;
+					return;
+				}
+			}
+		}
+
+		static Mmesh loadMesh(
+			const std::filesystem::path& path,
+			int index,
+			const Skeleton& skeleton)
+		{
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -217,6 +246,8 @@ namespace Kiki {
 			out.normals.reserve(mesh->mNumVertices);
 			out.uvs.reserve(mesh->mNumVertices);
 			out.matIndex = mesh->mMaterialIndex;
+			out.boneIDs.resize(mesh->mNumVertices, glm::ivec4(0));
+			out.weights.resize(mesh->mNumVertices, glm::vec4(0.0f));
 			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
 				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
@@ -230,6 +261,39 @@ namespace Kiki {
 				aiFace face = mesh->mFaces[i];
 				for (unsigned int j = 0; j < face.mNumIndices; j++) {
 					out.indices.push_back(face.mIndices[j]);
+				}
+			}
+			
+
+			for (unsigned int i = 0; i < mesh->mNumBones; i++) {
+				aiBone* bone = mesh->mBones[i];
+
+				std::string boneName = bone->mName.C_Str();
+
+				int boneID = skeleton.FindBoneIndex(boneName);
+				if (boneID == -1) continue;
+
+				for (unsigned int w = 0; w < bone->mNumWeights; w++) {
+					int vertexID = bone->mWeights[w].mVertexId;
+					float weight = bone->mWeights[w].mWeight;
+
+					AddBoneData(
+						out.boneIDs[vertexID],
+						out.weights[vertexID],
+						boneID,
+						weight
+					);
+				}
+			}
+			for (size_t i = 0; i < out.weights.size(); i++) {
+				float sum =
+					out.weights[i].x +
+					out.weights[i].y +
+					out.weights[i].z +
+					out.weights[i].w;
+
+				if (sum > 0.0f) {
+					out.weights[i] /= sum;
 				}
 			}
 			return out;
@@ -468,6 +532,19 @@ namespace Kiki {
 			auto& t = scene->mRootNode->mTransformation;
 			out.worldTransform = toglmMat4(t);
 
+			if (scene->HasAnimations()) {
+				out.hasAnimations = true;
+				out.skeleton = AnimationLoader::LoadSkeleton(scene);
+
+				if (out.skeleton) {
+					for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
+						std::string animName = scene->mAnimations[i]->mName.C_Str();
+						std::transform(animName.begin(), animName.end(), animName.begin(), ::tolower);
+						out.animations[animName] = AnimationLoader::LoadAnimation(scene, *out.skeleton, i);
+					}
+				}
+			}
+
 			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
 
 			collectLights(scene, out);
@@ -512,6 +589,36 @@ namespace Kiki {
 					aiFace face = aiMesh->mFaces[j];
 					for (unsigned int k = 0; k < face.mNumIndices; k++) {
 						mesh.indices.push_back(face.mIndices[k]);
+					}
+				}
+
+				mesh.boneIDs.resize(aiMesh->mNumVertices, glm::ivec4(0));
+				mesh.weights.resize(aiMesh->mNumVertices, glm::vec4(0.0f));
+
+				if (out.skeleton) {
+					for (unsigned int b = 0; b < aiMesh->mNumBones; b++) {
+						aiBone* bone = aiMesh->mBones[b];
+						std::string boneName = bone->mName.C_Str();
+
+						int boneID = out.skeleton->FindBoneIndex(boneName);
+						if (boneID == -1) continue;
+
+						for (unsigned int w = 0; w < bone->mNumWeights; w++) {
+							int vertexID = bone->mWeights[w].mVertexId;
+							float weight = bone->mWeights[w].mWeight;
+
+							AddBoneData(
+								mesh.boneIDs[vertexID],
+								mesh.weights[vertexID],
+								boneID,
+								weight
+							);
+						}
+					}
+
+					for (size_t v = 0; v < mesh.weights.size(); v++) {
+						float sum = mesh.weights[v].x + mesh.weights[v].y + mesh.weights[v].z + mesh.weights[v].w;
+						if (sum > 0.0f) mesh.weights[v] /= sum;
 					}
 				}
 				out.meshes.push_back(mesh);

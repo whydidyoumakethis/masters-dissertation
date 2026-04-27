@@ -21,7 +21,16 @@ namespace Kiki {
         int createMaterial(Mtexture& texture);
         Material const& getMaterial(int id);
 
-        int createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords, std::vector<glm::vec4> const& tangents);
+        int createMesh(
+            std::vector<glm::vec3> const& positions,
+            std::vector<std::uint32_t> const& indices,
+            std::vector<glm::vec3> const& normals,
+            std::vector<glm::vec2> const& texCoords,
+            std::vector<glm::vec4> const& tangents,
+            std::vector<glm::ivec4> const& boneIDs,
+            std::vector<glm::vec4> const& weights
+        );
+
         Mesh& getMesh(int id);
 
         void clearLevel();
@@ -29,7 +38,7 @@ namespace Kiki {
 
         entt::entity loadModel(const std::string path, const std::string name = "Object", PhysicsType type = PhysicsType::Static);
 
-        void loadScene(const Mscene& scene);
+        void loadScene(Mscene scene);
 
         bool validMaterial(int id);
         bool validMesh(int id);
