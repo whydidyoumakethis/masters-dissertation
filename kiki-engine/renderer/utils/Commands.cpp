@@ -896,9 +896,9 @@ vkCmdEndRendering(aCmdBuff);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
 
             SSRSettings ssrSettings;
-            ssrSettings.settings.x = 128; // maxSteps
-            ssrSettings.settings.y = 6; // binarySteps
-            ssrSettings.settings.z = 0.1f; // stepSize
+            ssrSettings.settings.x = 16; // maxSteps
+            ssrSettings.settings.y = 4; // binarySteps
+            ssrSettings.settings.z = 0.5f; // stepSize
             ssrSettings.settings.w = 0.2f; // thicknessTolerance
 
             // TODO: debug, could change the ssr settings here :)
