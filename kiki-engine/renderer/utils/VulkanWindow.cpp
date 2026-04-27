@@ -207,6 +207,7 @@ namespace rutils {
 
 		// Create GLFW Window and the Vulkan surface
         glfwWindowHint( GLFW_CLIENT_API, GLFW_NO_API );
+		glfwWindowHint(GLFW_COCOA_RETINA_FRAMEBUFFER, GLFW_FALSE);
 
 		// Get details of the monitor
 		int count;

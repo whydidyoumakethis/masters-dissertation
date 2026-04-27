@@ -2,6 +2,7 @@
 #define KIKI_INTERFACE_FONTMANAGER
 
 #include "utils/Font.hpp"
+#include "utils/LatinAlphabet.hpp"
 #include "renderer/RenderManager.hpp"
 
 #include <msdfgen.h>
@@ -50,7 +51,7 @@ namespace Kiki {
         void shutdown();
 
         iutils::Font& getFont(std::string name);
-        std::string loadFont(std::filesystem::path path, std::string name = "", std::u32string characters = U"", int baseSize = 48);
+        std::string loadFont(std::filesystem::path path, std::string name = "", std::u32string characters = LATIN_ALPHABET, int baseSize = 48);
         void addCharacters(iutils::Font* font, std::u32string characters);
         void deleteFont(std::string name);
         void deleteAllFonts();

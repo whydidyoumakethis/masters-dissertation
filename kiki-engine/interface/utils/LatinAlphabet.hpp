@@ -1,0 +1,3 @@
+#ifndef LATIN_ALPHABET
+#define LATIN_ALPHABET U"AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz"
+#endif

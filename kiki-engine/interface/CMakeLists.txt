@@ -13,6 +13,7 @@ target_sources(kiki
       FontManager.hpp   
       events/ButtonClickEvent.hpp
       events/ButtonHoverEvent.hpp   
+      utils/LatinAlphabet.hpp
 
   PRIVATE
     FILE_SET interfacePrivateHeaders
