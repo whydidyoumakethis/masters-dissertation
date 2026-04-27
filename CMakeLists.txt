@@ -20,6 +20,15 @@ set(MSDF_ATLAS_DYNAMIC_RUNTIME ON CACHE BOOL "" FORCE)
 
 set(FREETYPE_LIBRARY_TYPE STATIC CACHE INTERNAL "")
 
+option(ENABLE_TRACY "Enable Tracy for profiling" ON)
+
+if (APPLE)
+option(ENABLE_TRACY_VK "Enable Tracy for Vulkan GPU profiling" OFF)
+else()
+option(ENABLE_TRACY_VK "Enable Tracy for Vulkan GPU profiling" ON)
+endif()
+
+
 # --- Jolt Physics Configuration ---
 # Must be set before FetchContent to ensure Jolt builds with correct settings
 # Use dynamic MSVC runtime to match the rest of the engine (Fixes LNK2038)
@@ -89,7 +98,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(
-    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog
+    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog 
 )
 
 # --- Shader Compilation ---
@@ -113,6 +122,9 @@ foreach(shader IN LISTS SHADERS)
 endforeach()
 
 add_custom_target(shaders ALL DEPENDS ${COMPILED_SHADERS})
+
+# --- KikiDeps Interface ---
+
 
 # stb
 FetchContent_Declare(
@@ -231,11 +243,43 @@ if(MSVC)
     )
 endif()
 
+set(HB_HAVE_FREETYPE OFF CACHE BOOL "" FORCE)
+set(HB_HAVE_GLIB OFF CACHE BOOL "" FORCE)
+set(HB_HAVE_ICU OFF CACHE BOOL "" FORCE)
+set(HB_BUILD_UTILS OFF CACHE BOOL "" FORCE)
+set(HB_BUILD_SUBSET ON CACHE BOOL "" FORCE) 
+
+FetchContent_Declare(
+    harfbuzz
+    GIT_REPOSITORY https://github.com/harfbuzz/harfbuzz.git
+    GIT_TAG        8.3.0  
+)
+FetchContent_MakeAvailable(harfbuzz)
+
 # set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
 
 # -------- Create an interface library to propagate dependencies --------
 # This helps your subdirectories automatically get volk, glfw, glm
 add_library(KikiDeps INTERFACE)
+
+
+# tracy
+if (ENABLE_TRACY)
+    FetchContent_Declare(
+        tracy
+        GIT_REPOSITORY "https://github.com/wolfpld/tracy.git"
+        GIT_TAG        "v0.13.1"
+    )
+
+    set(TRACY_ENABLE ON CACHE BOOL "" FORCE)
+
+    if (ENABLE_TRACY_VK)
+        target_compile_definitions(KikiDeps INTERFACE TRACY_VK_ENABLE)
+    endif()
+
+    FetchContent_MakeAvailable(tracy)
+    target_link_libraries(KikiDeps INTERFACE Tracy::TracyClient)
+endif()
 
 target_link_libraries(KikiDeps INTERFACE 
     volk 
@@ -249,6 +293,7 @@ target_link_libraries(KikiDeps INTERFACE
     freetype
     msdfgen::msdfgen
     msdfgen::msdfgen-ext
+    harfbuzz
 )
 
 target_include_directories(KikiDeps INTERFACE 

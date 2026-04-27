@@ -1,15 +1,16 @@
 #ifndef KIKI_RENDERER
 #define KIKI_RENDERER
 
-#include "../Components/MaterialComponent.hpp"
-#include "../Components/MeshComponent.hpp"
-#include "../Components/TransparencyComponent.hpp"
+#include "Components/MaterialComponent.hpp"
+#include "Components/MeshComponent.hpp"
+#include "Components/TransparencyComponent.hpp"
 #include "utils/VulkanWindow.hpp"
 #include "utils/VulkanWrapper.hpp"
 #include "utils/Synchronisation.hpp"
 #include "utils/Allocator.hpp"
 #include "utils/Buffer.hpp"
 #include "utils/Image.hpp"
+#include "interface/utils/Font.hpp"
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
 #include "utils/Pipelines.hpp"
@@ -23,6 +24,8 @@
 #include <cstring>
 
 #include <imgui_impl_vulkan.h>
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
 
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -34,6 +37,7 @@ namespace Kiki {
         rutils::Buffer texCoords;
         rutils::Buffer normals;
         rutils::Buffer indices;
+        rutils::Buffer tangents;
         rutils::Buffer boneIDs;
         rutils::Buffer weights;
         std::uint32_t vertexCount;
@@ -43,7 +47,10 @@ namespace Kiki {
     struct Material {
         rutils::Image texture;
         rutils::Image roughnessMetalness;
+        rutils::Image normalMap;
         VkDescriptorSet descriptorSet;
+        bool hasTexture = false;
+        bool hasNormalMap = false;
     };
 
     struct Skybox {
@@ -52,6 +59,11 @@ namespace Kiki {
         VkDescriptorSet descriptorSet;
         Mesh mesh;
         rutils::CubemapPaths paths;
+    };
+
+    struct WindowExtent {
+        uint32_t width;
+        uint32_t height;
     };
 
     struct ShaderPaths {
@@ -68,6 +80,12 @@ namespace Kiki {
         std::filesystem::path fxaa_f = "fxaa.frag.spv";
         std::filesystem::path ssr_f = "ssr.frag.spv";
         std::filesystem::path ssao_f = "ssao.frag.spv";
+        std::filesystem::path ssao_hblur_f = "ssao_hblur.frag.spv";
+        std::filesystem::path ssao_vblur_f = "ssao_vblur.frag.spv";
+        std::filesystem::path tonemap_f = "tonemap.frag.spv";
+        std::filesystem::path interface_v = "interface.vert.spv";
+        std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
+        std::filesystem::path interface_text_f = "interface_text.frag.spv";
     };
 
     class RenderManager {
@@ -93,6 +111,8 @@ namespace Kiki {
         rutils::CommandPool commandPool;
 
         rutils::Buffer sceneUBO;
+        rutils::Buffer interfaceUBO;
+        rutils::Buffer interfaceIndices;
 
         std::size_t frameIndex = 0;
         std::vector<VkCommandBuffer> commandBuffers;
@@ -101,21 +121,32 @@ namespace Kiki {
         rutils::DescriptorPool descriptorPool;
 
         rutils::DescriptorSetLayout sceneLayout;
+        rutils::DescriptorSetLayout interfaceLayout;
+        rutils::DescriptorSetLayout textLayout;
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
+        rutils::DescriptorSetLayout ssaoLayout;
+        rutils::DescriptorSetLayout ssaoBlurredLayout;
+        rutils::DescriptorSetLayout tonemapLayout;
         VkDescriptorSet sceneDescriptors;
+        VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
         VkDescriptorSet fxaaDescriptors;
         VkDescriptorSet ssrDescriptors;
         VkDescriptorSet ssaoDescriptors;
+        VkDescriptorSet ssaoHBlurDescriptors;
+        VkDescriptorSet ssaoBlurredDescriptors;
+        VkDescriptorSet tonemapDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
-        rutils::Image doneSSAOImage;
+        rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
         rutils::Sampler sampler;
+        rutils::Sampler fontSampler;
 
         rutils::Image noTexture;
+        rutils::Image noNormalMap;
         VkDescriptorSet noTextureDst;
 
         Skybox skybox;
@@ -124,6 +155,11 @@ namespace Kiki {
 
         rutils::Buffer dummyAnimationBuffer;
         VkDescriptorSet dummyAnimationDesc;
+        std::vector<glm::vec4> ssaoSamples;
+
+        # ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx;
+        # endif
 
         public:
 
@@ -136,6 +172,7 @@ namespace Kiki {
             std::vector<std::uint32_t> indices,
             std::vector<float> normals,
             std::vector<float> texCoords,
+            std::vector<float> tangents,
             std::vector<int> boneIDs,    
             std::vector<float> weights    
         );
@@ -143,6 +180,7 @@ namespace Kiki {
         rutils::Buffer allocateAnimationBuffer();
         VkDescriptorSet allocateAnimationDescriptorSet(const rutils::Buffer& buffer);
 
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents);
         Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});
@@ -167,6 +205,10 @@ namespace Kiki {
         void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
         void recreatePipelines();
 
+        void loadFontAtlas(iutils::Font* font, std::vector<uint8_t> atlas);
+        rutils::Buffer updateInterfaceVertices(std::vector<float> positions);
+        WindowExtent getWindowExtent();
+
         struct SceneUniform {
             glm::mat4 camera;
             glm::mat4 projection;
@@ -174,6 +216,11 @@ namespace Kiki {
             glm::vec4 lightPos;
             glm::vec4 lightColour;
             glm::vec4 cameraPos;
+            glm::vec4 ssaoSamples[16];
+        };
+
+        struct InterfaceUniform {
+            glm::mat4 projection;
         };
 
         rutils::CommandPool tempTextureCmdPool;
@@ -185,6 +232,7 @@ namespace Kiki {
         static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
 
         ShaderPaths shaderPaths;
+        SceneUniform sceneUniforms;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);

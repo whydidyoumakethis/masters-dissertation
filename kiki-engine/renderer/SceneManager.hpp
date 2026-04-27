@@ -26,8 +26,11 @@ namespace Kiki {
             std::vector<std::uint32_t> const& indices,
             std::vector<glm::vec3> const& normals,
             std::vector<glm::vec2> const& texCoords,
+            std::vector<glm::vec4> const& tangents,
             std::vector<glm::ivec4> const& boneIDs,
-            std::vector<glm::vec4> const& weights);
+            std::vector<glm::vec4> const& weights\
+        );
+
         Mesh& getMesh(int id);
 
         void clearLevel();

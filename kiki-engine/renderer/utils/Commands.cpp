@@ -6,6 +6,11 @@
 #include "Components/TransparencyComponent.hpp"
 #include "Components/ColourComponent.hpp"
 #include "Animation/AnimationComponent.h"
+#include "Components/RoughnessMetallicFactorComponent.hpp"
+#include "Components/InterfaceComponent.hpp"
+#include "Components/TextComponent.hpp"
+#include "Components/BackgroundComponent.hpp"
+#include "interface/FontManager.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -13,7 +18,8 @@
 #include "../../ECS/World.h"
 
 #include <iostream>
-
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
 
 namespace rutils {
     CommandPool createCommandPool(VulkanWindow const& window, VkCommandPoolCreateFlags flags) {
@@ -49,9 +55,38 @@ namespace rutils {
         return cbuff;
     }
 
-    void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& swapchainImage, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors,	VkDescriptorSet fxaaDescriptors, VkDescriptorSet ssrDescriptors,
-        VkDescriptorSet ssaoDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox, Image const& doneLightingImage, Image const& doneSSAOImage, Image const& doneSSRImage, VkDescriptorSet dummyAnimationDesc) {
+    void recordCommands(
+        VkCommandBuffer aCmdBuff,
+# ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx,
+# endif
+        Pipelines const& pipelines,
+        PipelineLayouts const& pipelineLayouts,
+        ImageAndView const& swapchainImage,
+        Image const& aDepthAttach,
+        GBuffers& gbuffers,
+        VkExtent2D const& aImageExtent, 
+        VkBuffer aSceneUBO,
+        Kiki::RenderManager::SceneUniform const& aSceneUniform,
+        VkDescriptorSet aSceneDescriptors,
+        VkDescriptorSet ssaoDescriptors,
+        VkDescriptorSet ssaoHBlurDescriptors,
+		    VkDescriptorSet ssaoBlurredDescriptors,
+        VkDescriptorSet deferredLightingDescriptors,
+        VkDescriptorSet fxaaDescriptors,
+		    VkDescriptorSet ssrDescriptors,
+		    VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet noTexture,
+        Kiki::Skybox const& skybox,
+        Image const& doneLightingImage,
+        Image const& doneSSRImage,
+        Image const& doneTonemapImage,
+        VkBuffer interfaceUBO,
+        Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
+        VkDescriptorSet interfaceDescriptors,
+        VkBuffer interfaceIndexBuffer,
+        VkDescriptorSet dummyAnimationDesc
+    ) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -64,8 +99,33 @@ namespace rutils {
             );
         }
 
-        // Upload scene uniforms
+        {
+            ZoneScopedN("Uploading scene UBO");
+
+            // Upload scene uniforms
+            rutils::bufferBarrier(aCmdBuff, aSceneUBO,
+                /* Before */
+                VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+                VK_ACCESS_2_UNIFORM_READ_BIT,
+                /* A f t e r */
+                VK_PIPELINE_STAGE_2_CLEAR_BIT,// vkCmdUpdateBuffer() is a ”clear command”
+                VK_ACCESS_2_TRANSFER_WRITE_BIT
+            );
+
+            vkCmdUpdateBuffer( aCmdBuff, aSceneUBO, 0, sizeof(Kiki::RenderManager::SceneUniform), &aSceneUniform );
+
         rutils::bufferBarrier(aCmdBuff, aSceneUBO,
+                /* Before */
+                VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                /* A f t e r */
+                VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+                VK_ACCESS_2_UNIFORM_READ_BIT
+            );
+        }
+
+        // Upload interface uniforms
+        rutils::bufferBarrier(aCmdBuff, interfaceUBO,
             /* Before */
             VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
             VK_ACCESS_2_UNIFORM_READ_BIT,
@@ -74,9 +134,9 @@ namespace rutils {
             VK_ACCESS_2_TRANSFER_WRITE_BIT
         );
 
-        vkCmdUpdateBuffer( aCmdBuff, aSceneUBO, 0, sizeof(Kiki::RenderManager::SceneUniform), &aSceneUniform );
+        vkCmdUpdateBuffer(aCmdBuff, interfaceUBO, 0, sizeof(Kiki::RenderManager::InterfaceUniform), &interfaceUniform);
 
-        rutils::bufferBarrier(aCmdBuff, aSceneUBO,
+        rutils::bufferBarrier(aCmdBuff, interfaceUBO,
             /* Before */
             VK_PIPELINE_STAGE_2_CLEAR_BIT,
             VK_ACCESS_2_TRANSFER_WRITE_BIT,
@@ -85,74 +145,79 @@ namespace rutils {
             VK_ACCESS_2_UNIFORM_READ_BIT
         );
 
-        // Barrier: Ensure the color attachment image is in the right layout
-        rutils::imageBarrier(aCmdBuff, doneLightingImage.image,
-            /* Before */
-            VK_PIPELINE_STAGE_2_NONE,
-            VK_ACCESS_2_NONE,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            /* A f t e r */
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        );
+        {
+            ZoneScopedN("Initial image barriers");
 
-        rutils::imageBarrier(aCmdBuff, aDepthAttach.image,
-            /* Before */
-            VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            /* A f t e r */
-            VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-            VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-            /* What */
-            VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 }
-        );
+            // Barrier: Ensure the color attachment image is in the right layout
+            rutils::imageBarrier(aCmdBuff, doneLightingImage.image,
+                /* Before */
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                /* A f t e r */
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
 
-        rutils::imageBarrier(aCmdBuff, gbuffers.textureColour.image,
-			// before
-			VK_PIPELINE_STAGE_2_NONE,
-			VK_ACCESS_2_NONE,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			// after
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-		);
-	
-		rutils::imageBarrier(aCmdBuff, gbuffers.normals.image,
-			// before
-			VK_PIPELINE_STAGE_2_NONE,
-			VK_ACCESS_2_NONE,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			// after
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-		);
-	
-		rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
-			// before
-			VK_PIPELINE_STAGE_2_NONE,
-			VK_ACCESS_2_NONE,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			// after
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-		);
+            rutils::imageBarrier(aCmdBuff, aDepthAttach.image,
+                /* Before */
+                VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                /* A f t e r */
+                VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                /* What */
+                VkImageSubresourceRange{ VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1 }
+            );
 
-		rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
-			// before
-			VK_PIPELINE_STAGE_2_NONE,
-			VK_ACCESS_2_NONE,
-			VK_IMAGE_LAYOUT_UNDEFINED,
-			// after
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-		);
+            rutils::imageBarrier(aCmdBuff, gbuffers.textureColour.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+        
+            rutils::imageBarrier(aCmdBuff, gbuffers.normals.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+        
+            rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.mappedNormals.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+        }
+        
 
 		// begin rendering
 		VkRenderingAttachmentInfo gBufferAttachments[4]{};
@@ -190,9 +255,9 @@ namespace rutils {
 		gBufferAttachments[2].clearValue.color.float32[2] = 0.f;
 		gBufferAttachments[2].clearValue.color.float32[3] = 0.f;
 
-        // world pos
+        // mapped normals
 		gBufferAttachments[3].sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		gBufferAttachments[3].imageView = gbuffers.worldPos.view;
+		gBufferAttachments[3].imageView = gbuffers.mappedNormals.view;
 		gBufferAttachments[3].imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
 		gBufferAttachments[3].loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
 		gBufferAttachments[3].storeOp = VK_ATTACHMENT_STORE_OP_STORE;
@@ -219,38 +284,139 @@ namespace rutils {
         renderInfo.pColorAttachments = gBufferAttachments;
         renderInfo.pDepthAttachment = &depthAttach;
 
-        vkCmdBeginRendering( aCmdBuff, &renderInfo );
+        {
+            ZoneScopedN("Recording g-buffer pass");
 
-        // Begin drawing with our graphics pipeline
-        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry.handle );
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "G-buffer pass");
+            #endif
 
+            vkCmdBeginRendering( aCmdBuff, &renderInfo );
 
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+            std::vector<entt::entity> transparent;
 
-        auto& world = World::Get();
-        auto& registry = world.Registry();
-        auto view = world.Query<TransformComponent, MeshComponent>();
+            auto& world = World::Get();
+            auto& registry = world.Registry();
+            auto view = world.Query<TransformComponent, MeshComponent>();
+            Kiki::SceneManager& sceneManager = Kiki::SceneManager::get();
 
-        Kiki::SceneManager& sceneManager = Kiki::SceneManager::get();
+            {
+                ZoneScopedN("Recording opaque draws");
 
-        std::vector<entt::entity> transparent;
+                // Begin drawing with our graphics pipeline
+                vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry.handle );
 
-        // TODO: Update so all objects with same material are drawn at same time to minimise descriptor set bind calls
-        for (auto [e, transform, meshComponent] : view.each()) {
-            if (sceneManager.validMesh(meshComponent.id)) {
-                if (!registry.all_of<TransparencyComponent>(e)) {
-                    Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(meshComponent.id);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+
+                // TODO: Update so all objects with same material are drawn at same time to minimise descriptor set bind calls
+                for (auto [e, transform, meshComponent] : view.each()) {
+                    if (sceneManager.validMesh(meshComponent.id)) {
+                        if (!registry.all_of<TransparencyComponent>(e)) {
+                            Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(meshComponent.id);
+
+                            glm::vec4 flags;
+                            flags.x = 0.f; // sprite
+                            flags.y = 1.f; // useTexture
+                            flags.z = 1.f; // roughnessFactor
+                            flags.w = 1.f; // metalnessFactor
+
+                            if (registry.all_of<MaterialComponent>(e)) {
+                                auto materialComponent = world.GetComponent<MaterialComponent>(e);
+
+                                if (sceneManager.validMaterial(materialComponent->id)) {
+                                    Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
+
+                                    // if material doesn't have a texture, use base colour instead
+                                    if (material.hasTexture == false) {
+                                        flags.y = 0.f;
+                                    }
+
+                                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
+                                } else {
+                                    flags.y = 0.f;
+                                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
+                                }
+                            } else {
+                                flags.y = 0.f;
+                                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
+                            }
+
+                            glm::vec3 colour;
+
+                            if (registry.all_of<ColourComponent>(e)) {
+                                colour = registry.get<ColourComponent>(e).colour;
+                            } else {
+                                colour = glm::vec3(0.3f, 0.3f, 0.3f);
+                            }
+
+                            glm::vec2 roughnessMetalnessFactors;
+
+                            if (registry.all_of<RoughnessMetallicFactorComponent>(e)) {
+                                roughnessMetalnessFactors = registry.get<RoughnessMetallicFactorComponent>(e).roughnessMetallicFactors;
+                                flags.z = roughnessMetalnessFactors.r;
+                                flags.w = roughnessMetalnessFactors.g;
+                            }
+                            else {
+                                roughnessMetalnessFactors = glm::vec2(1.f, 1.f);
+                            }
+
+                            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f), flags);
+
+                            // Bind vertex input
+                            VkBuffer buffers[4] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer, mesh.tangents.buffer };
+                            VkDeviceSize offsets[4]{};
+
+                            vkCmdBindVertexBuffers(aCmdBuff, 0, 4, buffers, offsets);
+                            vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+
+                            // Draw mesh
+                            vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+                        } else {
+                            transparent.emplace_back(e);
+                        }
+                    }
+                }
+            }
+
+            {
+                ZoneScopedN("Recording transparent draws");
+
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry_alpha.handle);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+
+                // TODO: sort transparent objects
+
+                for (auto e : transparent) {
+                    Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
+                    TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
+                    TransformComponent const& transform = registry.get<TransformComponent>(e);
+
+                    glm::vec4 flags;
+                    flags.x = 0.f; // sprite
+                    flags.y = 1.f; // useTexture
+                    flags.z = 1.f; // roughnessFactor
+                    flags.w = 1.f; // metalnessFactor
 
                     if (registry.all_of<MaterialComponent>(e)) {
                         auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
                         if (sceneManager.validMaterial(materialComponent->id)) {
                             Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
+
+                            // if material doesn't have a texture, use base colour instead
+                            if (material.hasTexture == false) {
+                                flags.y = 0.f;
+                            }
+
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
                         } else {
+                            flags.y = 0.f;
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                         }
                     } else {
+                        flags.y = 0.f;
                         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
                     }
 
@@ -262,19 +428,37 @@ namespace rutils {
                         colour = glm::vec3(0.3f, 0.3f, 0.3f);
                     }
 
-                    ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f));
+                    if (transparentComponent.sprite) {
+                        flags.x = 1.f;
+                    }
+
+
+                    glm::vec2 roughnessMetalnessFactors;
+
+                    if (registry.all_of<RoughnessMetallicFactorComponent>(e)) {
+                        roughnessMetalnessFactors = registry.get<RoughnessMetallicFactorComponent>(e).roughnessMetallicFactors;
+                        flags.z = roughnessMetalnessFactors.r;
+                        flags.w = roughnessMetalnessFactors.g;
+                    }
+                    else {
+                        roughnessMetalnessFactors = glm::vec2(1.f, 1.f);
+                    }
+
+                    ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), flags);
 
                     // Bind vertex input
-                    VkBuffer buffers[5] = {
+                    VkBuffer buffers[6] = {
                         mesh.positions.buffer,
                         mesh.texCoords.buffer,
                         mesh.normals.buffer,
+                        mesh.tangents.buffer,
                         mesh.boneIDs.buffer, 
                         mesh.weights.buffer 
                     };
-                    VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
 
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 5, buffers, offsets);
+                    VkDeviceSize offsets[6] = { 0, 0, 0, 0, 0 };
+
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 6, buffers, offsets);
                     vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                     vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
@@ -306,380 +490,613 @@ namespace rutils {
 
                     // Draw mesh
                     vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
-                } else {
-                    transparent.emplace_back(e);
                 }
+
+                // End rendering
+                vkCmdEndRendering(aCmdBuff);
             }
         }
 
-        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_geometry_alpha.handle);
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+        {
+            ZoneScopedN("G-buffer pass to lighting pass barriers");
 
-        // TODO: sort transparent objects
+            // ensure g buffer images are in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            rutils::imageBarrier(aCmdBuff, gbuffers.textureColour.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        
+            rutils::imageBarrier(aCmdBuff, gbuffers.normals.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        
+            rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
 
-        for (auto e : transparent) {
-            Kiki::Mesh const& mesh = Kiki::SceneManager::get().getMesh(registry.get<MeshComponent>(e).id);
-            TransparencyComponent transparentComponent = registry.get<TransparencyComponent>(e);
-            TransformComponent const& transform = registry.get<TransformComponent>(e);
+            rutils::imageBarrier(aCmdBuff, gbuffers.mappedNormals.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
 
-            if (registry.all_of<MaterialComponent>(e)) {
-                auto materialComponent = world.GetComponent<MaterialComponent>(e);
 
-                if (sceneManager.validMaterial(materialComponent->id)) {
-                    Kiki::Material const& material = sceneManager.getMaterial(materialComponent->id);
-                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &material.descriptorSet, 0, nullptr);
-                } else {
-                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
-                }
-            } else {
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 1, 1, &noTexture, 0, nullptr);
-            }
+            rutils::imageBarrier(aCmdBuff, aDepthAttach.image,
+                // before
+                VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+                // which part
+                VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1}
+            );
+        }
 
-            glm::vec3 colour;
+        {
+            // ssao pass
+            ZoneScopedN("Recording SSAO pass");
 
-            if (registry.all_of<ColourComponent>(e)) {
-                colour = registry.get<ColourComponent>(e).colour;
-            } else {
-                colour = glm::vec3(0.3f, 0.3f, 0.3f);
-            }
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO pass");
+            #endif
 
-            ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, (1.0f - transparentComponent.transparency)), (transparentComponent.sprite ? 1:0));
+            imageBarrier(aCmdBuff, gbuffers.ssao.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
 
-            // Bind vertex input
-            VkBuffer buffers[5] = {
-                mesh.positions.buffer,
-                mesh.texCoords.buffer,
-                mesh.normals.buffer,
-                mesh.boneIDs.buffer,  
-                mesh.weights.buffer   
+            VkRenderingAttachmentInfo ssaoColourAttach{};
+            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaoColourAttach.imageView = gbuffers.ssao.view;
+            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+
+            VkRenderingInfo ssaoRenderInfo{};
+            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaoRenderInfo.layerCount = 1;
+            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            ssaoRenderInfo.colorAttachmentCount = 1;
+            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+            VkDescriptorSet ssaoSets[] = {
+                aSceneDescriptors,
+                ssaoDescriptors
             };
-            VkDeviceSize offsets[5] = { 0, 0, 0, 0, 0 };
 
-            vkCmdBindVertexBuffers(aCmdBuff, 0, 5, buffers, offsets);
-            vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+            // draw fullscreen quad with ssao shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
 
-            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
+            SSAOSettings ssaoSettings;
+            ssaoSettings.width = aImageExtent.width;
+            ssaoSettings.height = aImageExtent.height;
 
-            auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
 
-            if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
-                vkCmdBindDescriptorSets(
-                    aCmdBuff,
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipelineLayouts.pbrPipelineLayout.handle,
-                    2, 
-                    1,
-                    &animComp->descriptorSet,
-                    0, nullptr
-                );
-            }
-            else {
-                vkCmdBindDescriptorSets(
-                    aCmdBuff,
-                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                    pipelineLayouts.pbrPipelineLayout.handle,
-                    2, 
-                    1,
-                    &dummyAnimationDesc,
-                    0, nullptr
-                );
-            }
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.ssao.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+
+            // end ssao pass
+        }
+
+        // ssao horizontal blur pass
+        {
+            ZoneScopedN("Recording SSAO horizontal blur pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO horizontal blur pass");
+            #endif
+
+            imageBarrier(aCmdBuff, gbuffers.ssao_hblur.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo ssaoColourAttach{};
+            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaoColourAttach.imageView = gbuffers.ssao_hblur.view;
+            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+
+            VkRenderingInfo ssaoRenderInfo{};
+            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaoRenderInfo.layerCount = 1;
+            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            ssaoRenderInfo.colorAttachmentCount = 1;
+            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+            VkDescriptorSet ssaoSets[] = {
+                ssaoHBlurDescriptors
+            };
+
+            // draw fullscreen quad with ssao shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_hblur.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.ssao_hblur.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
+
+        // ssao vertical blur pass
+        {
+            ZoneScopedN("Recording SSAO vertical blur pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAO vertical blur pass");
+            #endif
+
+            imageBarrier(aCmdBuff, gbuffers.ssao_blurred.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
 
             // Draw mesh
             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+            VkRenderingAttachmentInfo ssaoColourAttach{};
+            ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaoColourAttach.imageView = gbuffers.ssao_blurred.view;
+            ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+
+            VkRenderingInfo ssaoRenderInfo{};
+            ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaoRenderInfo.layerCount = 1;
+            ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            ssaoRenderInfo.colorAttachmentCount = 1;
+            ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+
+            VkDescriptorSet ssaoSets[] = {
+                ssaoBlurredDescriptors
+            };
+
+            // draw fullscreen quad with ssao shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_blurred.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            rutils::imageBarrier(aCmdBuff, gbuffers.ssao_blurred.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
         }
 
-        // End rendering
-        vkCmdEndRendering(aCmdBuff);
 
-		// deferred lighting pass
-
-		// ensure g buffer images are in VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		rutils::imageBarrier(aCmdBuff, gbuffers.textureColour.image,
-			// before
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			// after
-			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		);
-	
-		rutils::imageBarrier(aCmdBuff, gbuffers.normals.image,
-			// before
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			// after
-			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		);
-	
-		rutils::imageBarrier(aCmdBuff, gbuffers.roughnessMetalness.image,
-			// before
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			// after
-			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		);
-
-        rutils::imageBarrier(aCmdBuff, gbuffers.worldPos.image,
-			// before
-			VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-			// after
-			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-		);
-
-
-		rutils::imageBarrier(aCmdBuff, aDepthAttach.image,
-			// before
-			VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
-			VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-			VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
-			// after
-			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-			VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
-			// which part
-			VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 1}
-		);
-
+        // deferred lighting pass
         VkRenderingAttachmentInfo lightingAttach{};
-		lightingAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		lightingAttach.imageView = doneLightingImage.view;
-		lightingAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-		lightingAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		lightingAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-		lightingAttach.clearValue.color.float32[0] = 0.f;
-		lightingAttach.clearValue.color.float32[1] = 0.f;
-		lightingAttach.clearValue.color.float32[2] = 0.f;
-		lightingAttach.clearValue.color.float32[3] = 1.f;
+        lightingAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        lightingAttach.imageView = doneLightingImage.view;
+        lightingAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+        lightingAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        lightingAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        lightingAttach.clearValue.color.float32[0] = 0.f;
+        lightingAttach.clearValue.color.float32[1] = 0.f;
+        lightingAttach.clearValue.color.float32[2] = 0.f;
+        lightingAttach.clearValue.color.float32[3] = 1.f;
 
-		VkRenderingAttachmentInfo depthAttachLighting{};
-		depthAttachLighting.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-		depthAttachLighting.imageView = aDepthAttach.view;
-		depthAttachLighting.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        VkRenderingAttachmentInfo depthAttachLighting{};
+        depthAttachLighting.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        depthAttachLighting.imageView = aDepthAttach.view;
+        depthAttachLighting.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 
-		VkRenderingInfo lightingInfo{};
-		lightingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-		lightingInfo.layerCount = 1;
-		lightingInfo.renderArea.offset = VkOffset2D{0, 0};
-		lightingInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+        VkRenderingInfo lightingInfo{};
+        lightingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        lightingInfo.layerCount = 1;
+        lightingInfo.renderArea.offset = VkOffset2D{0, 0};
+        lightingInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
 
-		lightingInfo.colorAttachmentCount = 1;
-		lightingInfo.pColorAttachments = &lightingAttach;
+        lightingInfo.colorAttachmentCount = 1;
+        lightingInfo.pColorAttachments = &lightingAttach;
         lightingInfo.pDepthAttachment = &depthAttachLighting;
 
-		vkCmdBeginRendering(aCmdBuff, &lightingInfo);
+        {
+            ZoneScopedN("Recording deferred lighting pass");
 
-		// draw fullscreen quad
-		vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_lighting.handle);
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Deferred lighting pass");
+            #endif
 
-		VkDescriptorSet sets[] = {
-			aSceneDescriptors,
-			deferredLightingDescriptors
-		};
+            vkCmdBeginRendering(aCmdBuff, &lightingInfo);
 
-		vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
-		vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+            // draw fullscreen quad
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.deferred_lighting.handle);
 
-		vkCmdEndRendering(aCmdBuff);
+            VkDescriptorSet sets[] = {
+                aSceneDescriptors,
+                deferredLightingDescriptors
+            };
 
-        // begin ssao pass
-        // transition the image we just rendered to be sampled
-        imageBarrier(aCmdBuff, doneLightingImage.image,
-            // before
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            // after
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
-        imageBarrier(aCmdBuff, doneSSAOImage.image,
-            // before
-            VK_PIPELINE_STAGE_2_NONE,
-            VK_ACCESS_2_NONE,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            // after
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        );
+vkCmdEndRendering(aCmdBuff);
+        }
 
-        VkRenderingAttachmentInfo ssaoColourAttach{};
-        ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        ssaoColourAttach.imageView = doneSSAOImage.view;
-        ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-        ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        {
+            ZoneScopedN("Recording SSR pass");
 
-        VkRenderingInfo ssaoRenderInfo{};
-        ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        ssaoRenderInfo.layerCount = 1;
-        ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-        ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSR pass");
+            #endif
 
-        ssaoRenderInfo.colorAttachmentCount = 1;
-        ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+            // begin ssr pass
+            // transition the image we just rendered to be sampled
+            imageBarrier(aCmdBuff, doneLightingImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
 
-        vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+            imageBarrier(aCmdBuff, doneSSRImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
 
-		VkDescriptorSet ssaoSets[] = {
-			aSceneDescriptors,
-			ssaoDescriptors
-		};
+            VkRenderingAttachmentInfo ssrColourAttach{};
+            ssrColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssrColourAttach.imageView = doneSSRImage.view;
+            ssrColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            ssrColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssrColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-        // draw fullscreen quad with post-processing shader
-        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
-        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+            VkRenderingInfo ssrRenderInfo{};
+            ssrRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssrRenderInfo.layerCount = 1;
+            ssrRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            ssrRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
 
-        vkCmdEndRendering(aCmdBuff);
-        // end ssao pass
+            ssrRenderInfo.colorAttachmentCount = 1;
+            ssrRenderInfo.pColorAttachments = &ssrColourAttach;
 
-        // begin ssr pass
-        // transition the image we just rendered to be sampled
-        imageBarrier(aCmdBuff, doneSSAOImage.image,
-            // before
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            // after
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
+            vkCmdBeginRendering(aCmdBuff, &ssrRenderInfo);
 
-        imageBarrier(aCmdBuff, doneSSRImage.image,
-            // before
-            VK_PIPELINE_STAGE_2_NONE,
-            VK_ACCESS_2_NONE,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            // after
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        );
+            VkDescriptorSet ssrSets[] = {
+                aSceneDescriptors,
+                ssrDescriptors
+            };
 
-        VkRenderingAttachmentInfo ssrColourAttach{};
-        ssrColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        ssrColourAttach.imageView = doneSSRImage.view;
-        ssrColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-        ssrColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        ssrColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            // draw fullscreen quad with post-processing shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssr.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
 
-        VkRenderingInfo ssrRenderInfo{};
-        ssrRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        ssrRenderInfo.layerCount = 1;
-        ssrRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-        ssrRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            SSRSettings ssrSettings;
+            ssrSettings.settings.x = 128; // maxSteps
+            ssrSettings.settings.y = 6; // binarySteps
+            ssrSettings.settings.z = 0.1f; // stepSize
+            ssrSettings.settings.w = 0.2f; // thicknessTolerance
 
-        ssrRenderInfo.colorAttachmentCount = 1;
-        ssrRenderInfo.pColorAttachments = &ssrColourAttach;
+            // TODO: debug, could change the ssr settings here :)
 
-        vkCmdBeginRendering(aCmdBuff, &ssrRenderInfo);
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ssrSettings), &ssrSettings);
 
-		VkDescriptorSet ssrSets[] = {
-			aSceneDescriptors,
-			ssrDescriptors
-		};
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
-        // draw fullscreen quad with post-processing shader
-        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssr.handle);
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
-        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+            vkCmdEndRendering(aCmdBuff);
+            // end ssr pass
+        }
 
-        vkCmdEndRendering(aCmdBuff);
-        // end ssr pass
+        {
+            ZoneScopedN("Recording tonemap pass");
 
-        // begin fxaa pass
-        // transition the image we just rendered to be sampled
-        imageBarrier(aCmdBuff, doneSSRImage.image,
-            // before
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            // after
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Tonemap pass");
+            #endif
 
-        imageBarrier(aCmdBuff, swapchainImage.image,
-            // before
-            VK_PIPELINE_STAGE_2_NONE,
-            VK_ACCESS_2_NONE,
-            VK_IMAGE_LAYOUT_UNDEFINED,
-            // after
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        );
+            // begin tonemap pass
+            // transition the image we just rendered to be sampled
+            // TODO: change this once bloom is in
+            imageBarrier(aCmdBuff, doneSSRImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
 
-        VkRenderingAttachmentInfo fxaaColourAttach{};
-        fxaaColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        fxaaColourAttach.imageView = swapchainImage.view;
-        fxaaColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
-        fxaaColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        fxaaColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+            imageBarrier(aCmdBuff, doneTonemapImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
 
-        VkRenderingInfo fxaaRenderInfo{};
-        fxaaRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        fxaaRenderInfo.layerCount = 1;
-        fxaaRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-        fxaaRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            VkRenderingAttachmentInfo tonemapColourAttach{};
+            tonemapColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            tonemapColourAttach.imageView = doneTonemapImage.view;
+            tonemapColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            tonemapColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            tonemapColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-        fxaaRenderInfo.colorAttachmentCount = 1;
-        fxaaRenderInfo.pColorAttachments = &fxaaColourAttach;
+            VkRenderingInfo tonemapRenderInfo{};
+            tonemapRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            tonemapRenderInfo.layerCount = 1;
+            tonemapRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            tonemapRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
 
-        vkCmdBeginRendering(aCmdBuff, &fxaaRenderInfo);
+            tonemapRenderInfo.colorAttachmentCount = 1;
+            tonemapRenderInfo.pColorAttachments = &tonemapColourAttach;
 
-        VkDescriptorSet fxaaSets[] = {
-            aSceneDescriptors,
-            fxaaDescriptors
-        };
+            vkCmdBeginRendering(aCmdBuff, &tonemapRenderInfo);
 
-        // draw fullscreen quad with post-processing shader
-        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.fxaa.handle);
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
-        vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+            VkDescriptorSet tonemapSets[] = {
+                tonemapDescriptors
+            };
 
-        // begin imgui pass
-#       ifndef NDEBUG
-        ImGui::Render();
-        ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
-#       endif
-        // end imgui pass
+            // draw fullscreen quad with post-processing shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.tonemap.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.tonemapPipelineLayout.handle, 0, 1, tonemapSets, 0, nullptr);
 
-        vkCmdEndRendering(aCmdBuff);
-        // end fxaa pass
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+            // end tonemap pass
+        }
+
+        {
+            ZoneScopedN("Recording FXAA and ImGui pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "FXAA and ImGui pass");
+            #endif
+
+            // begin fxaa pass
+            // transition the image we just rendered to be sampled
+            imageBarrier(aCmdBuff, doneTonemapImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+
+            imageBarrier(aCmdBuff, swapchainImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo fxaaColourAttach{};
+            fxaaColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            fxaaColourAttach.imageView = swapchainImage.view;
+            fxaaColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            fxaaColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            fxaaColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo fxaaRenderInfo{};
+            fxaaRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            fxaaRenderInfo.layerCount = 1;
+            fxaaRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            fxaaRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            fxaaRenderInfo.colorAttachmentCount = 1;
+            fxaaRenderInfo.pColorAttachments = &fxaaColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &fxaaRenderInfo);
+
+            VkDescriptorSet fxaaSets[] = {
+                aSceneDescriptors,
+                fxaaDescriptors
+            };
+
+            // draw fullscreen quad with post-processing shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.fxaa.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            // begin imgui pass
+    #       ifndef NDEBUG
+            {
+                ZoneScopedN("Recording ImGui pass");
+
+                #ifdef TRACY_VK_ENABLE
+                TracyVkZone(tracyVkCtx, aCmdBuff, "ImGui pass")
+                #endif
+                ImGui::Render();
+                ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
+
+            }
+    #       endif
+            // end imgui pass
+
+            //vkCmdEndRendering(aCmdBuff);
+            // end fxaa pass
+        }
 
         // TODO: ui pass should go here, after fxaa :)
+        //vkCmdBeginRendering(aCmdBuff, &renderInfo);
 
-        // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
-        imageBarrier(aCmdBuff, swapchainImage.image,
-            /* Before */
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            /* A f t e r */
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_NONE,
-            VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-        );
+        // UI PASS: TODO check in right place after merge
+        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle );
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
 
+        auto& world = World::Get();
+        auto& registry = world.Registry();
+        auto uiComponents = world.Query<InterfaceComponent>();
+
+        for (auto [e, interfaceComponent] : uiComponents.each()) {
+            if (registry.all_of<BackgroundComponent>(e)) {
+                auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+
+                if (backgroundComponent.vertices.buffer != VK_NULL_HANDLE) {
+                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
+
+                    VkDeviceSize offsets[1]{};
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &backgroundComponent.vertices.buffer, offsets);
+                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                    ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)));
+                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+                    
+                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                }
+            }
+
+            if (registry.all_of<TextComponent>(e)) {
+                auto& textComponent = registry.get<TextComponent>(e);
+                auto& font = Kiki::FontManager::get().getFont(textComponent.font);
+
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceText.handle);
+
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
+
+                ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)));
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                for (auto& buffer : textComponent.vertices) {
+                    VkDeviceSize offsets[1]{};
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &buffer.buffer, offsets);
+                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                }
+            }
+        }
+
+        // END OF UI PASS
+
+        vkCmdEndRendering(aCmdBuff);
+
+        {
+            ZoneScopedN("Presentation barrier");
+
+            // Barrier: synchronize with the copy after and transition image is to TRANSFER SRC OPTIMAL
+            imageBarrier(aCmdBuff, swapchainImage.image,
+                /* Before */
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                /* A f t e r */
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
+            );
+        }
+
+        #ifdef TRACY_VK_ENABLE
+        TracyVkCollect(tracyVkCtx, aCmdBuff);
+        #endif
+        
         // End command recording
         if (auto const res = vkEndCommandBuffer( aCmdBuff ); VK_SUCCESS != res) {
             throw Kiki::FatalError( "Unable to end recording command buffer\n"

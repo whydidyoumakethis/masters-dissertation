@@ -7,6 +7,7 @@
 #include "physics/PhysicsUtils.hpp"   
 #include "physics/PhysicsSystem.hpp" 
 #include "Components/MiscComponent.hpp"
+#include "Components/RoughnessMetallicFactorComponent.hpp"
 
 #include "Animation/AnimationLoader.h"
 #include "Animation/AnimationComponent.h"
@@ -41,6 +42,8 @@ namespace Kiki {
     )
     {
         std::vector<float> p, t, n;
+    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords, std::vector<glm::vec4> const& tangents) {
+        std::vector<float> p, t, n, tangents_dst;
 
         for (glm::vec3 pos : positions) {
             p.emplace_back(pos.x);
@@ -72,6 +75,14 @@ namespace Kiki {
         //spdlog::info("Allocating Mesh -> Pos: {}, Indices: {}, Normals: {}, UVs: {}, Bones: {}, Weights: {}", p.size(), indices.size(), n.size(), t.size(), bIDs.size(), bWeights.size());
 
         meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, bIDs, bWeights));
+        for (glm::vec4 tan : tangents) {
+            tangents_dst.emplace_back(tan.x);
+            tangents_dst.emplace_back(tan.y);
+            tangents_dst.emplace_back(tan.z);
+            tangents_dst.emplace_back(tan.w);
+        }
+
+        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, tangents_dst));
 
         return meshes.size() - 1;
     }
@@ -124,6 +135,7 @@ namespace Kiki {
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(fullPath, 0);
 
         registry.emplace<TransformComponent>(model);
+        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs, mesh.tangents));
         registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
 
         registry.emplace<MeshComponent>(model, createMesh(
@@ -248,6 +260,7 @@ namespace Kiki {
                 mesh.indices,
                 mesh.normals,
                 mesh.uvs,
+                mesh.tangents,
                 safeBoneIDs, 
                 safeWeights  
             ));
@@ -260,7 +273,8 @@ namespace Kiki {
                     registry.emplace<TransparencyComponent>(model); // yeah idk what else to do other then just have this added
                 }
             }
-            registry.emplace<ColourComponent>(model, glm::vec3(0.3f, 0.3f, 0.3f));
+            registry.emplace<ColourComponent>(model, glm::vec3(texture.baseColour));
+            registry.emplace<RoughnessMetallicFactorComponent>(model, glm::vec2(texture.roughnessFactor, texture.metallicFactor));
             //Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
@@ -306,23 +320,38 @@ namespace Kiki {
             JPH::EMotionType joltMotionType;
             uint16_t joltLayer;
             //COPIED WHAT WAS DONE IN LOAD MODEL, PLEASE WORK ON THIS FUNCTION FROM NOW AS PREVIOUS FUNCTION HAS DEPRECATED FUNCTIONS
+
 			switch (instance.bodyType) {
 			case MbodyType::STATIC:
-                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+                //colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
                 joltMotionType = JPH::EMotionType::Static;
                 joltLayer = 0; // NON_MOVING
                 break;
             case MbodyType::DYNAMIC:
-                colliderShape = CreateConvexHull(mesh.vertices);
+                //colliderShape = CreateConvexHull(mesh.vertices);
                 joltMotionType = JPH::EMotionType::Dynamic;
                 joltLayer = 1; // MOVING
 				break;
             case MbodyType::KINEMATIC:
-                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+                //colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
                 joltMotionType = JPH::EMotionType::Kinematic;
 				joltLayer = 0;
                 break;
              }
+
+            switch (instance.colliderType) {
+
+            case McolliderType::BOX:
+                colliderShape = CreateConvexHull(mesh.vertices);
+                break;
+            case McolliderType::CONVEX_HULL:
+                colliderShape = CreateConvexHull(mesh.vertices);
+                break;
+            case McolliderType::MESH:
+                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+                break;
+            }
+
             if (colliderShape) {
                 registry.emplace<MeshColliderComponent>(model, colliderShape);
 				registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);

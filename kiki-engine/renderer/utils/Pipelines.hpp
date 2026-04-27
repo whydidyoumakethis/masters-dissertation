@@ -11,8 +11,26 @@ namespace rutils {
     struct ObjectData {
         glm::mat4 model;
         glm::vec4 baseColour;
-        std::uint32_t sprite = 0;
-        std::uint32_t padding[3];
+        // std::uint32_t sprite = 0;
+        // std::uint32_t useTexture = 1;
+        glm::vec4 flags;
+    };
+
+    struct SSRSettings {
+        glm::vec4 settings = glm::vec4(64, 6, 0.25f, 0.4f);
+        // x = maxSteps, int
+        // y = binarySteps, int
+        // z = stepSize, float
+        // w = thicknessTolerance, float
+    };
+
+    struct SSAOSettings {
+        std::uint32_t width;
+        std::uint32_t height;
+    };
+
+    struct ShapeData {
+        glm::vec4 colour;
     };
 
     struct Pipelines {
@@ -24,6 +42,11 @@ namespace rutils {
         rutils::Pipeline fxaa;
         rutils::Pipeline ssr;
         rutils::Pipeline ssao;
+        rutils::Pipeline ssao_hblur;
+        rutils::Pipeline ssao_blurred;
+        rutils::Pipeline tonemap;
+        rutils::Pipeline interfaceShape;
+        rutils::Pipeline interfaceText;
     };
 
     struct PipelineLayouts {
@@ -31,6 +54,11 @@ namespace rutils {
         PipelineLayout deferredPipelineLayout;
         PipelineLayout skyboxPipelineLayout;
         PipelineLayout postprocessPipelineLayout;
+        PipelineLayout ssaoPipelineLayout;
+        PipelineLayout ssaoBlurPipelineLayout;
+        PipelineLayout tonemapPipelineLayout;
+        PipelineLayout interfaceShapeLayout;
+        PipelineLayout interfaceTextLayout;
     };
 
     Pipelines createAllPipelines(
@@ -40,6 +68,10 @@ namespace rutils {
 
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout, VkDescriptorSetLayout animationLayout);
     PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout);
+    PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout);
+    PipelineLayout createSSAOBlurPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaoBlurLayout);
+    PipelineLayout createTonemapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout tonemapLayout);
+    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
@@ -49,6 +81,11 @@ namespace rutils {
     Pipeline createFXAAPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSRPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createSSAOPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSAOHBlurPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createSSAOBlurredPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createTonemapPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+
+    Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
 
 #endif

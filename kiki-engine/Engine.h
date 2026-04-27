@@ -44,9 +44,8 @@ namespace Kiki {
 
 		void Run() {
 			_running = true;
-
 			auto previousClock = std::chrono::steady_clock::now();
-
+			_scheduler.printSystemOrder();
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
 				// float dt = _timer.Tick();
 				auto const now = std::chrono::steady_clock::now();
