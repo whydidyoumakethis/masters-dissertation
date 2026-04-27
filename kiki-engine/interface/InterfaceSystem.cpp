@@ -107,7 +107,7 @@ namespace Kiki {
                         backgroundComponent.colour = glm::vec3(buttonComponent.hoverColour.x, buttonComponent.hoverColour.y, buttonComponent.hoverColour.z);
                         backgroundComponent.transparency = 1.0f - buttonComponent.hoverColour.w;
                     }
-                } else if (!mouseWithin) {
+                } else if (!mouseWithin && buttonComponent.buttonState != ButtonState::NONE) {
                     buttonComponent.buttonState = ButtonState::NONE;
 
                     if (background) {

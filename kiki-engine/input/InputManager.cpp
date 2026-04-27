@@ -129,6 +129,14 @@ namespace Kiki {
     }
 
     void InputManager::handleMouseMotion(GLFWwindow* window, float xPos, float yPos) {
+        int windowX, windowY;
+        int framebufferX, framebufferY;
+        glfwGetWindowSize(window, &windowX, &windowY);
+        glfwGetFramebufferSize(window, &framebufferX, &framebufferY);
+
+        xPos = xPos * ((float) framebufferX / (float) windowX);
+        yPos = yPos * ((float) framebufferY / (float) windowY);
+
         mouse.dx = xPos - mouse.x;
         mouse.dy = yPos - mouse.y;
         mouse.x = xPos;
