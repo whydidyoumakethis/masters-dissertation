@@ -5,6 +5,7 @@
 #include "ECS/System.h"
 #include "FontManager.hpp"
 #include "TextureManager.hpp"
+#include "RenderManager.hpp"
 
 namespace Kiki {
     struct ScaleVec2D {
@@ -12,7 +13,6 @@ namespace Kiki {
         float x;
         float scaleY;
         float y;
-        bool dirty = true;
 
         // Absolute values should only be changed by the InterfaceSystem
         float absoluteX;
@@ -23,11 +23,13 @@ namespace Kiki {
         private:
         FontManager& fontManager = FontManager::get();
         TextureManager& textureManager = TextureManager::get();
+        RenderManager& renderManager = RenderManager::get();
 
         World& world = World::Get();
+        entt::registry& registry = world.Registry();
 
         public:
-        Phase GetPhase() const override { return Phase::Input; }
+        Phase GetPhase() const override { return Phase::PreUpdate; }
 
         void OnStart() override;
 

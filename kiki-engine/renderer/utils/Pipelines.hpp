@@ -15,18 +15,26 @@ namespace rutils {
         std::uint32_t padding[3];
     };
 
+    struct ShapeData {
+        glm::vec4 colour;
+    };
+
     struct Pipelines {
         rutils::Pipeline pbr;
         rutils::Pipeline pbr_alpha;
         rutils::Pipeline deferred_geometry;
         rutils::Pipeline deferred_geometry_alpha;
         rutils::Pipeline deferred_lighting;
+        rutils::Pipeline interfaceShape;
+        rutils::Pipeline interfaceText;
     };
 
     struct PipelineLayouts {
         PipelineLayout pbrPipelineLayout;
         PipelineLayout deferredPipelineLayout;
         PipelineLayout skyboxPipelineLayout;
+        PipelineLayout interfaceShapeLayout;
+        PipelineLayout interfaceTextLayout;
     };
 
     Pipelines createAllPipelines(
@@ -35,12 +43,15 @@ namespace rutils {
     );
 
     PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout);
+    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     
     Pipeline createDeferredGeometryPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createDeferredGeometryAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createDeferredLightingPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+
+    Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
 
 #endif

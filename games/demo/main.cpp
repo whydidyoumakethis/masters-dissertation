@@ -5,6 +5,11 @@
 #include "system/ThirdPersonCameraSystem.h"
 #include "system/GoalTriggerSystem.h"
 
+#include "Components/BackgroundComponent.hpp"
+#include "Components/InterfaceComponent.hpp"
+#include "Components/TextComponent.hpp"
+#include "interface/FontManager.hpp"
+
 #include "GltfLoader/GltfLoaderAssimp.h"
 
 int main(int argc, char** argv) {
@@ -27,6 +32,17 @@ int main(int argc, char** argv) {
 		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_back.png"
 	);
 
+	//auto& registry = world.Registry();
+	//auto ui = world.CreateEntity();
+	//registry.emplace<InterfaceComponent>(ui, Kiki::ScaleVec2D(0.2, 0, 0.4, 0), Kiki::ScaleVec2D(0.6, 0, 0.2, 0));
+	//registry.emplace<BackgroundComponent>(ui, glm::vec3(1.0f, 0.0f, 0.0f), 0.5f);
+
+	//Kiki::FontManager::get().loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/NotoSansJP-Regular.ttf", "font", U"お茶ください");
+	//registry.emplace<TextComponent>(ui, "font", U"お茶ください", 48.0f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f);
+
+	//auto ui2 = world.CreateEntity();
+	//registry.emplace<InterfaceComponent>(ui2, Kiki::ScaleVec2D(0.4, 0, 0.2, 0), Kiki::ScaleVec2D(0.2, 0, 0.6, 0), entt::null, (unsigned int) 0);
+	//registry.emplace<BackgroundComponent>(ui2, glm::vec3(0.0f, 1.0f, 0.0f), 0.0f);
 
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
 	// use wasd to move the character, shift to speed up, space to jump.

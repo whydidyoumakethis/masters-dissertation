@@ -2,18 +2,33 @@
 #define KIKI_INTERFACE_FONTMANAGER
 
 #include "utils/Font.hpp"
+#include "renderer/RenderManager.hpp"
 
 #include <msdfgen.h>
 #include <msdfgen-ext.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include <unordered_map>
 #include <filesystem>
 
 namespace Kiki {
     struct StagingGlyph {
+        uint32_t glyphId;
         msdfgen::Bitmap<float, 3> bitmap;
         double l, r, t, b;
-        double advance;
+    };
+
+    enum class HorizontalAlignment {
+        LEFT,
+        CENTRE,
+        RIGHT
+    };
+
+    enum class VerticalAlignment {
+        TOP,
+        CENTRE,
+        BOTTOM
     };
 
     class FontManager {
@@ -24,6 +39,8 @@ namespace Kiki {
         FontManager& operator=(const FontManager&) = delete;
 
         msdfgen::FreetypeHandle* freetype;
+        FT_Library freetypeLibrary;
+        RenderManager& renderManager = RenderManager::get();
 
         std::unordered_map<std::string, iutils::Font> fonts;
 
@@ -32,6 +49,7 @@ namespace Kiki {
         void initialise();
         void shutdown();
 
+        iutils::Font& getFont(std::string name);
         std::string loadFont(std::filesystem::path path, std::string name = "", std::u32string characters = U"", int baseSize = 48);
         void addCharacters(iutils::Font* font, std::u32string characters);
         void deleteFont(std::string name);

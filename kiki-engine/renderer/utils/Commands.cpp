@@ -5,6 +5,10 @@
 #include "Pipelines.hpp"
 #include "Components/TransparencyComponent.hpp"
 #include "Components/ColourComponent.hpp"
+#include "Components/InterfaceComponent.hpp"
+#include "Components/TextComponent.hpp"
+#include "Components/BackgroundComponent.hpp"
+#include "interface/FontManager.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -49,7 +53,8 @@ namespace rutils {
     }
 
     void recordCommands(VkCommandBuffer aCmdBuff, Pipelines const& pipelines, PipelineLayouts const& pipelineLayouts, ImageAndView const& aColorAttach, Image const& aDepthAttach, GBuffers& gbuffers, VkExtent2D const& aImageExtent, 
-        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox) {
+        VkBuffer aSceneUBO, Kiki::RenderManager::SceneUniform const& aSceneUniform, VkDescriptorSet aSceneDescriptors, VkDescriptorSet deferredLightingDescriptors, VkDescriptorSet noTexture, Kiki::Skybox const& skybox, 
+        VkBuffer interfaceUBO, Kiki::RenderManager::InterfaceUniform const& interfaceUniform, VkDescriptorSet interfaceDescriptors, VkBuffer interfaceIndexBuffer) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
         begInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -75,6 +80,27 @@ namespace rutils {
         vkCmdUpdateBuffer( aCmdBuff, aSceneUBO, 0, sizeof(Kiki::RenderManager::SceneUniform), &aSceneUniform );
 
         rutils::bufferBarrier(aCmdBuff, aSceneUBO,
+            /* Before */
+            VK_PIPELINE_STAGE_2_CLEAR_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+            VK_ACCESS_2_UNIFORM_READ_BIT
+        );
+
+        // Upload interface uniforms
+        rutils::bufferBarrier(aCmdBuff, interfaceUBO,
+            /* Before */
+            VK_PIPELINE_STAGE_2_VERTEX_SHADER_BIT,
+            VK_ACCESS_2_UNIFORM_READ_BIT,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_CLEAR_BIT,// vkCmdUpdateBuffer() is a ”clear command”
+            VK_ACCESS_2_TRANSFER_WRITE_BIT
+        );
+
+        vkCmdUpdateBuffer(aCmdBuff, interfaceUBO, 0, sizeof(Kiki::RenderManager::InterfaceUniform), &interfaceUniform);
+
+        rutils::bufferBarrier(aCmdBuff, interfaceUBO,
             /* Before */
             VK_PIPELINE_STAGE_2_CLEAR_BIT,
             VK_ACCESS_2_TRANSFER_WRITE_BIT,
@@ -426,6 +452,50 @@ namespace rutils {
 
 		vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
 		vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+        // UI PASS: TODO check in right place after merge
+        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle );
+        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
+
+        auto uiComponents = world.Query<InterfaceComponent>();
+
+        for (auto [e, interfaceComponent] : uiComponents.each()) {
+            if (registry.all_of<BackgroundComponent>(e)) {
+                auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
+
+                VkDeviceSize offsets[1]{};
+                vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &backgroundComponent.vertices.buffer, offsets);
+                vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)));
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+                
+                vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+            }
+
+            if (registry.all_of<TextComponent>(e)) {
+                auto& textComponent = registry.get<TextComponent>(e);
+                auto& font = Kiki::FontManager::get().getFont(textComponent.font);
+
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceText.handle);
+
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
+
+                ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)));
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                for (auto& buffer : textComponent.vertices) {
+                    VkDeviceSize offsets[1]{};
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &buffer.buffer, offsets);
+                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                }
+            }
+        }
+
+        // END OF UI PASS
 
 #       ifndef NDEBUG
         ImGui::Render();

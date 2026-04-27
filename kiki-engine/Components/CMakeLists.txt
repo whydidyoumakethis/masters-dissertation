@@ -11,4 +11,6 @@ target_sources(kiki
       DebugComponent.hpp
       MiscComponent.hpp
       InterfaceComponent.hpp
+      BackgroundComponent.hpp
+      TextComponent.hpp
 )

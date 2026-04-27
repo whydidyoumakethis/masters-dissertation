@@ -1,15 +1,16 @@
 #ifndef KIKI_RENDERER
 #define KIKI_RENDERER
 
-#include "../Components/MaterialComponent.hpp"
-#include "../Components/MeshComponent.hpp"
-#include "../Components/TransparencyComponent.hpp"
+#include "Components/MaterialComponent.hpp"
+#include "Components/MeshComponent.hpp"
+#include "Components/TransparencyComponent.hpp"
 #include "utils/VulkanWindow.hpp"
 #include "utils/VulkanWrapper.hpp"
 #include "utils/Synchronisation.hpp"
 #include "utils/Allocator.hpp"
 #include "utils/Buffer.hpp"
 #include "utils/Image.hpp"
+#include "interface/utils/Font.hpp"
 #include "WindowInfo.hpp"
 #include "Camera.hpp"
 #include "utils/Pipelines.hpp"
@@ -52,6 +53,11 @@ namespace Kiki {
         rutils::CubemapPaths paths;
     };
 
+    struct WindowExtent {
+        uint32_t width;
+        uint32_t height;
+    };
+
     struct ShaderPaths {
         std::filesystem::path pbr_v = "default.vert.spv";
         std::filesystem::path pbr_f = "default.frag.spv";
@@ -63,6 +69,9 @@ namespace Kiki {
         std::filesystem::path deferred_geometry_alpha_f = "deferred_geometry_alpha.frag.spv";
         std::filesystem::path deferred_lighting_v = "fullscreen.vert.spv";
         std::filesystem::path deferred_lighting_f = "deferred_lighting.frag.spv";
+        std::filesystem::path interface_v = "interface.vert.spv";
+        std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
+        std::filesystem::path interface_text_f = "interface_text.frag.spv";
     };
 
     class RenderManager {
@@ -87,6 +96,8 @@ namespace Kiki {
         rutils::CommandPool commandPool;
 
         rutils::Buffer sceneUBO;
+        rutils::Buffer interfaceUBO;
+        rutils::Buffer interfaceIndices;
 
         std::size_t frameIndex = 0;
         std::vector<VkCommandBuffer> commandBuffers;
@@ -95,14 +106,18 @@ namespace Kiki {
         rutils::DescriptorPool descriptorPool;
 
         rutils::DescriptorSetLayout sceneLayout;
+        rutils::DescriptorSetLayout interfaceLayout;
+        rutils::DescriptorSetLayout textLayout;
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
         VkDescriptorSet sceneDescriptors;
+        VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
 
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;
+        rutils::Sampler fontSampler;
 
         rutils::Image noTexture;
         VkDescriptorSet noTextureDst;
@@ -137,6 +152,10 @@ namespace Kiki {
         void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
         void recreatePipelines();
 
+        void loadFontAtlas(iutils::Font* font, std::vector<uint8_t> atlas);
+        rutils::Buffer updateInterfaceVertices(std::vector<float> positions);
+        WindowExtent getWindowExtent();
+
         struct SceneUniform {
             glm::mat4 camera;
             glm::mat4 projection;
@@ -144,6 +163,10 @@ namespace Kiki {
             glm::vec4 lightPos;
             glm::vec4 lightColour;
             glm::vec4 cameraPos;
+        };
+
+        struct InterfaceUniform {
+            glm::mat4 projection;
         };
 
         rutils::CommandPool tempTextureCmdPool;
