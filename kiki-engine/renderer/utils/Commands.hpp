@@ -40,7 +40,11 @@ namespace rutils {
         Image const& doneLightingImage,
         Image const& doneSSRImage,
         Image const& doneTonemapImage,
-        VkBuffer interfaceUBO, Kiki::RenderManager::InterfaceUniform const& interfaceUniform, VkDescriptorSet interfaceDescriptors, VkBuffer interfaceIndexBuffer
+        VkBuffer interfaceUBO,
+        Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
+        VkDescriptorSet interfaceDescriptors,
+        VkBuffer interfaceIndexBuffer.
+        VkDescriptorSet dummyAnimationDesc
     );
 
 	void submitCommands(

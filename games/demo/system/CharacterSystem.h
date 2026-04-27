@@ -43,7 +43,11 @@ public:
         	}
         	if(transform){
         		transform->position = spawnPos;
-				//transform->position.y += 1.1f; // spawn a bit above the ground to avoid initial collision issues
+                float modelRotationOffset = 180.0f;
+                transform->rotation = glm::angleAxis(
+                    glm::radians(character->facingYaw + modelRotationOffset),
+                    glm::vec3(0, 1, 0)
+                );
         		transform->dirty = true;
         	}
             if(physics){
@@ -147,25 +151,33 @@ private:
 
         character.facingYaw += diff * character.rotateSpeed * dt;
 
+        float modelRotationOffset = 180.0f;
+
 		// update transform rotation to match facing direction
         transform.rotation = glm::angleAxis(
-            glm::radians(character.facingYaw),
+            glm::radians(character.facingYaw + modelRotationOffset),
             glm::vec3(0, 1, 0)
         );
         transform.dirty = true;
     }
     void UpdateState(CharacterComponent& character, PhysicalAttributesComponent& pa) {
-        bool isMoving = glm::length(glm::vec2(
-            character.velocity.x, character.velocity.z)) > 0.1f;
+        float currentSpeed = glm::length(glm::vec2(character.velocity.x, character.velocity.z));
+        bool isMoving = glm::length(glm::vec2(character.velocity.x, character.velocity.z)) > 0.1f;
 
-        if (!pa.isGrounded) {
-            //character.state = character.velocity.y > 0
-            //    ? CharacterState::Jumping
-            //    : CharacterState::Falling;
-			character.state = CharacterState::Jumping;
+        if (character.state == CharacterState::Jumping) {
+            if (character.velocity.y <= 0.0f && pa.isGrounded) { 
+                character.state = isMoving ? CharacterState::Walking : CharacterState::Idle;
+            }
+            return;
         }
-        else if (isMoving) {
-            character.state = CharacterState::Walking;
+
+        if (isMoving) {
+            if (currentSpeed > character.walkSpeed + 1.0f) {
+                character.state = CharacterState::Running;
+            }
+            else {
+                character.state = CharacterState::Walking;
+            }
         }
         else {
             character.state = CharacterState::Idle;

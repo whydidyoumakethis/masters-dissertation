@@ -71,6 +71,18 @@ namespace rutils {
         vertexInputs[3].binding = 3;
         vertexInputs[3].stride = sizeof(glm::vec4);
         vertexInputs[3].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+      
+        // --- bone IDs ---
+        vertexInputs[4].binding = 4;
+        vertexInputs[4].stride = sizeof(glm::ivec4);
+        vertexInputs[4].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+        // --- weights ---
+        vertexInputs[5].binding = 5;
+        vertexInputs[5].stride = sizeof(glm::vec4);
+        vertexInputs[5].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+
 
         vertexAttributes[0].binding = 0; // must match binding above
         vertexAttributes[0].location = 0; // must match shader
@@ -91,12 +103,23 @@ namespace rutils {
         vertexAttributes[3].location = 3; // must match shader
         vertexAttributes[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
         vertexAttributes[3].offset = 0;
+      
+        // bone IDs
+        vertexAttributes[4].binding = 4;
+        vertexAttributes[4].location = 4;
+        vertexAttributes[4].format = VK_FORMAT_R32G32B32A32_SINT;
+        vertexAttributes[4].offset = 0;
+
+        // weights
+        vertexAttributes[5].binding = 5;
+        vertexAttributes[5].location = 5;
+        vertexAttributes[5].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        vertexAttributes[5].offset = 0;
 
         inputInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        inputInfo->vertexBindingDescriptionCount = 4; // number of vertexInputs above
+        inputInfo->vertexBindingDescriptionCount = 6; // number of vertexInputs above
         inputInfo->pVertexBindingDescriptions = vertexInputs;
-        inputInfo->vertexAttributeDescriptionCount = 4; // number of vertexAttributes above
-        inputInfo->pVertexAttributeDescriptions = vertexAttributes;
+        inputInfo->vertexAttributeDescriptionCount = 6; // number of vertexAttributes above
 
         // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
         assemblyInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -104,11 +127,13 @@ namespace rutils {
         assemblyInfo->primitiveRestartEnable = VK_FALSE;
     }
 
-    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout) {
+    PipelineLayout createPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout materialLayout, VkDescriptorSetLayout animationLayout)
+    {
         VkDescriptorSetLayout layouts[] = {
             // Order must match the set = N in the shaders
             sceneLayout, // set 0
-            materialLayout
+			materialLayout, // set 1
+            animationLayout
         };
 
         VkPushConstantRange pushRange{};
@@ -338,8 +363,8 @@ namespace rutils {
         stages[1].module = fragModule;
         stages[1].pName = "main";
 
-        VkVertexInputBindingDescription vertexInputs[4]{};
-        VkVertexInputAttributeDescription vertexAttributes[4]{};
+        VkVertexInputBindingDescription vertexInputs[6]{};
+        VkVertexInputAttributeDescription vertexAttributes[6]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -469,8 +494,8 @@ namespace rutils {
         stages[1].pName = "main";
 
 
-        VkVertexInputBindingDescription vertexInputs[4]{};
-        VkVertexInputAttributeDescription vertexAttributes[4]{};
+        VkVertexInputBindingDescription vertexInputs[6]{};
+        VkVertexInputAttributeDescription vertexAttributes[6]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -598,8 +623,9 @@ namespace rutils {
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         stages[1].module = fragModule;
         stages[1].pName = "main";
-        VkVertexInputBindingDescription vertexInputs[4]{};
-        VkVertexInputAttributeDescription vertexAttributes[4]{};
+
+        VkVertexInputBindingDescription vertexInputs[6]{};
+        VkVertexInputAttributeDescription vertexAttributes[6]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -729,8 +755,8 @@ namespace rutils {
         stages[1].module = fragModule;
         stages[1].pName = "main";
 
-        VkVertexInputBindingDescription vertexInputs[4]{};
-        VkVertexInputAttributeDescription vertexAttributes[4]{};
+        VkVertexInputBindingDescription vertexInputs[6]{};
+        VkVertexInputAttributeDescription vertexAttributes[6]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);

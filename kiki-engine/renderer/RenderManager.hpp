@@ -38,6 +38,8 @@ namespace Kiki {
         rutils::Buffer normals;
         rutils::Buffer indices;
         rutils::Buffer tangents;
+        rutils::Buffer boneIDs;
+        rutils::Buffer weights;
         std::uint32_t vertexCount;
         std::uint32_t indexCount;
     };
@@ -140,7 +142,6 @@ namespace Kiki {
         rutils::Image doneSSRImage;
         rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
-        rutils::Allocator allocator;
         rutils::Sampler sampler;
         rutils::Sampler fontSampler;
 
@@ -150,6 +151,10 @@ namespace Kiki {
 
         Skybox skybox;
 
+        rutils::DescriptorSetLayout animationLayout;
+
+        rutils::Buffer dummyAnimationBuffer;
+        VkDescriptorSet dummyAnimationDesc;
         std::vector<glm::vec4> ssaoSamples;
 
         # ifdef TRACY_VK_ENABLE
@@ -157,7 +162,23 @@ namespace Kiki {
         # endif
 
         public:
+
+
+        rutils::Allocator allocator;
         static RenderManager& get();
+
+        Mesh allocateMesh(
+            std::vector<float> positions,
+            std::vector<std::uint32_t> indices,
+            std::vector<float> normals,
+            std::vector<float> texCoords,
+            std::vector<float> tangents,
+            std::vector<int> boneIDs,    
+            std::vector<float> weights    
+        );
+
+        rutils::Buffer allocateAnimationBuffer();
+        VkDescriptorSet allocateAnimationDescriptorSet(const rutils::Buffer& buffer);
 
         Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents);
         Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
