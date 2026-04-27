@@ -43,7 +43,7 @@ namespace rutils {
         VkBuffer interfaceUBO,
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
         VkDescriptorSet interfaceDescriptors,
-        VkBuffer interfaceIndexBuffer.
+        VkBuffer interfaceIndexBuffer,
         VkDescriptorSet dummyAnimationDesc
     );
 

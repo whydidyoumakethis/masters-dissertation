@@ -872,6 +872,8 @@ namespace Kiki {
         rutils::bufferBarrier(uploadCmd, weightsGPU.buffer,
             VK_PIPELINE_STAGE_2_COPY_BIT, VK_ACCESS_2_TRANSFER_WRITE_BIT,
             VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT, VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
+        );
+
         VkBufferCopy tancopy{};
         tancopy.size = tangentsSize;
 
