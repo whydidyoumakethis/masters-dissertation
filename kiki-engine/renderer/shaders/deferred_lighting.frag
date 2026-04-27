@@ -93,7 +93,6 @@ void main()
 
     float ambientOcclusion = texture(gAO, v2fTexCoord).r;
     vec3 finalColour = emissive + (ambient(sceneAmbient, baseColour) * (ambientOcclusion * ambientOcclusion)) + lighting;
-    finalColour = clamp(finalColour, 0.f, 1.f);
 
     oColor = vec4(finalColour, 1.0);
 }

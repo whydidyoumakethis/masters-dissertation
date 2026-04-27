@@ -80,6 +80,7 @@ namespace Kiki {
         std::filesystem::path ssao_f = "ssao.frag.spv";
         std::filesystem::path ssao_hblur_f = "ssao_hblur.frag.spv";
         std::filesystem::path ssao_vblur_f = "ssao_vblur.frag.spv";
+        std::filesystem::path tonemap_f = "tonemap.frag.spv";
         std::filesystem::path interface_v = "interface.vert.spv";
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
@@ -124,6 +125,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout cubemapLayout;
         rutils::DescriptorSetLayout ssaoLayout;
         rutils::DescriptorSetLayout ssaoBlurredLayout;
+        rutils::DescriptorSetLayout tonemapLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -132,9 +134,11 @@ namespace Kiki {
         VkDescriptorSet ssaoDescriptors;
         VkDescriptorSet ssaoHBlurDescriptors;
         VkDescriptorSet ssaoBlurredDescriptors;
+        VkDescriptorSet tonemapDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
+        rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;

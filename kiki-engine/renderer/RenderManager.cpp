@@ -68,12 +68,15 @@ namespace Kiki {
             postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
             ssaoLayout = rutils::createSSAODescriptorLayout(window);
             ssaoBlurredLayout = rutils::createSSAOBlurredDescriptorLayout(window);
+            tonemapLayout = rutils::createTonemapDescriptorLayout(window);
+
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle);
             pipelineLayouts.skyboxPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, cubemapLayout.handle);
             pipelineLayouts.postprocessPipelineLayout = rutils::createPostProcessingPipelineLayout(window, sceneLayout.handle, postProcessingLayout.handle);
             pipelineLayouts.ssaoPipelineLayout = rutils::createSSAOPipelineLayout(window, sceneLayout.handle, ssaoLayout.handle);
             pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
+            pipelineLayouts.tonemapPipelineLayout = rutils::createTonemapPipelineLayout(window, tonemapLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -85,6 +88,7 @@ namespace Kiki {
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
@@ -105,8 +109,11 @@ namespace Kiki {
             ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
 
+            tonemapDescriptors = rutils::allocDescSet(window, descriptorPool.handle, tonemapLayout.handle);
+            initialiseTonemapDescriptorSet(window, doneSSRImage, sampler, tonemapDescriptors);
+
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneTonemapImage, sampler, fxaaDescriptors);
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -361,6 +368,7 @@ namespace Kiki {
 
                 doneLightingImage = rutils::createPostProcessingImage(window, allocator);
                 doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+                doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
             }
 
             {
@@ -372,6 +380,7 @@ namespace Kiki {
                 initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
+                initialiseTonemapDescriptorSet(window, doneSSRImage, sampler, tonemapDescriptors);
             }
 
             auto& registry = World::Get().Registry();
@@ -510,10 +519,12 @@ namespace Kiki {
                 deferredLightingDescriptors,
                 fxaaDescriptors,
                 ssrDescriptors,
+                tonemapDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
                 doneSSRImage,
+                doneTonemapImage,
                 interfaceUBO.buffer,
                 interfaceUniform,
                 interfaceDescriptors,
@@ -1368,6 +1379,7 @@ namespace Kiki {
         pipelines.ssao = {};
         pipelines.ssao_hblur = {};
         pipelines.ssao_blurred = {};
+        pipelines.tonemap = {};
         pipelines.interfaceShape = {};
         pipelines.interfaceText = {};
 
@@ -1377,11 +1389,13 @@ namespace Kiki {
         pipelineLayouts.postprocessPipelineLayout = {};
         pipelineLayouts.ssaoPipelineLayout = {};
         pipelineLayouts.ssaoBlurPipelineLayout = {};
+        pipelineLayouts.tonemapPipelineLayout = {};
         pipelineLayouts.interfaceShapeLayout = {};
         pipelineLayouts.interfaceTextLayout = {};
 
         depthBuffer = {};
         doneLightingImage = {};
+        doneTonemapImage = {};
         doneSSRImage = {};
         sceneUBO = {};
         interfaceUBO = {};
@@ -1394,6 +1408,7 @@ namespace Kiki {
         postProcessingLayout = {};
         ssaoLayout = {};
         ssaoBlurredLayout = {};
+        tonemapLayout = {};
         interfaceLayout = {};
         textLayout = {};
 

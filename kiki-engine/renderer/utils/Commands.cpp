@@ -74,10 +74,12 @@ namespace rutils {
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
 		VkDescriptorSet ssrDescriptors,
+		VkDescriptorSet tonemapDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
         Image const& doneSSRImage,
+        Image const& doneTonemapImage,
         VkBuffer interfaceUBO, Kiki::RenderManager::InterfaceUniform const& interfaceUniform, VkDescriptorSet interfaceDescriptors, VkBuffer interfaceIndexBuffer
     ) {
         // Begin recording commands
@@ -841,6 +843,70 @@ vkCmdEndRendering(aCmdBuff);
         }
 
         {
+            ZoneScopedN("Recording tonemap pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Tonemap pass");
+            #endif
+
+            // begin tonemap pass
+            // transition the image we just rendered to be sampled
+            // TODO: change this once bloom is in
+            imageBarrier(aCmdBuff, doneSSRImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+
+            imageBarrier(aCmdBuff, doneTonemapImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo tonemapColourAttach{};
+            tonemapColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            tonemapColourAttach.imageView = doneTonemapImage.view;
+            tonemapColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            tonemapColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            tonemapColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo tonemapRenderInfo{};
+            tonemapRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            tonemapRenderInfo.layerCount = 1;
+            tonemapRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            tonemapRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            tonemapRenderInfo.colorAttachmentCount = 1;
+            tonemapRenderInfo.pColorAttachments = &tonemapColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &tonemapRenderInfo);
+
+            VkDescriptorSet tonemapSets[] = {
+                tonemapDescriptors
+            };
+
+            // draw fullscreen quad with post-processing shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.tonemap.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.tonemapPipelineLayout.handle, 0, 1, tonemapSets, 0, nullptr);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+            // end tonemap pass
+        }
+
+        {
             ZoneScopedN("Recording FXAA and ImGui pass");
 
             #ifdef TRACY_VK_ENABLE
@@ -849,7 +915,7 @@ vkCmdEndRendering(aCmdBuff);
 
             // begin fxaa pass
             // transition the image we just rendered to be sampled
-            imageBarrier(aCmdBuff, doneSSRImage.image,
+            imageBarrier(aCmdBuff, doneTonemapImage.image,
                 // before
                 VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

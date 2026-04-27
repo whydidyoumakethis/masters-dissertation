@@ -780,6 +780,59 @@ namespace rutils {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = window.hdrFormat;
+        imageInfo.extent.width = window.swapchainExtent.width;
+        imageInfo.extent.height = window.swapchainExtent.height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.flags = 0;
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+
+        if (auto const res = vmaCreateImage(allocator.allocator, &imageInfo, &allocInfo, &image, &allocation, nullptr); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to allocate depth buffer image.\n"
+                "vmaCreateImage() returned {}", toString(res)
+            );
+        }
+
+        Image postProcessingImage( allocator.allocator, image, allocation );
+
+        // Create the image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = postProcessingImage.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = window.hdrFormat;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0, 1,
+            0, 1
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &postProcessingImage.view); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create image view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return postProcessingImage;
+    }
+
+    Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = window.swapchainFormat;
         imageInfo.extent.width = window.swapchainExtent.width;
         imageInfo.extent.height = window.swapchainExtent.height;

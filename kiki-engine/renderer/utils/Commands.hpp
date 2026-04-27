@@ -18,26 +18,28 @@ namespace rutils {
         VkCommandBuffer aCmdBuff,
 # ifdef TRACY_VK_ENABLE
         TracyVkCtx tracyVkCtx,
-# endif
-        Pipelines const& pipelines,
-        PipelineLayouts const& pipelineLayouts,
+		# endif
+        Pipelines const&,
+        PipelineLayouts const&,
         ImageAndView const& swapchainImage,
         Image const& aDepthAttach,
         GBuffers& gbuffers,
-        VkExtent2D const& aImageExtent,
+        VkExtent2D const&,
         VkBuffer aSceneUBO,
-        Kiki::RenderManager::SceneUniform const& aSceneUniform,
+        Kiki::RenderManager::SceneUniform const&,
         VkDescriptorSet aSceneDescriptors,
         VkDescriptorSet ssaoDescriptors,
         VkDescriptorSet ssaoHBlurDescriptors,
         VkDescriptorSet ssaoBlurredDescriptors,
         VkDescriptorSet deferredLightingDescriptors,
-        VkDescriptorSet fxaaDescriptors,
+        VkDescriptorSet ffxaDescriptors,
         VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet tonemapDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
         Image const& doneSSRImage,
+        Image const& doneTonemapImage,
         VkBuffer interfaceUBO, Kiki::RenderManager::InterfaceUniform const& interfaceUniform, VkDescriptorSet interfaceDescriptors, VkBuffer interfaceIndexBuffer
     );
 
