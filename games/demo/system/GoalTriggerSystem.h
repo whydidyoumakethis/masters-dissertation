@@ -3,9 +3,19 @@
 
 class GoalTriggerSystem : public System {
 public:
-	Phase GetPhase() const override { return Phase::Physics; }
+	Phase GetPhase() const override { return Phase::PostUpdate; }
 	void OnUpdate(float dt) override {
-		
+		if (goalReached) {
+			goalReached = false; // reset the flag for next time
+			auto* playerTransform = World::Get().GetComponent<TransformComponent>(playerEntity);
+			auto* cc = World::Get().GetComponent<CharacterComponent>(playerEntity);
+			auto spawnPos = cc->spawnPosition;
+			if (playerTransform) {
+				playerTransform->position = spawnPos;
+				spdlog::info("Resetting player position to spawn point: x={}, y={}, z={}", spawnPos.x, spawnPos.y, spawnPos.z);
+				playerTransform->dirty = true;
+			}
+		}
 	}
 	void OnStart() override {
 		
@@ -29,15 +39,11 @@ public:
 		
 		if ((e.entity1 == playerEntity && e.entity2 == goalEntity) || (e.entity1 == goalEntity && e.entity2 == playerEntity)) {
 			spdlog::info("Player reached the goal! You win!");
-			auto* playerTransform = reg.try_get<TransformComponent>(playerEntity);
-			auto spawnPos = reg.try_get<CharacterComponent>(playerEntity)->spawnPosition;
-			if (playerTransform) {
-				playerTransform->position = spawnPos;
-				playerTransform->dirty = true;
-			}
+			goalReached = true;
 		}
 	}
 private:
+	bool goalReached = false;
 	Entity playerEntity = NullEntity;
 	Entity goalEntity = NullEntity;
 };

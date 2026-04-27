@@ -24,6 +24,8 @@
 #include <cstring>
 
 #include <imgui_impl_vulkan.h>
+#include <tracy/Tracy.hpp>
+#include <tracy/TracyVulkan.hpp>
 
 
 #define GLM_ENABLE_EXPERIMENTAL
@@ -35,6 +37,7 @@ namespace Kiki {
         rutils::Buffer texCoords;
         rutils::Buffer normals;
         rutils::Buffer indices;
+        rutils::Buffer tangents;
         std::uint32_t vertexCount;
         std::uint32_t indexCount;
     };
@@ -42,7 +45,10 @@ namespace Kiki {
     struct Material {
         rutils::Image texture;
         rutils::Image roughnessMetalness;
+        rutils::Image normalMap;
         VkDescriptorSet descriptorSet;
+        bool hasTexture = false;
+        bool hasNormalMap = false;
     };
 
     struct Skybox {
@@ -69,6 +75,11 @@ namespace Kiki {
         std::filesystem::path deferred_geometry_alpha_f = "deferred_geometry_alpha.frag.spv";
         std::filesystem::path deferred_lighting_v = "fullscreen.vert.spv";
         std::filesystem::path deferred_lighting_f = "deferred_lighting.frag.spv";
+        std::filesystem::path fxaa_f = "fxaa.frag.spv";
+        std::filesystem::path ssr_f = "ssr.frag.spv";
+        std::filesystem::path ssao_f = "ssao.frag.spv";
+        std::filesystem::path ssao_hblur_f = "ssao_hblur.frag.spv";
+        std::filesystem::path ssao_vblur_f = "ssao_vblur.frag.spv";
         std::filesystem::path interface_v = "interface.vert.spv";
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
@@ -90,6 +101,7 @@ namespace Kiki {
 
         rutils::Pipelines pipelines;
         rutils::DescriptorSetLayout gBufferLayout;
+        rutils::DescriptorSetLayout postProcessingLayout;
         
         rutils::GBuffers gbuffers;
 
@@ -110,24 +122,40 @@ namespace Kiki {
         rutils::DescriptorSetLayout textLayout;
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
+        rutils::DescriptorSetLayout ssaoLayout;
+        rutils::DescriptorSetLayout ssaoBlurredLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
+        VkDescriptorSet fxaaDescriptors;
+        VkDescriptorSet ssrDescriptors;
+        VkDescriptorSet ssaoDescriptors;
+        VkDescriptorSet ssaoHBlurDescriptors;
+        VkDescriptorSet ssaoBlurredDescriptors;
 
+        rutils::Image doneLightingImage;
+        rutils::Image doneSSRImage;
         rutils::Image depthBuffer;
         rutils::Allocator allocator;
         rutils::Sampler sampler;
         rutils::Sampler fontSampler;
 
         rutils::Image noTexture;
+        rutils::Image noNormalMap;
         VkDescriptorSet noTextureDst;
 
         Skybox skybox;
 
+        std::vector<glm::vec4> ssaoSamples;
+
+        # ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx;
+        # endif
+
         public:
         static RenderManager& get();
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords);
+        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents);
         Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});
@@ -163,6 +191,7 @@ namespace Kiki {
             glm::vec4 lightPos;
             glm::vec4 lightColour;
             glm::vec4 cameraPos;
+            glm::vec4 ssaoSamples[16];
         };
 
         struct InterfaceUniform {
@@ -178,6 +207,7 @@ namespace Kiki {
         static_assert(sizeof(SceneUniform) % 4 == 0, "SceneUniform size must be a multiple of 4 bytes");
 
         ShaderPaths shaderPaths;
+        SceneUniform sceneUniforms;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);

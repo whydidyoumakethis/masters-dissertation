@@ -19,6 +19,11 @@ namespace rutils {
         pipelines.deferred_geometry = createDeferredGeometryPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.deferred_geometry_alpha = createDeferredGeometryAlphaPipeline(window, pipelineLayouts.pbrPipelineLayout.handle);
         pipelines.deferred_lighting = createDeferredLightingPipeline(window, pipelineLayouts.deferredPipelineLayout.handle);
+        pipelines.fxaa = createFXAAPipeline(window, pipelineLayouts.postprocessPipelineLayout.handle);
+        pipelines.ssr = createSSRPipeline(window, pipelineLayouts.postprocessPipelineLayout.handle);
+        pipelines.ssao = createSSAOPipeline(window, pipelineLayouts.ssaoPipelineLayout.handle);
+        pipelines.ssao_hblur = createSSAOHBlurPipeline(window, pipelineLayouts.ssaoBlurPipelineLayout.handle);
+        pipelines.ssao_blurred = createSSAOBlurredPipeline(window, pipelineLayouts.ssaoBlurPipelineLayout.handle);
 
         pipelines.interfaceShape = createInterfacePipeline(window, pipelineLayouts.interfaceShapeLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_shape_f);
         pipelines.interfaceText = createInterfacePipeline(window, pipelineLayouts.interfaceTextLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_text_f);
@@ -61,6 +66,11 @@ namespace rutils {
         vertexInputs[2].stride = sizeof(glm::vec3);
         vertexInputs[2].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
+        // tangents
+        vertexInputs[3].binding = 3;
+        vertexInputs[3].stride = sizeof(glm::vec4);
+        vertexInputs[3].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
         vertexAttributes[0].binding = 0; // must match binding above
         vertexAttributes[0].location = 0; // must match shader
         vertexAttributes[0].format = VK_FORMAT_R32G32B32_SFLOAT;
@@ -76,10 +86,15 @@ namespace rutils {
         vertexAttributes[2].format = VK_FORMAT_R32G32B32_SFLOAT;
         vertexAttributes[2].offset = 0;
 
+        vertexAttributes[3].binding = 3;
+        vertexAttributes[3].location = 3; // must match shader
+        vertexAttributes[3].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+        vertexAttributes[3].offset = 0;
+
         inputInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-        inputInfo->vertexBindingDescriptionCount = 3; // number of vertexInputs above
+        inputInfo->vertexBindingDescriptionCount = 4; // number of vertexInputs above
         inputInfo->pVertexBindingDescriptions = vertexInputs;
-        inputInfo->vertexAttributeDescriptionCount = 3; // number of vertexAttributes above
+        inputInfo->vertexAttributeDescriptionCount = 4; // number of vertexAttributes above
         inputInfo->pVertexAttributeDescriptions = vertexAttributes;
 
         // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
@@ -99,6 +114,92 @@ namespace rutils {
         pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pushRange.offset = 0;
         pushRange.size = sizeof(ObjectData);
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = sizeof(layouts)/sizeof(layouts[0]); // updated!
+        layoutInfo.pSetLayouts = layouts; // updated!
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges = &pushRange;
+
+        VkPipelineLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreatePipelineLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError( "Unable to create pipeline layout\n"
+                "vkCreatePipelineLayout() returned {}", toString(res)
+            );
+        }
+
+        return rutils::PipelineLayout(window.device, layout);
+    }
+
+    PipelineLayout createPostProcessingPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout postProcessingLayout) {
+        VkDescriptorSetLayout layouts[] = {
+            // Order must match the set = N in the shaders
+            sceneLayout, // set 0
+            postProcessingLayout // set 1
+        };
+
+        VkPushConstantRange pushRange{};
+        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushRange.offset = 0;
+        pushRange.size = sizeof(ObjectData);
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = sizeof(layouts)/sizeof(layouts[0]); // updated!
+        layoutInfo.pSetLayouts = layouts; // updated!
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges = &pushRange;
+
+        VkPipelineLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreatePipelineLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError( "Unable to create pipeline layout\n"
+                "vkCreatePipelineLayout() returned {}", toString(res)
+            );
+        }
+
+        return rutils::PipelineLayout(window.device, layout);
+    }
+
+    PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout) {
+        VkDescriptorSetLayout layouts[] = {
+            // Order must match the set = N in the shaders
+            sceneLayout, // set 0
+            ssaoLayout // set 1
+        };
+
+        VkPushConstantRange pushRange{};
+        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushRange.offset = 0;
+        pushRange.size = sizeof(SSAOSettings);
+
+        VkPipelineLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        layoutInfo.setLayoutCount = sizeof(layouts)/sizeof(layouts[0]); // updated!
+        layoutInfo.pSetLayouts = layouts; // updated!
+        layoutInfo.pushConstantRangeCount = 1;
+        layoutInfo.pPushConstantRanges = &pushRange;
+
+        VkPipelineLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreatePipelineLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError( "Unable to create pipeline layout\n"
+                "vkCreatePipelineLayout() returned {}", toString(res)
+            );
+        }
+
+        return rutils::PipelineLayout(window.device, layout);
+    }
+
+    PipelineLayout createSSAOBlurPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaoBlurLayout) {
+        VkDescriptorSetLayout layouts[] = {
+            // Order must match the set = N in the shaders
+            ssaoBlurLayout // set 0
+        };
+
+        VkPushConstantRange pushRange{};
+        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushRange.offset = 0;
+        pushRange.size = sizeof(SSAOSettings);
 
         VkPipelineLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -207,8 +308,8 @@ namespace rutils {
         stages[1].module = fragModule;
         stages[1].pName = "main";
 
-        VkVertexInputBindingDescription vertexInputs[3]{};
-        VkVertexInputAttributeDescription vertexAttributes[3]{};
+        VkVertexInputBindingDescription vertexInputs[4]{};
+        VkVertexInputAttributeDescription vertexAttributes[4]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -338,8 +439,8 @@ namespace rutils {
         stages[1].pName = "main";
 
 
-        VkVertexInputBindingDescription vertexInputs[3]{};
-        VkVertexInputAttributeDescription vertexAttributes[3]{};
+        VkVertexInputBindingDescription vertexInputs[4]{};
+        VkVertexInputAttributeDescription vertexAttributes[4]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -467,8 +568,8 @@ namespace rutils {
         stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
         stages[1].module = fragModule;
         stages[1].pName = "main";
-        VkVertexInputBindingDescription vertexInputs[3]{};
-        VkVertexInputAttributeDescription vertexAttributes[3]{};
+        VkVertexInputBindingDescription vertexInputs[4]{};
+        VkVertexInputAttributeDescription vertexAttributes[4]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -528,7 +629,7 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT};
         renderingInfo.colorAttachmentCount = 4;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
@@ -598,8 +699,8 @@ namespace rutils {
         stages[1].module = fragModule;
         stages[1].pName = "main";
 
-        VkVertexInputBindingDescription vertexInputs[3]{};
-        VkVertexInputAttributeDescription vertexAttributes[3]{};
+        VkVertexInputBindingDescription vertexInputs[4]{};
+        VkVertexInputAttributeDescription vertexAttributes[4]{};
         VkPipelineVertexInputStateCreateInfo inputInfo{};
         VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
         setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
@@ -672,7 +773,7 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R8G8B8A8_UNORM};
+        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT};
         renderingInfo.colorAttachmentCount = 4;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
@@ -835,6 +936,636 @@ namespace rutils {
         return Pipeline(aWindow.device, pipe);
     }
 
+    Pipeline createFXAAPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        // load shader code
+        // we only use the vertex and fragment shaders here
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.fxaa_f.string().c_str());
+
+        VkShaderModuleCreateInfo code[2]{};
+        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
+
+        code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
+
+        // Define shader stages in the pipeline
+        VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
+        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
+        stages[0].pName = "main";
+
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
+        stages[1].pName = "main";
+
+        // empty as we're generating the fullscreen quad procedurally
+        VkPipelineVertexInputStateCreateInfo inputInfo{};
+        inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
+        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+        assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        assemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+        // define viewport and scissor regions
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkPipelineViewportStateCreateInfo viewportInfo{};
+        setup_viewport(aWindow, &viewport, &scissor, &viewportInfo);
+
+        // define rasterisation options
+        VkPipelineRasterizationStateCreateInfo rasterInfo{};
+        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterInfo.depthClampEnable = VK_FALSE;
+        rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.lineWidth = 1.f; // required
+
+        // define multisampling state
+        VkPipelineMultisampleStateCreateInfo samplingInfo{};
+        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        // define blend state
+        VkPipelineColorBlendAttachmentState blendStates[1]{};
+        blendStates[0].blendEnable = VK_FALSE;
+        blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+        VkPipelineColorBlendStateCreateInfo blendInfo{};
+        blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        blendInfo.logicOpEnable = VK_FALSE;
+        blendInfo.attachmentCount = 1;
+        blendInfo.pAttachments = blendStates;
+
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_FALSE;
+        depthInfo.depthWriteEnable = VK_FALSE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
+
+        // pipeline rendering info
+        // related to dynamic rendering (core in Vulkan 1.3)
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        
+        VkFormat const colorFormats[] = {aWindow.swapchainFormat};
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = colorFormats;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+
+        // create pipeline
+        VkGraphicsPipelineCreateInfo pipeInfo{};
+        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeInfo.pNext = &renderingInfo;
+
+        pipeInfo.stageCount = 2;
+        pipeInfo.pStages = stages;
+
+        pipeInfo.pVertexInputState = &inputInfo;
+        pipeInfo.pInputAssemblyState = &assemblyInfo;
+        pipeInfo.pTessellationState = nullptr; // no tessellation
+        pipeInfo.pViewportState = &viewportInfo;
+        pipeInfo.pRasterizationState = &rasterInfo;
+        pipeInfo.pMultisampleState = &samplingInfo;
+        pipeInfo.pDepthStencilState = &depthInfo;
+        pipeInfo.pColorBlendState = &blendInfo;
+        pipeInfo.pDynamicState = nullptr; // no dynamic states
+
+        pipeInfo.layout = aPipelineLayout;
+        pipeInfo.subpass = 0; // first subpass of aRenderPass
+
+        VkPipeline pipe = VK_NULL_HANDLE;
+        if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+        }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
+        return Pipeline(aWindow.device, pipe);
+    }
+
+    Pipeline createSSAOPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        // load shader code
+        // we only use the vertex and fragment shaders here
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.ssao_f.string().c_str());
+
+        VkShaderModuleCreateInfo code[2]{};
+        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
+
+        code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
+
+        // Define shader stages in the pipeline
+        VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
+        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
+        stages[0].pName = "main";
+
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
+        stages[1].pName = "main";
+
+        // empty as we're generating the fullscreen quad procedurally
+        VkPipelineVertexInputStateCreateInfo inputInfo{};
+        inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
+        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+        assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        assemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+        // define viewport and scissor regions
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkPipelineViewportStateCreateInfo viewportInfo{};
+        setup_viewport(aWindow, &viewport, &scissor, &viewportInfo);
+
+        // define rasterisation options
+        VkPipelineRasterizationStateCreateInfo rasterInfo{};
+        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterInfo.depthClampEnable = VK_FALSE;
+        rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.lineWidth = 1.f; // required
+
+        // define multisampling state
+        VkPipelineMultisampleStateCreateInfo samplingInfo{};
+        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        // define blend state
+        VkPipelineColorBlendAttachmentState blendStates[1]{};
+        blendStates[0].blendEnable = VK_FALSE;
+        blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+
+        VkPipelineColorBlendStateCreateInfo blendInfo{};
+        blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        blendInfo.logicOpEnable = VK_FALSE;
+        blendInfo.attachmentCount = 1;
+        blendInfo.pAttachments = blendStates;
+
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_FALSE;
+        depthInfo.depthWriteEnable = VK_FALSE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
+
+        // pipeline rendering info
+        // related to dynamic rendering (core in Vulkan 1.3)
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        
+        VkFormat const colorFormats[] = {VK_FORMAT_R16_SFLOAT};
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = colorFormats;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+        // create pipeline
+        VkGraphicsPipelineCreateInfo pipeInfo{};
+        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeInfo.pNext = &renderingInfo;
+
+        pipeInfo.stageCount = 2;
+        pipeInfo.pStages = stages;
+
+        pipeInfo.pVertexInputState = &inputInfo;
+        pipeInfo.pInputAssemblyState = &assemblyInfo;
+        pipeInfo.pTessellationState = nullptr; // no tessellation
+        pipeInfo.pViewportState = &viewportInfo;
+        pipeInfo.pRasterizationState = &rasterInfo;
+        pipeInfo.pMultisampleState = &samplingInfo;
+        pipeInfo.pDepthStencilState = &depthInfo;
+        pipeInfo.pColorBlendState = &blendInfo;
+        pipeInfo.pDynamicState = nullptr; // no dynamic states
+
+        pipeInfo.layout = aPipelineLayout;
+        pipeInfo.subpass = 0; // first subpass of aRenderPass
+
+        VkPipeline pipe = VK_NULL_HANDLE;
+        if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+        }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
+        return Pipeline(aWindow.device, pipe);
+    }
+
+    Pipeline createSSAOHBlurPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        // load shader code
+        // we only use the vertex and fragment shaders here
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.ssao_hblur_f.string().c_str());
+
+        VkShaderModuleCreateInfo code[2]{};
+        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
+
+        code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
+
+        // Define shader stages in the pipeline
+        VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
+        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
+        stages[0].pName = "main";
+
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
+        stages[1].pName = "main";
+
+        // empty as we're generating the fullscreen quad procedurally
+        VkPipelineVertexInputStateCreateInfo inputInfo{};
+        inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
+        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+        assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        assemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+        // define viewport and scissor regions
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkPipelineViewportStateCreateInfo viewportInfo{};
+        setup_viewport(aWindow, &viewport, &scissor, &viewportInfo);
+
+        // define rasterisation options
+        VkPipelineRasterizationStateCreateInfo rasterInfo{};
+        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterInfo.depthClampEnable = VK_FALSE;
+        rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.lineWidth = 1.f; // required
+
+        // define multisampling state
+        VkPipelineMultisampleStateCreateInfo samplingInfo{};
+        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        // define blend state
+        VkPipelineColorBlendAttachmentState blendStates[1]{};
+        blendStates[0].blendEnable = VK_FALSE;
+        blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+
+        VkPipelineColorBlendStateCreateInfo blendInfo{};
+        blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        blendInfo.logicOpEnable = VK_FALSE;
+        blendInfo.attachmentCount = 1;
+        blendInfo.pAttachments = blendStates;
+
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_FALSE;
+        depthInfo.depthWriteEnable = VK_FALSE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
+
+        // pipeline rendering info
+        // related to dynamic rendering (core in Vulkan 1.3)
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        
+        VkFormat const colorFormats[] = {VK_FORMAT_R16_SFLOAT};
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = colorFormats;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+        // create pipeline
+        VkGraphicsPipelineCreateInfo pipeInfo{};
+        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeInfo.pNext = &renderingInfo;
+
+        pipeInfo.stageCount = 2;
+        pipeInfo.pStages = stages;
+
+        pipeInfo.pVertexInputState = &inputInfo;
+        pipeInfo.pInputAssemblyState = &assemblyInfo;
+        pipeInfo.pTessellationState = nullptr; // no tessellation
+        pipeInfo.pViewportState = &viewportInfo;
+        pipeInfo.pRasterizationState = &rasterInfo;
+        pipeInfo.pMultisampleState = &samplingInfo;
+        pipeInfo.pDepthStencilState = &depthInfo;
+        pipeInfo.pColorBlendState = &blendInfo;
+        pipeInfo.pDynamicState = nullptr; // no dynamic states
+
+        pipeInfo.layout = aPipelineLayout;
+        pipeInfo.subpass = 0; // first subpass of aRenderPass
+
+        VkPipeline pipe = VK_NULL_HANDLE;
+        if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+        }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
+        return Pipeline(aWindow.device, pipe);
+    }
+
+    Pipeline createSSAOBlurredPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        // load shader code
+        // we only use the vertex and fragment shaders here
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.ssao_vblur_f.string().c_str());
+
+        VkShaderModuleCreateInfo code[2]{};
+        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
+
+        code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
+
+        // Define shader stages in the pipeline
+        VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
+        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
+        stages[0].pName = "main";
+
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
+        stages[1].pName = "main";
+
+        // empty as we're generating the fullscreen quad procedurally
+        VkPipelineVertexInputStateCreateInfo inputInfo{};
+        inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
+        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+        assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        assemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+        // define viewport and scissor regions
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkPipelineViewportStateCreateInfo viewportInfo{};
+        setup_viewport(aWindow, &viewport, &scissor, &viewportInfo);
+
+        // define rasterisation options
+        VkPipelineRasterizationStateCreateInfo rasterInfo{};
+        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterInfo.depthClampEnable = VK_FALSE;
+        rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.lineWidth = 1.f; // required
+
+        // define multisampling state
+        VkPipelineMultisampleStateCreateInfo samplingInfo{};
+        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        // define blend state
+        VkPipelineColorBlendAttachmentState blendStates[1]{};
+        blendStates[0].blendEnable = VK_FALSE;
+        blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT;
+
+        VkPipelineColorBlendStateCreateInfo blendInfo{};
+        blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        blendInfo.logicOpEnable = VK_FALSE;
+        blendInfo.attachmentCount = 1;
+        blendInfo.pAttachments = blendStates;
+
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_FALSE;
+        depthInfo.depthWriteEnable = VK_FALSE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
+
+        // pipeline rendering info
+        // related to dynamic rendering (core in Vulkan 1.3)
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        
+        VkFormat const colorFormats[] = {VK_FORMAT_R16_SFLOAT};
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = colorFormats;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+        // create pipeline
+        VkGraphicsPipelineCreateInfo pipeInfo{};
+        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeInfo.pNext = &renderingInfo;
+
+        pipeInfo.stageCount = 2;
+        pipeInfo.pStages = stages;
+
+        pipeInfo.pVertexInputState = &inputInfo;
+        pipeInfo.pInputAssemblyState = &assemblyInfo;
+        pipeInfo.pTessellationState = nullptr; // no tessellation
+        pipeInfo.pViewportState = &viewportInfo;
+        pipeInfo.pRasterizationState = &rasterInfo;
+        pipeInfo.pMultisampleState = &samplingInfo;
+        pipeInfo.pDepthStencilState = &depthInfo;
+        pipeInfo.pColorBlendState = &blendInfo;
+        pipeInfo.pDynamicState = nullptr; // no dynamic states
+
+        pipeInfo.layout = aPipelineLayout;
+        pipeInfo.subpass = 0; // first subpass of aRenderPass
+
+        VkPipeline pipe = VK_NULL_HANDLE;
+        if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+        }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
+        return Pipeline(aWindow.device, pipe);
+    }
+
+    Pipeline createSSRPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        // load shader code
+        // we only use the vertex and fragment shaders here
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
+        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.ssr_f.string().c_str());
+
+        VkShaderModuleCreateInfo code[2]{};
+        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
+
+        code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[1].codeSize = fShader.size()*sizeof(std::uint32_t);
+        code[1].pCode = fShader.data();
+
+        // Define shader stages in the pipeline
+        VkPipelineShaderStageCreateInfo stages[2]{};
+        VkShaderModule vertModule;
+        VkShaderModule fragModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+        vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule);
+
+        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
+        stages[0].pName = "main";
+
+        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+        stages[1].module = fragModule;
+        stages[1].pName = "main";
+
+        // empty as we're generating the fullscreen quad procedurally
+        VkPipelineVertexInputStateCreateInfo inputInfo{};
+        inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+
+        // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
+        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+        assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
+        assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
+        assemblyInfo.primitiveRestartEnable = VK_FALSE;
+
+        // define viewport and scissor regions
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkPipelineViewportStateCreateInfo viewportInfo{};
+        setup_viewport(aWindow, &viewport, &scissor, &viewportInfo);
+
+        // define rasterisation options
+        VkPipelineRasterizationStateCreateInfo rasterInfo{};
+        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterInfo.depthClampEnable = VK_FALSE;
+        rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.lineWidth = 1.f; // required
+
+        // define multisampling state
+        VkPipelineMultisampleStateCreateInfo samplingInfo{};
+        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        // define blend state
+        VkPipelineColorBlendAttachmentState blendStates[1]{};
+        blendStates[0].blendEnable = VK_FALSE;
+        blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+
+        VkPipelineColorBlendStateCreateInfo blendInfo{};
+        blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
+        blendInfo.logicOpEnable = VK_FALSE;
+        blendInfo.attachmentCount = 1;
+        blendInfo.pAttachments = blendStates;
+
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_FALSE;
+        depthInfo.depthWriteEnable = VK_FALSE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
+
+        // pipeline rendering info
+        // related to dynamic rendering (core in Vulkan 1.3)
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        
+        VkFormat const colorFormats[] = {aWindow.swapchainFormat};
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachmentFormats = colorFormats;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+
+        // create pipeline
+        VkGraphicsPipelineCreateInfo pipeInfo{};
+        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeInfo.pNext = &renderingInfo;
+
+        pipeInfo.stageCount = 2;
+        pipeInfo.pStages = stages;
+
+        pipeInfo.pVertexInputState = &inputInfo;
+        pipeInfo.pInputAssemblyState = &assemblyInfo;
+        pipeInfo.pTessellationState = nullptr; // no tessellation
+        pipeInfo.pViewportState = &viewportInfo;
+        pipeInfo.pRasterizationState = &rasterInfo;
+        pipeInfo.pMultisampleState = &samplingInfo;
+        pipeInfo.pDepthStencilState = &depthInfo;
+        pipeInfo.pColorBlendState = &blendInfo;
+        pipeInfo.pDynamicState = nullptr; // no dynamic states
+
+        pipeInfo.layout = aPipelineLayout;
+        pipeInfo.subpass = 0; // first subpass of aRenderPass
+
+        VkPipeline pipe = VK_NULL_HANDLE;
+        if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create graphics pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+        }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
+        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
+        return Pipeline(aWindow.device, pipe);
+    }
+    
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath) {
         auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.interface_v.string().c_str());
         auto const fShader = rutils::loadShader(fShaderPath.string().c_str());

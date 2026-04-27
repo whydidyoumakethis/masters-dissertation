@@ -15,24 +15,31 @@ namespace rutils {
     VkCommandBuffer allocCommandBuffer(VulkanWindow const& window, VkCommandPool pool);
 
     void recordCommands(
-		VkCommandBuffer,
-		Pipelines const&,
-		PipelineLayouts const&,
-		ImageAndView const&,
-		Image const& aDepthAttach,
-		GBuffers& gbuffers,
-		VkExtent2D const&,
-		VkBuffer aSceneUBO,
-		Kiki::RenderManager::SceneUniform const&,
-		VkDescriptorSet aSceneDescriptors,
-		VkDescriptorSet deferredLightingDescriptors,
-		VkDescriptorSet noTexture,
-		Kiki::Skybox const& skybox,
-		VkBuffer interfaceUBO,
-		Kiki::RenderManager::InterfaceUniform const&,
-		VkDescriptorSet layoutDescriptors,
-		VkBuffer interfaceIndexBuffer
-	);
+        VkCommandBuffer aCmdBuff,
+# ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx,
+# endif
+        Pipelines const& pipelines,
+        PipelineLayouts const& pipelineLayouts,
+        ImageAndView const& swapchainImage,
+        Image const& aDepthAttach,
+        GBuffers& gbuffers,
+        VkExtent2D const& aImageExtent,
+        VkBuffer aSceneUBO,
+        Kiki::RenderManager::SceneUniform const& aSceneUniform,
+        VkDescriptorSet aSceneDescriptors,
+        VkDescriptorSet ssaoDescriptors,
+        VkDescriptorSet ssaoHBlurDescriptors,
+        VkDescriptorSet ssaoBlurredDescriptors,
+        VkDescriptorSet deferredLightingDescriptors,
+        VkDescriptorSet fxaaDescriptors,
+        VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet noTexture,
+        Kiki::Skybox const& skybox,
+        Image const& doneLightingImage,
+        Image const& doneSSRImage,
+        VkBuffer interfaceUBO, Kiki::RenderManager::InterfaceUniform const& interfaceUniform, VkDescriptorSet interfaceDescriptors, VkBuffer interfaceIndexBuffer
+    );
 
 	void submitCommands(
 		VulkanWindow const&,
