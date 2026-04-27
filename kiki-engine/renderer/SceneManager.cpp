@@ -343,6 +343,12 @@ namespace Kiki {
             case McolliderType::BOX:
                 colliderShape = CreateConvexHull(mesh.vertices);
                 break;
+            case McolliderType::SPHERE:
+                colliderShape = CreateConvexHull(mesh.vertices);
+				break;
+            case McolliderType::CAPSULE:
+                colliderShape = CreateConvexHull(mesh.vertices);
+				break;
             case McolliderType::CONVEX_HULL:
                 colliderShape = CreateConvexHull(mesh.vertices);
                 break;
