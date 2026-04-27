@@ -200,18 +200,22 @@ namespace Kiki {
 
     void PhysicsSystem::UpdateIsGrounded(entt::entity entity, float maxDistance) {
         auto& reg = World::Get().Registry();
-        if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
-			auto box = mcc->shape.GetPtr()->GetLocalBounds();
-            float bottom = box.mMin.GetY();
-			auto physic = reg.ctx().get<PhysicsService>();
-            auto result = physic.Raycast(
-                reg.get<TransformComponent>(entity).position,
-                glm::vec3(0, -1, 0),
-                -bottom + maxDistance,
-                reg.get<RigidBodyComponent>(entity).bodyID);
-			if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
-                ip->isGrounded = result.hasHit;
-            }
+        auto physic = reg.ctx().get<PhysicsService>();
+
+        glm::vec3 rayOrigin = reg.get<TransformComponent>(entity).position;
+
+        rayOrigin.y += 0.5f;
+
+        float testRayLength = 3.0f;
+
+        auto result = physic.Raycast(
+            rayOrigin,
+            glm::vec3(0, -1, 0),
+            testRayLength,
+            reg.get<RigidBodyComponent>(entity).bodyID);
+
+        if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
+            ip->isGrounded = result.hasHit;
         }
     }
 

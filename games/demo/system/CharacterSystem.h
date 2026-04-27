@@ -86,6 +86,11 @@ private:
         bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT);
         float speed = isRunning ? character.runSpeed : character.walkSpeed;
 
+        // 获取底层 Jolt 物理刚体现有的速度（为了保留 Y 轴的重力和跳跃速度）
+        PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+        auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
+        JPH::Vec3 currentJoltVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
+
         if (glm::length(inputDir) > 0.001f) {
 			// normalize to prevent faster diagonal movement
             inputDir = glm::normalize(inputDir);
@@ -105,13 +110,19 @@ private:
 			// record target facing direction (character faces movement direction)
             //character.targetYaw = glm::degrees(atan2(moveDir.x, moveDir.z));
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
+
+            // 重新设置速度，X 和 Z 用我们算好的，Y 用物理引擎的
+            glm::vec3 newVel = glm::vec3(character.velocity.x, currentJoltVel.GetY(), character.velocity.z);
+            physics.setEntityVelocity(playerEntity, newVel);
         }
         else {
 			// TODO: apply friction to slow down instead of stopping immediately
 			// or just connect with physics system
             character.velocity.x = 0.0f;
             character.velocity.z = 0.0f;
-            return;
+            // 不按键时，只清零水平速度，依然保留 Y 轴物理速度
+            glm::vec3 newVel = glm::vec3(0.0f, currentJoltVel.GetY(), 0.0f);
+            physics.setEntityVelocity(playerEntity, newVel);
         }
         transform.position += character.velocity * dt;
 		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
@@ -125,10 +136,14 @@ private:
         PhysicalAttributesComponent& ip,
         float dt)
     {
-        if (inputManager.isKeyDown(GLFW_KEY_SPACE)
-			&& character.state != CharacterState::Jumping
-            ) {
-			ip.impulse.y += character.jumpForce;
+        if (inputManager.isKeyDown(GLFW_KEY_SPACE) && character.state != CharacterState::Jumping) {
+            PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+            auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
+            JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
+
+            // 直接给 Y 轴一个固定的起跳速度，不受质量影响
+            physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
+
             character.state = CharacterState::Jumping;
         }
     }
@@ -161,11 +176,15 @@ private:
         transform.dirty = true;
     }
     void UpdateState(CharacterComponent& character, PhysicalAttributesComponent& pa) {
-        float currentSpeed = glm::length(glm::vec2(character.velocity.x, character.velocity.z));
         bool isMoving = glm::length(glm::vec2(character.velocity.x, character.velocity.z)) > 0.1f;
+        float currentSpeed = glm::length(glm::vec2(character.velocity.x, character.velocity.z));
+
+        PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+        auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
+        float realVy = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID).GetY();
 
         if (character.state == CharacterState::Jumping) {
-            if (character.velocity.y <= 0.0f && pa.isGrounded) { 
+            if (realVy <= 0.1f && pa.isGrounded) {
                 character.state = isMoving ? CharacterState::Walking : CharacterState::Idle;
             }
             return;

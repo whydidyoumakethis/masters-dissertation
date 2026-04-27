@@ -339,29 +339,46 @@ namespace Kiki {
              }
 
             switch (instance.colliderType) {
-
             case McolliderType::BOX:
-                colliderShape = CreateConvexHull(mesh.vertices);
+                registry.emplace<BoxColliderComponent>(model);
+                spdlog::info("[Physics] Attached BOX collider to mesh: '{}'", mesh.name);
                 break;
+
             case McolliderType::SPHERE:
-                colliderShape = CreateConvexHull(mesh.vertices);
-				break;
-            case McolliderType::CAPSULE:
-                colliderShape = CreateConvexHull(mesh.vertices);
-				break;
-            case McolliderType::CONVEX_HULL:
-                colliderShape = CreateConvexHull(mesh.vertices);
+                registry.emplace<SphereColliderComponent>(model);
+                spdlog::info("[Physics] Attached SPHERE collider to mesh: '{}'", mesh.name);
                 break;
+
+            case McolliderType::CAPSULE:
+                registry.emplace<CapsuleColliderComponent>(model);
+                spdlog::info("[Physics] Attached CAPSULE collider to mesh: '{}'", mesh.name);
+                break;
+
+            case McolliderType::CONVEX_HULL:
+                if (auto hull = CreateConvexHull(mesh.vertices)) {
+                    registry.emplace<MeshColliderComponent>(model, hull);
+                    spdlog::info("[Physics] Attached CONVEX_HULL collider to mesh: '{}'", mesh.name);
+                }
+                else {
+                    spdlog::warn("[Physics] Failed to create CONVEX_HULL for mesh: '{}'", mesh.name);
+                }
+                break;
+
             case McolliderType::MESH:
-                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+            case McolliderType::NONE:
+            default:
+                if (auto triMesh = CreateTriangleMesh(mesh.vertices, mesh.indices)) {
+                    registry.emplace<MeshColliderComponent>(model, triMesh);
+                    spdlog::info("[Physics] Attached TRIANGLE_MESH (Default) collider to mesh: '{}'", mesh.name);
+                }
+                else {
+                    spdlog::warn("[Physics] Failed to create TRIANGLE_MESH for mesh: '{}'", mesh.name);
+                }
                 break;
             }
 
-            if (colliderShape) {
-                registry.emplace<MeshColliderComponent>(model, colliderShape);
-				registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
-                registry.emplace<PhysicalAttributesComponent>(model);
-            }
+            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+            registry.emplace<PhysicalAttributesComponent>(model);
 
 			// Misc tags
             if (instance.miscTag != MmiscTags::NONE) {
