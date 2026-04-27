@@ -363,14 +363,45 @@ namespace rutils {
                             ObjectData objData = ObjectData(transform.worldMatrix, glm::vec4(colour, 1.0f), flags);
 
                             // Bind vertex input
-                            VkBuffer buffers[4] = { mesh.positions.buffer, mesh.texCoords.buffer, mesh.normals.buffer, mesh.tangents.buffer };
-                            VkDeviceSize offsets[4]{};
+                            VkBuffer buffers[6] = {
+                                mesh.positions.buffer,
+                                mesh.texCoords.buffer,
+                                mesh.normals.buffer,
+                                mesh.tangents.buffer,
+                                mesh.boneIDs.buffer,
+                                mesh.weights.buffer
+                            };
+                            VkDeviceSize offsets[6]{};
 
-                            vkCmdBindVertexBuffers(aCmdBuff, 0, 4, buffers, offsets);
+                            vkCmdBindVertexBuffers(aCmdBuff, 0, 6, buffers, offsets);
                             vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
                             vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(objData), &objData);
 
+                            auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
+
+                            if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
+                                vkCmdBindDescriptorSets(
+                                    aCmdBuff,
+                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    pipelineLayouts.pbrPipelineLayout.handle,
+                                    2, 
+                                    1,
+                                    &animComp->descriptorSet,
+                                    0, nullptr
+                                );
+                            }
+                            else {
+                                vkCmdBindDescriptorSets(
+                                    aCmdBuff,
+                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                                    pipelineLayouts.pbrPipelineLayout.handle,
+                                    2,
+                                    1,
+                                    &dummyAnimationDesc,
+                                    0, nullptr
+                                );
+                            }
                             // Draw mesh
                             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
                         } else {
@@ -712,8 +743,6 @@ namespace rutils {
                 VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
             );
 
-            // Draw mesh
-            vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
             VkRenderingAttachmentInfo ssaoColourAttach{};
             ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
             ssaoColourAttach.imageView = gbuffers.ssao_blurred.view;

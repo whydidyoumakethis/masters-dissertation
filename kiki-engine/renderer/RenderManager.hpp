@@ -180,7 +180,6 @@ namespace Kiki {
         rutils::Buffer allocateAnimationBuffer();
         VkDescriptorSet allocateAnimationDescriptorSet(const rutils::Buffer& buffer);
 
-        Mesh allocateMesh(std::vector<float> positions, std::vector<std::uint32_t> indices, std::vector<float> normals, std::vector<float> texCoords, std::vector<float> tangents);
         Mesh allocateSkyboxMesh(std::vector<float> positions, std::vector<std::uint32_t> indices);
 
         void initialise(WindowInfo info = Kiki::WindowInfo{});

@@ -37,12 +37,11 @@ namespace Kiki {
         std::vector<std::uint32_t> const& indices,
         std::vector<glm::vec3> const& normals,
         std::vector<glm::vec2> const& texCoords,
+        std::vector<glm::vec4> const& tangents,
         std::vector<glm::ivec4> const& boneIDs,  
         std::vector<glm::vec4> const& weights  
     )
     {
-        std::vector<float> p, t, n;
-    int SceneManager::createMesh(std::vector<glm::vec3> const& positions, std::vector<std::uint32_t> const& indices, std::vector<glm::vec3> const& normals, std::vector<glm::vec2> const& texCoords, std::vector<glm::vec4> const& tangents) {
         std::vector<float> p, t, n, tangents_dst;
 
         for (glm::vec3 pos : positions) {
@@ -74,7 +73,6 @@ namespace Kiki {
 
         //spdlog::info("Allocating Mesh -> Pos: {}, Indices: {}, Normals: {}, UVs: {}, Bones: {}, Weights: {}", p.size(), indices.size(), n.size(), t.size(), bIDs.size(), bWeights.size());
 
-        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, bIDs, bWeights));
         for (glm::vec4 tan : tangents) {
             tangents_dst.emplace_back(tan.x);
             tangents_dst.emplace_back(tan.y);
@@ -82,7 +80,7 @@ namespace Kiki {
             tangents_dst.emplace_back(tan.w);
         }
 
-        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, tangents_dst));
+        meshes.emplace_back(RenderManager::get().allocateMesh(p, indices, n, t, tangents_dst, bIDs, bWeights));
 
         return meshes.size() - 1;
     }
@@ -135,7 +133,7 @@ namespace Kiki {
         Mtexture texture = Kiki::GltfLoaderAssimp::loadTexture(fullPath, 0);
 
         registry.emplace<TransformComponent>(model);
-        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs, mesh.tangents));
+        registry.emplace<MeshComponent>(model, createMesh(mesh.vertices, mesh.indices, mesh.normals, mesh.uvs, mesh.tangents, mesh.boneIDs, mesh.weights));
         registry.emplace<TagComponent>(model, entt::hashed_string(name.c_str()), name);
 
         registry.emplace<MeshComponent>(model, createMesh(
@@ -143,6 +141,7 @@ namespace Kiki {
             mesh.indices,
             mesh.normals,
             mesh.uvs,
+            mesh.tangents,
             mesh.boneIDs, 
             mesh.weights 
         ));

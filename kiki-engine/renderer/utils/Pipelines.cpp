@@ -120,6 +120,7 @@ namespace rutils {
         inputInfo->vertexBindingDescriptionCount = 6; // number of vertexInputs above
         inputInfo->pVertexBindingDescriptions = vertexInputs;
         inputInfo->vertexAttributeDescriptionCount = 6; // number of vertexAttributes above
+        inputInfo->pVertexAttributeDescriptions = vertexAttributes;
 
         // define which primitive (point, line, triangle...) the input is assembled into for rasterisation
         assemblyInfo->sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
