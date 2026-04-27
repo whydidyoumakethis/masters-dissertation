@@ -385,12 +385,21 @@ namespace Kiki {
         // glfwPollEvents(); called in input manager
         
         if (recreateSwapchain) {
+
+
             ZoneScopedN("Recreate swapchain");
+
+            // Wait until window is not minimized (size > 0)
+            int width = 0, height = 0;
+            glfwGetFramebufferSize(window.window, &width, &height);
+            while (width == 0 || height == 0) {
+                glfwGetFramebufferSize(window.window, &width, &height);
+                glfwWaitEvents();
+            }
 
             // We need to destroy several objects, which may still be in use by the GPU. Therefore, first wait for the GPU
             // to finish processing.
             vkDeviceWaitIdle(window.device);
-
             // Recreate resources
             {
                 ZoneScopedN("Creating resources");
