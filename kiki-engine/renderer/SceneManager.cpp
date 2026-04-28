@@ -371,7 +371,7 @@ namespace Kiki {
                     joltHalfHeight = 0.05f;
                 }
 
-                registry.emplace<CapsuleColliderComponent>(model, radius, joltHalfHeight);
+                registry.emplace<CapsuleColliderComponent>(model, radius/2, joltHalfHeight);
 
                 spdlog::info("[Physics] Calculated CAPSULE: Radius = {:.2f}, HalfHeight = {:.2f}, TotalHeight = {:.2f}",
                     radius, joltHalfHeight, sizeY);
@@ -401,7 +401,9 @@ namespace Kiki {
                 break;
             }
 
-            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+            //registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+            bool isPlayer = (instance.miscTag == MmiscTags::PLAYER);
+            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer, 0.0f, 0.5f, false, isPlayer);
             registry.emplace<PhysicalAttributesComponent>(model);
 
 			// Misc tags
