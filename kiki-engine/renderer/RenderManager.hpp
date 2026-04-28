@@ -68,7 +68,7 @@ namespace Kiki {
 
     struct ShadowCubemap {
         rutils::Image cubemap;
-        std::array<VkImageView, 6> faceViews;
+        VkImageView arrayView = VK_NULL_HANDLE;
     };
 
     struct WindowExtent {

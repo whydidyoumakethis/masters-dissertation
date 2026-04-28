@@ -1101,10 +1101,10 @@ namespace rutils {
         // related to dynamic rendering (core in Vulkan 1.3)
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-        
         renderingInfo.colorAttachmentCount = 0;
         renderingInfo.pColorAttachmentFormats = nullptr;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+        renderingInfo.viewMask = 0x3F; // 6 faces
 
         // create pipeline
         VkGraphicsPipelineCreateInfo pipeInfo{};

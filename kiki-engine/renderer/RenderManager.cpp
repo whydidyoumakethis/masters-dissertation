@@ -125,7 +125,7 @@ namespace Kiki {
             for (int i = 0; i < 8; i++) {
                 ShadowCubemap shadowCubemap{};
                 shadowCubemap.cubemap = rutils::createShadowCubemap(window, allocator);
-                shadowCubemap.faceViews = rutils::createShadowCubemapFaceViews(window, shadowCubemap.cubemap);
+                shadowCubemap.arrayView = rutils::createShadowCubemapArrayView(window, shadowCubemap.cubemap);
                 shadowCubemaps.push_back(std::move(shadowCubemap));
             }
 
@@ -1655,11 +1655,9 @@ namespace Kiki {
         pipelineLayouts.shadowMapPipelineLayout = {};
 
         for (auto& shadowCubemap : shadowCubemaps) {
-            for (auto& faceView : shadowCubemap.faceViews) {
-                if (faceView != VK_NULL_HANDLE) {
-                    vkDestroyImageView(window.device, faceView, nullptr);
-                    faceView = VK_NULL_HANDLE;
-                }
+            if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
+                vkDestroyImageView(window.device, shadowCubemap.arrayView, nullptr);
+                shadowCubemap.arrayView = VK_NULL_HANDLE;
             }
         }
         shadowCubemaps.clear();

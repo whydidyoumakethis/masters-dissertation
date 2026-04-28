@@ -937,6 +937,30 @@ namespace rutils {
         return shadowCubemap;
     }
 
+    VkImageView createShadowCubemapArrayView(VulkanWindow const& window, Image const& cubemap) {
+        VkImageView arrayView = VK_NULL_HANDLE;
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = cubemap.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        viewInfo.format = VK_FORMAT_D32_SFLOAT;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            0, 1,
+            0, 6
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &arrayView); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to create shadow cubemap 2D array view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return arrayView;
+    }
+
 	std::array<VkImageView, 6> createShadowCubemapFaceViews(VulkanWindow const& window, Image const& cubemap) {
         std::array<VkImageView, 6> faceViews;
 

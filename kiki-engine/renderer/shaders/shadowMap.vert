@@ -3,6 +3,7 @@
 #define MAX_LIGHTS 8
 
 #extension GL_EXT_scalar_block_layout : require
+#extension GL_EXT_multiview : require
 
 layout(location = 0) in vec3 iPosition;
 layout(location = 1) in vec2 iTexCoord;
@@ -21,7 +22,7 @@ layout(scalar, set = 1, binding = 0) uniform BoneMatrices {
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    ivec4 indices; // x is light index, y is face index
+    ivec4 indices; // x is light index
 } object;
 
 void main() {
@@ -38,6 +39,6 @@ void main() {
     }
 
     mat4 finalModelMat = object.model * skinMat;
-    int matrixIndex = (object.indices.x * 6) + object.indices.y;
+    int matrixIndex = (object.indices.x * 6) + gl_ViewIndex;
     gl_Position = shadowMatrices.lightMatrices[matrixIndex] * finalModelMat * vec4(iPosition, 1.f);
 }
