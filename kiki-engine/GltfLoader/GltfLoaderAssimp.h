@@ -407,7 +407,7 @@ namespace Kiki {
 					aiString bodyTypeStr;
 					node->mMetaData->Get("body", bodyTypeStr);
 
-					cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
+					//cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
 
 					if (string(bodyTypeStr.C_Str()) == "dynamic") {
 						instance.bodyType = MbodyType::DYNAMIC;
@@ -422,7 +422,7 @@ namespace Kiki {
 					aiString colliderTypeStr;
 					node->mMetaData->Get("collider", colliderTypeStr);
 
-					cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
+					//cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
 
 					if (string(colliderTypeStr.C_Str()) == "box") {
 						instance.colliderType = McolliderType::BOX;

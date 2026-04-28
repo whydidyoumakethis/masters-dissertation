@@ -1,12 +1,10 @@
 #include "physics/PhysicsSystem.hpp"
 
-
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
-
-
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 
 #include "ECS/World.h"
 #include <spdlog/spdlog.h>
@@ -114,8 +112,19 @@ namespace Kiki {
             spdlog::info("Entity {} using pre-computed MeshCollider.", (uint32_t)entity);
         }
         else if (auto* capsule = reg.try_get<CapsuleColliderComponent>(entity)) {
-            shape = new JPH::CapsuleShape(capsule->radius, capsule->height);
-		}
+            JPH::Ref<JPH::Shape> baseCapsule = new JPH::CapsuleShape(capsule->halfHeight, capsule->radius);
+
+			// calculate the offset to move the capsule up so that its bottom is at the Transform's position
+            float offsetUp = capsule->halfHeight + capsule->radius;
+
+            JPH::RotatedTranslatedShapeSettings offsetShapeSettings(
+                JPH::Vec3(0, offsetUp, 0),
+                JPH::Quat::sIdentity(),
+                baseCapsule
+            );
+
+            shape = offsetShapeSettings.Create().Get();
+        }
         else if (auto* box = reg.try_get<BoxColliderComponent>(entity)) {
             shape = new JPH::BoxShape(ToJPH(box->halfExtents));
         }
@@ -200,18 +209,22 @@ namespace Kiki {
 
     void PhysicsSystem::UpdateIsGrounded(entt::entity entity, float maxDistance) {
         auto& reg = World::Get().Registry();
-        if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
-			auto box = mcc->shape.GetPtr()->GetLocalBounds();
-            float bottom = box.mMin.GetY();
-			auto physic = reg.ctx().get<PhysicsService>();
-            auto result = physic.Raycast(
-                reg.get<TransformComponent>(entity).position,
-                glm::vec3(0, -1, 0),
-                -bottom + maxDistance,
-                reg.get<RigidBodyComponent>(entity).bodyID);
-			if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
-                ip->isGrounded = result.hasHit;
-            }
+        auto physic = reg.ctx().get<PhysicsService>();
+
+        glm::vec3 rayOrigin = reg.get<TransformComponent>(entity).position;
+
+        rayOrigin.y += 0.5f;
+
+        float testRayLength = 3.0f;
+
+        auto result = physic.Raycast(
+            rayOrigin,
+            glm::vec3(0, -1, 0),
+            testRayLength,
+            reg.get<RigidBodyComponent>(entity).bodyID);
+
+        if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
+            ip->isGrounded = result.hasHit;
         }
     }
 

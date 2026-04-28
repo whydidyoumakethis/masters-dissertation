@@ -380,23 +380,70 @@ namespace Kiki {
              }
 
             switch (instance.colliderType) {
-
             case McolliderType::BOX:
-                colliderShape = CreateConvexHull(mesh.vertices);
+                registry.emplace<BoxColliderComponent>(model);
+                spdlog::info("[Physics] Attached BOX collider to mesh: '{}'", mesh.name);
                 break;
-            case McolliderType::CONVEX_HULL:
-                colliderShape = CreateConvexHull(mesh.vertices);
+
+            case McolliderType::SPHERE:
+                registry.emplace<SphereColliderComponent>(model);
+                spdlog::info("[Physics] Attached SPHERE collider to mesh: '{}'", mesh.name);
                 break;
-            case McolliderType::MESH:
-                colliderShape = CreateTriangleMesh(mesh.vertices, mesh.indices);
+
+            case McolliderType::CAPSULE:
+            {
+                glm::vec3 minAABB = mesh.vertices[0];
+                glm::vec3 maxAABB = mesh.vertices[0];
+
+                for (const auto& v : mesh.vertices) {
+                    minAABB = glm::min(minAABB, v);
+                    maxAABB = glm::max(maxAABB, v);
+                }
+
+                float sizeX = maxAABB.x - minAABB.x;
+                float sizeY = maxAABB.y - minAABB.y; 
+                float sizeZ = maxAABB.z - minAABB.z;
+
+                float radius = std::max(sizeX, sizeZ) / 2.0f;
+
+                float joltHalfHeight = (sizeY - 2.0f * radius) / 2.0f;
+
+                if (joltHalfHeight < 0.05f) {
+                    joltHalfHeight = 0.05f;
+                }
+
+                registry.emplace<CapsuleColliderComponent>(model, radius, joltHalfHeight);
+
+                spdlog::info("[Physics] Calculated CAPSULE: Radius = {:.2f}, HalfHeight = {:.2f}, TotalHeight = {:.2f}",
+                    radius, joltHalfHeight, sizeY);
                 break;
             }
 
-            if (colliderShape) {
-                registry.emplace<MeshColliderComponent>(model, colliderShape);
-				registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
-                registry.emplace<PhysicalAttributesComponent>(model);
+            case McolliderType::CONVEX_HULL:
+                if (auto hull = CreateConvexHull(mesh.vertices)) {
+                    registry.emplace<MeshColliderComponent>(model, hull);
+                    spdlog::info("[Physics] Attached CONVEX_HULL collider to mesh: '{}'", mesh.name);
+                }
+                else {
+                    spdlog::warn("[Physics] Failed to create CONVEX_HULL for mesh: '{}'", mesh.name);
+                }
+                break;
+
+            case McolliderType::MESH:
+            case McolliderType::NONE:
+            default:
+                if (auto triMesh = CreateTriangleMesh(mesh.vertices, mesh.indices)) {
+                    registry.emplace<MeshColliderComponent>(model, triMesh);
+                    spdlog::info("[Physics] Attached TRIANGLE_MESH (Default) collider to mesh: '{}'", mesh.name);
+                }
+                else {
+                    spdlog::warn("[Physics] Failed to create TRIANGLE_MESH for mesh: '{}'", mesh.name);
+                }
+                break;
             }
+
+            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+            registry.emplace<PhysicalAttributesComponent>(model);
 
 			// Misc tags
             if (instance.miscTag != MmiscTags::NONE) {
