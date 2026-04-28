@@ -44,7 +44,7 @@ int main(int argc, char** argv) {
 	// registry.emplace<BackgroundComponent>(ui, glm::vec3(1.0f, 0.0f, 0.0f), 0.5f);
 	// registry.emplace<ButtonComponent>(ui, glm::vec4(1.0f, 0.0f, 0.0f, 0.5f), glm::vec4(0.0f, 1.0f, 0.0f, 0.5f), glm::vec4(0.0f, 0.0f, 1.0f, 0.5f));
 
-	// Kiki::FontManager::get().loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/NotoSansJP-Regular.ttf", "font", U"お茶ください");
+	 Kiki::FontManager::get().loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/NotoSans-Regular.ttf", "font");// , U"お茶ください");
 	// registry.emplace<TextComponent>(ui, "font", U"お茶ください", 48.0f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f);
 
 	// auto ui2 = world.CreateEntity();
