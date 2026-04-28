@@ -1077,7 +1077,7 @@ namespace rutils {
         rasterInfo.depthClampEnable = VK_FALSE;
         rasterInfo.rasterizerDiscardEnable = VK_FALSE;
         rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
-        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
         rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
         rasterInfo.depthBiasEnable = VK_FALSE;
         rasterInfo.lineWidth = 1.f; // required
