@@ -350,9 +350,33 @@ namespace Kiki {
                 break;
 
             case McolliderType::CAPSULE:
-                registry.emplace<CapsuleColliderComponent>(model);
-                spdlog::info("[Physics] Attached CAPSULE collider to mesh: '{}'", mesh.name);
+            {
+                glm::vec3 minAABB = mesh.vertices[0];
+                glm::vec3 maxAABB = mesh.vertices[0];
+
+                for (const auto& v : mesh.vertices) {
+                    minAABB = glm::min(minAABB, v);
+                    maxAABB = glm::max(maxAABB, v);
+                }
+
+                float sizeX = maxAABB.x - minAABB.x;
+                float sizeY = maxAABB.y - minAABB.y; 
+                float sizeZ = maxAABB.z - minAABB.z;
+
+                float radius = std::max(sizeX, sizeZ) / 2.0f;
+
+                float joltHalfHeight = (sizeY - 2.0f * radius) / 2.0f;
+
+                if (joltHalfHeight < 0.05f) {
+                    joltHalfHeight = 0.05f;
+                }
+
+                registry.emplace<CapsuleColliderComponent>(model, radius, joltHalfHeight);
+
+                spdlog::info("[Physics] Calculated CAPSULE: Radius = {:.2f}, HalfHeight = {:.2f}, TotalHeight = {:.2f}",
+                    radius, joltHalfHeight, sizeY);
                 break;
+            }
 
             case McolliderType::CONVEX_HULL:
                 if (auto hull = CreateConvexHull(mesh.vertices)) {

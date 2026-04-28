@@ -1,12 +1,10 @@
 #include "physics/PhysicsSystem.hpp"
 
-
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
-
-
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 
 #include "ECS/World.h"
 #include <spdlog/spdlog.h>
@@ -114,8 +112,19 @@ namespace Kiki {
             spdlog::info("Entity {} using pre-computed MeshCollider.", (uint32_t)entity);
         }
         else if (auto* capsule = reg.try_get<CapsuleColliderComponent>(entity)) {
-            shape = new JPH::CapsuleShape(capsule->radius, capsule->height);
-		}
+            JPH::Ref<JPH::Shape> baseCapsule = new JPH::CapsuleShape(capsule->halfHeight, capsule->radius);
+
+			// calculate the offset to move the capsule up so that its bottom is at the Transform's position
+            float offsetUp = capsule->halfHeight + capsule->radius;
+
+            JPH::RotatedTranslatedShapeSettings offsetShapeSettings(
+                JPH::Vec3(0, offsetUp, 0),
+                JPH::Quat::sIdentity(),
+                baseCapsule
+            );
+
+            shape = offsetShapeSettings.Create().Get();
+        }
         else if (auto* box = reg.try_get<BoxColliderComponent>(entity)) {
             shape = new JPH::BoxShape(ToJPH(box->halfExtents));
         }

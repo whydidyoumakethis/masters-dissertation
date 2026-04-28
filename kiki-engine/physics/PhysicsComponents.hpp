@@ -46,8 +46,8 @@ namespace Kiki {
     
     struct CapsuleColliderComponent {
         float radius = 0.5f;
-        float height = 1.0f;
-	};
+        float halfHeight = 0.5f;
+    };
     struct PhysicalAttributesComponent {
         glm::vec3 impulse = { 0.0f, 0.0f, 0.0f };
 		bool isGrounded = false;
