@@ -16,7 +16,7 @@
 #include "debugging/DebugSystem.hpp"
 #include "interface/InterfaceSystem.hpp"
 
-#include <chrono>
+#include "Timer/Timer.h"
 
 namespace Kiki {
 	class Engine {
@@ -44,13 +44,9 @@ namespace Kiki {
 
 		void Run() {
 			_running = true;
-			auto previousClock = std::chrono::steady_clock::now();
 			_scheduler.printSystemOrder();
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
-				// float dt = _timer.Tick();
-				auto const now = std::chrono::steady_clock::now();
-				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
-				previousClock = now;
+				float dt = _timer.Tick();
 				MessageCenter::Flush();
 				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
 				_scheduler.Update(dt);
@@ -65,5 +61,6 @@ namespace Kiki {
 	private:
 		SystemScheduler _scheduler;
 		bool            _running = false;
+		Timer           _timer;
 	};
 }
