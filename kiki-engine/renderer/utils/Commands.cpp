@@ -288,6 +288,11 @@ namespace rutils {
         renderInfo.pColorAttachments = gBufferAttachments;
         renderInfo.pDepthAttachment = &depthAttach;
 
+        auto& world = World::Get();
+        auto& registry = world.Registry();
+        auto view = world.Query<TransformComponent, MeshComponent>();
+        Kiki::SceneManager& sceneManager = Kiki::SceneManager::get();
+
         {
             ZoneScopedN("Recording g-buffer pass");
 
@@ -298,11 +303,6 @@ namespace rutils {
             vkCmdBeginRendering( aCmdBuff, &renderInfo );
 
             std::vector<entt::entity> transparent;
-
-            auto& world = World::Get();
-            auto& registry = world.Registry();
-            auto view = world.Query<TransformComponent, MeshComponent>();
-            Kiki::SceneManager& sceneManager = Kiki::SceneManager::get();
 
             {
                 ZoneScopedN("Recording opaque draws");
@@ -524,10 +524,10 @@ namespace rutils {
             TracyVkZone(tracyVkCtx, aCmdBuff, "Shadow map pass");
             #endif
 
-            auto& shadowWorld = World::Get();
-            auto& shadowRegistry = shadowWorld.Registry();
-            auto shadowView = shadowWorld.Query<TransformComponent, MeshComponent>();
-            Kiki::SceneManager& shadowSceneManager = Kiki::SceneManager::get();
+            // auto& shadowWorld = World::Get();
+            // auto& shadowRegistry = shadowWorld.Registry();
+            // auto shadowView = shadowWorld.Query<TransformComponent, MeshComponent>();
+            // Kiki::SceneManager& shadowSceneManager = Kiki::SceneManager::get();
 
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.shadowMap.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 0, 1, &shadowMatrixDescriptors, 0, nullptr);
@@ -575,10 +575,10 @@ namespace rutils {
 
                     vkCmdBeginRendering(aCmdBuff, &shadowMapRenderInfo);
 
-                    for (auto [e, transform, meshComponent] : shadowView.each()) {
-                        if (!shadowSceneManager.validMesh(meshComponent.id)) continue;
+                    for (auto [e, transform, meshComponent] : view.each()) {
+                        if (!sceneManager.validMesh(meshComponent.id)) continue;
 
-                        Kiki::Mesh const& mesh = shadowSceneManager.getMesh(meshComponent.id);
+                        Kiki::Mesh const& mesh = sceneManager.getMesh(meshComponent.id);
 
                         VkBuffer buffers[6] = {
                             mesh.positions.buffer,
@@ -593,7 +593,7 @@ namespace rutils {
                         vkCmdBindVertexBuffers(aCmdBuff, 0, 6, buffers, offsets);
                         vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
 
-                        auto animComp = shadowRegistry.try_get<Kiki::AnimationComponent>(e);
+                        auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
                         if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
                             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 1, 1, &animComp->descriptorSet, 0, nullptr);
                         } else {
@@ -1177,8 +1177,6 @@ namespace rutils {
         vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle );
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
 
-        auto& world = World::Get();
-        auto& registry = world.Registry();
         auto uiComponents = world.Query<InterfaceComponent>();
 
         for (auto [e, interfaceComponent] : uiComponents.each()) {
