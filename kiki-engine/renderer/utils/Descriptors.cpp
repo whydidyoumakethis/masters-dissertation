@@ -1,4 +1,6 @@
 #include "Descriptors.hpp"
+#include <glm/glm.hpp>
+#include <array>
 
 #include "ToString.hpp"
 #include "../../logging/FatalError.hpp"
@@ -107,7 +109,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[7]{};
+        VkDescriptorSetLayoutBinding bindings[8]{};
 
         // base colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -150,6 +152,12 @@ namespace rutils {
         bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[6].descriptorCount = 1;
         bindings[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // shadow cubemaps
+        bindings[7].binding = 7;
+        bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[7].descriptorCount = 8;
+        bindings[7].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -288,10 +296,32 @@ namespace rutils {
         return DescriptorSetLayout(window.device, layout);
     }
 
+    DescriptorSetLayout createShadowMatrixDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors, std::uint32_t aMaxSets) {
         VkDescriptorPoolSize const pools[] = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, aMaxDescriptors },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, aMaxDescriptors }
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, aMaxDescriptors },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aMaxDescriptors }
         };
 
         VkDescriptorPoolCreateInfo poolInfo{};
@@ -328,8 +358,8 @@ namespace rutils {
         return dset;
     }
 
-    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler) {
-        VkWriteDescriptorSet desc[7]{};
+    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler, std::vector<Kiki::ShadowCubemap> const& shadowCubemaps) {
+        VkWriteDescriptorSet desc[8]{};
 
         VkDescriptorImageInfo texColourInfo{};
         texColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -365,6 +395,14 @@ namespace rutils {
         ambientOcclusionInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
         ambientOcclusionInfo.imageView = gbuffers.ssao_blurred.view;
         ambientOcclusionInfo.sampler = sampler.handle;
+
+        std::array<VkDescriptorImageInfo, 8> shadowInfo{};
+        std::vector<VkImageView> shadowCubemapViews;
+        for (int i = 0; i < 8; i++) {
+            shadowInfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            shadowInfo[i].imageView = shadowCubemaps[i].cubemap.view;
+            shadowInfo[i].sampler = cubemapSampler.handle;
+        }
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = deferredLightingDescriptors;
@@ -415,7 +453,14 @@ namespace rutils {
         desc[6].descriptorCount = 1;
         desc[6].pImageInfo = &ambientOcclusionInfo;
 
-        vkUpdateDescriptorSets(window.device, 7, desc, 0, nullptr);
+        desc[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[7].dstSet = deferredLightingDescriptors;
+        desc[7].dstBinding = 7;
+        desc[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[7].descriptorCount = 8;
+        desc[7].pImageInfo = shadowInfo.data();
+
+        vkUpdateDescriptorSets(window.device, 8, desc, 0, nullptr);
     }
 
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors) {
@@ -576,6 +621,25 @@ namespace rutils {
         desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         desc[0].descriptorCount = 1;
         desc[0].pImageInfo = &tonemapInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseShadowMatrixDescriptorSet(VulkanWindow const& window, VkBuffer shadowMatricesBuffer, VkDescriptorSet& shadowMatrixDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = shadowMatricesBuffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(glm::mat4) * 8 * 6;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = shadowMatrixDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].dstArrayElement = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        desc[0].descriptorCount = 1;
+        desc[0].pBufferInfo = &bufferInfo;
 
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
     }

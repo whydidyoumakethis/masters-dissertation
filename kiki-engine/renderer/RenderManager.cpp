@@ -15,6 +15,7 @@
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
@@ -43,6 +44,7 @@ namespace Kiki {
             gBufferLayout = rutils::createGBufferDescriptorLayout(window);
             cubemapLayout = rutils::createCubemapDescriptorLayout(window);
             animationLayout = rutils::createAnimationDescriptorLayout(window);
+            shadowMatrixLayout = rutils::createShadowMatrixDescriptorLayout(window);
 
 
             interfaceLayout = rutils::createInterfaceDescriptorLayout(window);
@@ -79,6 +81,14 @@ namespace Kiki {
                 VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
             );
 
+            shadowMatricesBuffer = rutils::createBuffer(
+                allocator,
+                sizeof(glm::mat4) * 8 * 6,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+                VMA_MEMORY_USAGE_AUTO_PREFER_HOST
+            );
+
             std::vector<glm::mat4> identityBones(MAX_BONES, glm::mat4(1.0f));
             void* mappedData = nullptr;
             vmaMapMemory(allocator.allocator, dummyAnimationBuffer.allocation, &mappedData);
@@ -97,6 +107,7 @@ namespace Kiki {
             pipelineLayouts.ssaoPipelineLayout = rutils::createSSAOPipelineLayout(window, sceneLayout.handle, ssaoLayout.handle);
             pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
             pipelineLayouts.tonemapPipelineLayout = rutils::createTonemapPipelineLayout(window, tonemapLayout.handle);
+            pipelineLayouts.shadowMapPipelineLayout = rutils::createShadowMapPipelineLayout(window, shadowMatrixLayout.handle, animationLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -105,16 +116,25 @@ namespace Kiki {
 
             descriptorPool = rutils::createDescriptorPool(window);
 
-
-
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
 
+            shadowCubemaps.clear();
+            for (int i = 0; i < 8; i++) {
+                ShadowCubemap shadowCubemap{};
+                shadowCubemap.cubemap = rutils::createShadowCubemap(window, allocator);
+                shadowCubemap.arrayView = rutils::createShadowCubemapArrayView(window, shadowCubemap.cubemap);
+                shadowCubemaps.push_back(std::move(shadowCubemap));
+            }
+
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
             createSkybox(skybox.paths);
+
+            shadowMatrixDescriptors = rutils::allocDescSet(window, descriptorPool.handle, shadowMatrixLayout.handle);
+            initialiseShadowMatrixDescriptorSet(window, shadowMatricesBuffer.buffer, shadowMatrixDescriptors);
 
             ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoLayout.handle);
             initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
@@ -126,7 +146,7 @@ namespace Kiki {
             initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
 
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
-            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
 
             ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
@@ -421,10 +441,11 @@ namespace Kiki {
             {
                 ZoneScopedN("Initialising descriptor sets");
 
+                initialiseShadowMatrixDescriptorSet(window, shadowMatricesBuffer.buffer, shadowMatrixDescriptors);
                 initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
                 initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
                 initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
-                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
                 initialiseTonemapDescriptorSet(window, doneSSRImage, sampler, tonemapDescriptors);
@@ -530,6 +551,12 @@ namespace Kiki {
             updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
         }
 
+        {
+            ZoneScopedN("Updating shadow matrices");
+
+            updateShadowMatrices(allocator, shadowMatricesBuffer, lights);
+        }
+
         InterfaceUniform interfaceUniform{};
         interfaceUniform.projection = glm::ortho(0.0f, (float) window.swapchainExtent.width, 0.0f, (float) window.swapchainExtent.height);
 
@@ -567,6 +594,7 @@ namespace Kiki {
                 fxaaDescriptors,
                 ssrDescriptors,
                 tonemapDescriptors,
+                shadowMatrixDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
@@ -576,7 +604,9 @@ namespace Kiki {
                 interfaceUniform,
                 interfaceDescriptors,
                 interfaceIndices.buffer,
-                dummyAnimationDesc
+                dummyAnimationDesc,
+                shadowCubemaps,
+                lights
             );
         }
 
@@ -1135,7 +1165,7 @@ namespace Kiki {
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
         // roughWidth / roughHeight
         rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
-        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.normalMapWidth, textureData.normalMapHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
 
         VkDescriptorImageInfo textureInfo[3]{};
 
@@ -1350,10 +1380,81 @@ namespace Kiki {
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
-        aSceneUniforms.lightPos = glm::vec4(0.f, 5.f, 0.f, 0.f);
-        aSceneUniforms.lightColour = glm::vec4(1.f, 1.f, 1.f, 1.f);
+        int numLights = std::min<size_t>(lights.size(), 8);
+        for (int i = 0; i < numLights; i++) {
+            aSceneUniforms.lightPos[i] = lights[i].position;
+            aSceneUniforms.lightColour[i] = lights[i].colour;
+        }
+
+        aSceneUniforms.numLights[0] = float(numLights);
+        aSceneUniforms.numLights[1] = camComp.nearPlane;
+        aSceneUniforms.numLights[2] = camComp.farPlane;
+
         aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
+
+    void RenderManager::updateShadowMatrices(rutils::Allocator const& allocator, rutils::Buffer const& shadowMatricesBuffer, std::vector<Light>& lights) {
+		CameraComponent camComp;
+        TransformComponent transformComp;
+
+        if (debugCam.enabled) {
+            if (registry.valid(debugCam.camera)) {
+                if (registry.all_of<CameraComponent>(debugCam.camera))
+                    camComp = registry.get<CameraComponent>(debugCam.camera);
+                if (registry.all_of<TransformComponent>(debugCam.camera))
+                    transformComp = registry.get<TransformComponent>(debugCam.camera);
+            } else {
+                debugCam.reset();
+            }
+        } else {
+            auto cameras = world.Query<CameraComponent>();
+
+            for (auto cam : cameras) {
+                auto comp = registry.get<CameraComponent>(cam);
+
+                if (comp.isMain) {
+                    camComp = comp;
+                    if (registry.all_of<TransformComponent>(cam))
+                        transformComp = registry.get<TransformComponent>(cam);
+                    break;
+                }
+            }
+        }
+
+        VkDeviceSize size = sizeof(glm::mat4) * 8 * 6;
+        std::array<glm::mat4, 8 * 6> shadowMatrices{};
+
+        int numLights = std::min<int>(lights.size(), 8);
+        for (int i = 0; i < numLights; i++) {
+            glm::vec3 pos = glm::vec3(lights[i].position);
+
+            glm::mat4 proj = glm::perspectiveRH_ZO(
+                glm::radians(90.f),
+                1.f,
+                camComp.nearPlane,
+                camComp.farPlane
+            );
+
+            shadowMatrices[(i * 6) + 0] = proj * glm::lookAt(pos, pos + glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f));
+            shadowMatrices[(i * 6) + 1] = proj * glm::lookAt(pos, pos + glm::vec3(-1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f));
+            shadowMatrices[(i * 6) + 2] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
+            shadowMatrices[(i * 6) + 3] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 0.f, -1.f));
+            shadowMatrices[(i * 6) + 4] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, -1.f, 0.f));
+            shadowMatrices[(i * 6) + 5] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, -1.f, 0.f));
+        }
+
+        void* mapped = nullptr;
+
+        if (auto const res = vmaMapMemory(allocator.allocator, shadowMatricesBuffer.allocation, &mapped); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to map shadow matrices buffer" "vmaMapMemory() returned {}", rutils::toString(res));
+        }
+
+        std::memcpy(mapped, shadowMatrices.data(), size);
+
+        vmaFlushAllocation(allocator.allocator, shadowMatricesBuffer.allocation, 0, size);
+        vmaUnmapMemory(allocator.allocator, shadowMatricesBuffer.allocation);
+    }
+
 
     void RenderManager::setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info) {
         info.Instance = window.instance;
@@ -1398,7 +1499,7 @@ namespace Kiki {
         skybox.paths.back = back;
 
         createSkybox(skybox.paths);
-        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
     }
 
     void RenderManager::createSkybox(const rutils::CubemapPaths& paths) {
@@ -1540,6 +1641,7 @@ namespace Kiki {
         pipelines.tonemap = {};
         pipelines.interfaceShape = {};
         pipelines.interfaceText = {};
+        pipelines.shadowMap = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1550,6 +1652,15 @@ namespace Kiki {
         pipelineLayouts.tonemapPipelineLayout = {};
         pipelineLayouts.interfaceShapeLayout = {};
         pipelineLayouts.interfaceTextLayout = {};
+        pipelineLayouts.shadowMapPipelineLayout = {};
+
+        for (auto& shadowCubemap : shadowCubemaps) {
+            if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
+                vkDestroyImageView(window.device, shadowCubemap.arrayView, nullptr);
+                shadowCubemap.arrayView = VK_NULL_HANDLE;
+            }
+        }
+        shadowCubemaps.clear();
 
         depthBuffer = {};
         doneLightingImage = {};
@@ -1558,6 +1669,7 @@ namespace Kiki {
         sceneUBO = {};
         interfaceUBO = {};
         interfaceIndices = {};
+        shadowMatricesBuffer = {};
 
         gBufferLayout = {};
         sceneLayout = {};
@@ -1570,10 +1682,12 @@ namespace Kiki {
         tonemapLayout = {};
         interfaceLayout = {};
         textLayout = {};
+        shadowMatrixLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
         interfaceDescriptors = {};
+        shadowMatrixDescriptors = {};
 
         sampler = {};
         fontSampler = {};

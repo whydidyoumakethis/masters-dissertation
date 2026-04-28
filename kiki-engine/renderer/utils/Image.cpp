@@ -86,7 +86,7 @@ namespace rutils {
         // stbi_image_free(imageData);
 
         // Create image
-        Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, VK_FORMAT_R8G8B8A8_SRGB, aContext,
+        Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, format, aContext,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 
         // Create command buffer for data upload and begin recording
@@ -881,6 +881,112 @@ namespace rutils {
 
         return postProcessingImage;
     }
+
+
+    Image createShadowCubemap(VulkanWindow const& window, Allocator const& allocator) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = VK_FORMAT_D32_SFLOAT;
+        imageInfo.extent.width = 1024;
+        imageInfo.extent.height = 1024;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 6; // cubemap
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.flags = 0;
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+
+        if (auto const res = vmaCreateImage(allocator.allocator, &imageInfo, &allocInfo, &image, &allocation, nullptr); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to allocate depth buffer image.\n"
+                "vmaCreateImage() returned {}", toString(res)
+            );
+        }
+
+        Image shadowCubemap( allocator.allocator, image, allocation );
+
+        // Create the image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = shadowCubemap.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        viewInfo.format = VK_FORMAT_D32_SFLOAT;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            0, 1,
+            0, 6
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &shadowCubemap.view); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create image view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return shadowCubemap;
+    }
+
+    VkImageView createShadowCubemapArrayView(VulkanWindow const& window, Image const& cubemap) {
+        VkImageView arrayView = VK_NULL_HANDLE;
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = cubemap.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        viewInfo.format = VK_FORMAT_D32_SFLOAT;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            0, 1,
+            0, 6
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &arrayView); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to create shadow cubemap 2D array view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return arrayView;
+    }
+
+	std::array<VkImageView, 6> createShadowCubemapFaceViews(VulkanWindow const& window, Image const& cubemap) {
+        std::array<VkImageView, 6> faceViews;
+
+        for (uint32_t face = 0; face < 6; face++) {
+            VkImageViewCreateInfo viewInfo{};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = cubemap.image;
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = VK_FORMAT_D32_SFLOAT;
+            viewInfo.components = VkComponentMapping{};
+            viewInfo.subresourceRange = VkImageSubresourceRange{
+                VK_IMAGE_ASPECT_DEPTH_BIT,
+                0, 1,
+                face, 1
+            };
+
+            if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &faceViews[face]); res != VK_SUCCESS) {
+                throw Kiki::FatalError("Unable to create image view\n"
+                    "vkCreateImageView() returned {}", toString(res)
+                );
+            }
+        }
+
+        return faceViews;
+    }
+
 
     GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator) {
         GBuffers gbuffers;

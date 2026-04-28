@@ -17,6 +17,7 @@
 
 #include "../../ECS/World.h"
 
+#include <algorithm>
 #include <iostream>
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyVulkan.hpp>
@@ -71,11 +72,12 @@ namespace rutils {
         VkDescriptorSet aSceneDescriptors,
         VkDescriptorSet ssaoDescriptors,
         VkDescriptorSet ssaoHBlurDescriptors,
-		    VkDescriptorSet ssaoBlurredDescriptors,
+        VkDescriptorSet ssaoBlurredDescriptors,
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
-		    VkDescriptorSet ssrDescriptors,
-		    VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet shadowMatrixDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
@@ -85,7 +87,9 @@ namespace rutils {
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
         VkDescriptorSet interfaceDescriptors,
         VkBuffer interfaceIndexBuffer,
-        VkDescriptorSet dummyAnimationDesc
+        VkDescriptorSet dummyAnimationDesc,
+        std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
+        std::vector<Kiki::Light> const& lights
     ) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -284,6 +288,11 @@ namespace rutils {
         renderInfo.pColorAttachments = gBufferAttachments;
         renderInfo.pDepthAttachment = &depthAttach;
 
+        auto& world = World::Get();
+        auto& registry = world.Registry();
+        auto view = world.Query<TransformComponent, MeshComponent>();
+        Kiki::SceneManager& sceneManager = Kiki::SceneManager::get();
+
         {
             ZoneScopedN("Recording g-buffer pass");
 
@@ -294,11 +303,6 @@ namespace rutils {
             vkCmdBeginRendering( aCmdBuff, &renderInfo );
 
             std::vector<entt::entity> transparent;
-
-            auto& world = World::Get();
-            auto& registry = world.Registry();
-            auto view = world.Query<TransformComponent, MeshComponent>();
-            Kiki::SceneManager& sceneManager = Kiki::SceneManager::get();
 
             {
                 ZoneScopedN("Recording opaque draws");
@@ -381,26 +385,10 @@ namespace rutils {
                             auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
 
                             if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
-                                vkCmdBindDescriptorSets(
-                                    aCmdBuff,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayouts.pbrPipelineLayout.handle,
-                                    2, 
-                                    1,
-                                    &animComp->descriptorSet,
-                                    0, nullptr
-                                );
+                                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 2, 1, &animComp->descriptorSet, 0, nullptr);
                             }
                             else {
-                                vkCmdBindDescriptorSets(
-                                    aCmdBuff,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayouts.pbrPipelineLayout.handle,
-                                    2,
-                                    1,
-                                    &dummyAnimationDesc,
-                                    0, nullptr
-                                );
+                                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 2, 1, &dummyAnimationDesc, 0, nullptr);
                             }
                             // Draw mesh
                             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
@@ -526,6 +514,126 @@ namespace rutils {
                 // End rendering
                 vkCmdEndRendering(aCmdBuff);
             }
+        }
+
+        {
+            // shadow map pass
+            ZoneScopedN("Recording shadow map pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Shadow map pass");
+            #endif
+
+            // auto& shadowWorld = World::Get();
+            // auto& shadowRegistry = shadowWorld.Registry();
+            // auto shadowView = shadowWorld.Query<TransformComponent, MeshComponent>();
+            // Kiki::SceneManager& shadowSceneManager = Kiki::SceneManager::get();
+
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.shadowMap.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 0, 1, &shadowMatrixDescriptors, 0, nullptr);
+
+            for (int lightIndex = 0; lightIndex < lights.size(); lightIndex++) {
+                Kiki::ShadowCubemap const& shadowCubemap = shadowCubemaps[lightIndex];
+
+                rutils::imageBarrier(aCmdBuff, shadowCubemap.cubemap.image,
+                    /* Before */
+                    VK_PIPELINE_STAGE_2_NONE,
+                    VK_ACCESS_2_NONE,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    /* After */
+                    VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                    /* What */
+                    VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
+                );
+
+                VkRenderingAttachmentInfo shadowDepthAttach{};
+                shadowDepthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                shadowDepthAttach.imageView = shadowCubemap.arrayView;
+                shadowDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+                shadowDepthAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                shadowDepthAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+                shadowDepthAttach.clearValue.depthStencil.depth = 1.f;
+
+                VkRenderingInfo shadowMapRenderInfo{};
+                shadowMapRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                shadowMapRenderInfo.viewMask = 0x3F;
+                shadowMapRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+                shadowMapRenderInfo.renderArea.extent = VkExtent2D{1024, 1024};
+                shadowMapRenderInfo.colorAttachmentCount = 0;
+                shadowMapRenderInfo.pColorAttachments = nullptr;
+                shadowMapRenderInfo.pDepthAttachment = &shadowDepthAttach;
+
+                vkCmdBeginRendering(aCmdBuff, &shadowMapRenderInfo);
+
+                for (auto [e, transform, meshComponent] : view.each()) {
+                    if (!sceneManager.validMesh(meshComponent.id)) continue;
+
+                    Kiki::Mesh const& mesh = sceneManager.getMesh(meshComponent.id);
+
+                    VkBuffer buffers[6] = {
+                        mesh.positions.buffer,
+                        mesh.texCoords.buffer,
+                        mesh.normals.buffer,
+                        mesh.tangents.buffer,
+                        mesh.boneIDs.buffer,
+                        mesh.weights.buffer
+                    };
+                    VkDeviceSize offsets[6]{};
+
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 6, buffers, offsets);
+                    vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                    auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
+                    if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
+                        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 1, 1, &animComp->descriptorSet, 0, nullptr);
+                    } else {
+                        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 1, 1, &dummyAnimationDesc, 0, nullptr);
+                    }
+
+                    rutils::ShadowData shadowData{};
+                    shadowData.model = transform.worldMatrix;
+                    shadowData.indices = glm::ivec4(lightIndex, 0, 0, 0);
+
+                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.shadowMapPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(shadowData), &shadowData);
+
+                    vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+                }
+
+                vkCmdEndRendering(aCmdBuff);
+
+                rutils::imageBarrier(aCmdBuff, shadowCubemap.cubemap.image,
+                    /* Before */
+                    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                    /* After */
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    /* What */
+                    VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
+                );
+            }
+
+            // ensure that every image is transitioned properly, even if unused
+            for (size_t lightIndex = lights.size(); lightIndex < shadowCubemaps.size(); lightIndex++) {
+                rutils::imageBarrier(aCmdBuff, shadowCubemaps[lightIndex].cubemap.image,
+                    // before
+                    VK_PIPELINE_STAGE_2_NONE,
+                    VK_ACCESS_2_NONE,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    // after
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    // what
+                    VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
+                );
+            }
+
+            // end shadow map pass
         }
 
         {
@@ -834,7 +942,7 @@ namespace rutils {
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
-vkCmdEndRendering(aCmdBuff);
+            vkCmdEndRendering(aCmdBuff);
         }
 
         {
@@ -1060,8 +1168,6 @@ vkCmdEndRendering(aCmdBuff);
         vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle );
         vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
 
-        auto& world = World::Get();
-        auto& registry = world.Registry();
         auto uiComponents = world.Query<InterfaceComponent>();
 
         for (auto [e, interfaceComponent] : uiComponents.each()) {

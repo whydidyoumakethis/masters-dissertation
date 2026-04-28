@@ -1,5 +1,7 @@
 #version 450
 
+#define MAX_LIGHTS 8
+
 #extension GL_EXT_scalar_block_layout : require
 
 layout(location = 0) in vec2 v2fTexCoord;
@@ -8,9 +10,11 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     mat4 camera;
     mat4 projection;
     mat4 projCam;
-    vec4 lightPos;
-    vec4 lightColour;
+    vec4 lightPos[MAX_LIGHTS];
+    vec4 lightColour[MAX_LIGHTS];
+    vec4 numLights;
     vec4 cameraPos;
+    vec4 ssaoSamples[16];
 } uScene;
 
 layout(set = 1, binding = 0) uniform sampler2D uSceneColour;

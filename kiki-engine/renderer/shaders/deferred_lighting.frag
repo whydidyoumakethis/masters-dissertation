@@ -1,5 +1,8 @@
 #version 450
 
+#define MAX_LIGHTS 8
+#define PCF_SAMPLES 20
+
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : require
 
@@ -11,9 +14,11 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     mat4 camera;
     mat4 projection;
     mat4 projCam;
-    vec4 lightPos;
-    vec4 lightColour;
+    vec4 lightPos[MAX_LIGHTS];
+    vec4 lightColour[MAX_LIGHTS]; // w is intensity
+    vec4 numLights;
     vec4 cameraPos;
+    vec4 ssaoSamples[16];
 } uScene;
 
 layout(set = 1, binding = 0) uniform sampler2D gTexColour;
@@ -23,8 +28,23 @@ layout(set = 1, binding = 3) uniform sampler2D gMappedNormal;
 layout(set = 1, binding = 4) uniform sampler2D gDepth;
 layout(set = 1, binding = 5) uniform samplerCube skybox;
 layout(set = 1, binding = 6) uniform sampler2D gAO;
+layout(set = 1, binding = 7) uniform samplerCube shadowCubemaps[MAX_LIGHTS];
 
 layout(location = 0) out vec4 oColor;
+
+// linearise depth sampled from a shadow cubemap
+float linearise(float depth, float near, float far) {
+    return (near * far) / (far - depth * (far - near));
+}
+
+// PCF sample offsets, from https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
+vec3 sampleOffsetDirections[20] = vec3[](
+   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+);   
 
 vec3 reconstructWorldPos(vec2 uv) {
     float depth = texture(gDepth, uv).r;
@@ -77,19 +97,46 @@ void main()
     // vector pointing towards the camera
     vec3 viewDirection = normalize(uScene.cameraPos.xyz - worldSpace);
 
-    vec3 lightColour = uScene.lightColour.xyz;
-    vec3 lightPos = uScene.lightPos.xyz;
+    vec3 lighting = vec3(0.f);
 
-    // vector pointing towards the light
-    vec3 lightDirection = normalize(lightPos - worldSpace);
+    // shadow near and far planes are stored in the scene uniform
+    // numLights[x] and [y]
+    float shadowNear = uScene.numLights[1];
+    float shadowFar = uScene.numLights[2];
 
-    // half vector from the light and view directions
-    vec3 halfVector = normalize(lightDirection + viewDirection);
+    for (int i = 0; i < uScene.numLights[0]; i++) {
+        vec3 lightColour = uScene.lightColour[i].xyz * uScene.lightColour[i].w;
+        vec3 lightPos = uScene.lightPos[i].xyz;
 
-    float nDotLPos = max(dot(normal, lightDirection), 0.05f);
+        // vector pointing towards the light
+        vec3 lightDirection = normalize(lightPos - worldSpace);
 
-    vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
-    vec3 lighting =  brdfResult * lightColour * nDotLPos;
+        // half vector from the light and view directions
+        vec3 halfVector = normalize(lightDirection + viewDirection);
+
+        float nDotLPos = max(dot(normal, lightDirection), 0.05f);
+
+        vec3 lightToFragment = worldSpace - lightPos;
+        vec3 absLightToFragment = abs(lightToFragment);
+        float distanceToFragment = max(absLightToFragment.x, max(absLightToFragment.y, absLightToFragment.z));
+        float bias = 0.05f; // to prevent shadow acne
+
+        float viewDistance = length(uScene.cameraPos.xyz - worldSpace);
+        float diskRadius = (1.f + (viewDistance / shadowFar)) / 25.f;
+
+        float visibility = 1.f;
+        float visibilityPerSample = visibility / float(PCF_SAMPLES);
+        for (int s = 0; s < PCF_SAMPLES; ++s) {
+            float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment + sampleOffsetDirections[s] * diskRadius).r;
+            float occluderDistance = linearise(shadowMapDepth, shadowNear, shadowFar);
+            if (distanceToFragment - bias > occluderDistance) {
+                visibility -= visibilityPerSample;
+            }
+        }
+
+        vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
+        lighting += brdfResult * lightColour * nDotLPos * visibility;
+    }
 
     float ambientOcclusion = texture(gAO, v2fTexCoord).r;
     vec3 finalColour = emissive + (ambient(sceneAmbient, baseColour) * (ambientOcclusion * ambientOcclusion)) + lighting;
