@@ -412,7 +412,7 @@ namespace Kiki {
                     joltHalfHeight = 0.05f;
                 }
 
-                registry.emplace<CapsuleColliderComponent>(model, radius/2, joltHalfHeight);
+                registry.emplace<CapsuleColliderComponent>(model, radius/2.5f, joltHalfHeight);
 
                 spdlog::info("[Physics] Calculated CAPSULE: Radius = {:.2f}, HalfHeight = {:.2f}, TotalHeight = {:.2f}",
                     radius, joltHalfHeight, sizeY);

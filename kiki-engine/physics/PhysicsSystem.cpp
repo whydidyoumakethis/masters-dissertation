@@ -223,9 +223,9 @@ namespace Kiki {
 
         glm::vec3 rayOrigin = reg.get<TransformComponent>(entity).position;
 
-        rayOrigin.y += 0.5f;
+        rayOrigin.y += 0.2f;
 
-        float testRayLength = 3.0f;
+        float testRayLength = 0.3f;
 
         auto result = physic.Raycast(
             rayOrigin,
