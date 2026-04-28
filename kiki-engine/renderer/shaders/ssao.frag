@@ -3,7 +3,7 @@
 
 #version 450
 
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 8
 #define RADIUS 0.5f
 #define SAMPLES 16
 #define PI 3.14159f

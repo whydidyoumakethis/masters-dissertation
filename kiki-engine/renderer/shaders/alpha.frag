@@ -1,6 +1,6 @@
 #version 450
 
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 8
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : require
