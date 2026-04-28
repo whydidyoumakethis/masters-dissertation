@@ -47,6 +47,7 @@ namespace rutils {
         rutils::Pipeline tonemap;
         rutils::Pipeline interfaceShape;
         rutils::Pipeline interfaceText;
+        rutils::Pipeline shadowMap;
     };
 
     struct PipelineLayouts {
@@ -59,6 +60,7 @@ namespace rutils {
         PipelineLayout tonemapPipelineLayout;
         PipelineLayout interfaceShapeLayout;
         PipelineLayout interfaceTextLayout;
+        PipelineLayout shadowMapPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -71,6 +73,7 @@ namespace rutils {
     PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout);
     PipelineLayout createSSAOBlurPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaoBlurLayout);
     PipelineLayout createTonemapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout tonemapLayout);
+    PipelineLayout createShadowMapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout tonemapLayout);
     void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);

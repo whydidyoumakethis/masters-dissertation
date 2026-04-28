@@ -1,4 +1,5 @@
 #include "Descriptors.hpp"
+#include <glm/glm.hpp>
 
 #include "ToString.hpp"
 #include "../../logging/FatalError.hpp"
@@ -288,10 +289,32 @@ namespace rutils {
         return DescriptorSetLayout(window.device, layout);
     }
 
+    DescriptorSetLayout createShadowMatrixDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors, std::uint32_t aMaxSets) {
         VkDescriptorPoolSize const pools[] = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, aMaxDescriptors },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, aMaxDescriptors }
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, aMaxDescriptors },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aMaxDescriptors }
         };
 
         VkDescriptorPoolCreateInfo poolInfo{};
@@ -576,6 +599,25 @@ namespace rutils {
         desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         desc[0].descriptorCount = 1;
         desc[0].pImageInfo = &tonemapInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseShadowMatrixDescriptorSet(VulkanWindow const& window, VkBuffer shadowMatricesBuffer, VkDescriptorSet& shadowMatrixDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = shadowMatricesBuffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(glm::mat4) * 32 * 6;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = shadowMatrixDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].dstArrayElement = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        desc[0].descriptorCount = 1;
+        desc[0].pBufferInfo = &bufferInfo;
 
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
     }

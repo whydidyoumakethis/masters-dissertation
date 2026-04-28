@@ -43,6 +43,7 @@ namespace Kiki {
             gBufferLayout = rutils::createGBufferDescriptorLayout(window);
             cubemapLayout = rutils::createCubemapDescriptorLayout(window);
             animationLayout = rutils::createAnimationDescriptorLayout(window);
+            shadowMatrixLayout = rutils::createShadowMatrixDescriptorLayout(window);
 
 
             interfaceLayout = rutils::createInterfaceDescriptorLayout(window);
@@ -79,6 +80,14 @@ namespace Kiki {
                 VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
             );
 
+            shadowMatricesBuffer = rutils::createBuffer(
+                allocator,
+                sizeof(glm::mat4) * 32 * 6,
+                VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
+                VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+                VMA_MEMORY_USAGE_AUTO_PREFER_HOST
+            );
+
             std::vector<glm::mat4> identityBones(MAX_BONES, glm::mat4(1.0f));
             void* mappedData = nullptr;
             vmaMapMemory(allocator.allocator, dummyAnimationBuffer.allocation, &mappedData);
@@ -105,8 +114,6 @@ namespace Kiki {
 
             descriptorPool = rutils::createDescriptorPool(window);
 
-
-
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
@@ -115,6 +122,9 @@ namespace Kiki {
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
             createSkybox(skybox.paths);
+
+            shadowMatrixDescriptors = rutils::allocDescSet(window, descriptorPool.handle, shadowMatrixLayout.handle);
+            initialiseShadowMatrixDescriptorSet(window, shadowMatricesBuffer.buffer, shadowMatrixDescriptors);
 
             ssaoDescriptors = rutils::allocDescSet(window, descriptorPool.handle, ssaoLayout.handle);
             initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
@@ -421,6 +431,7 @@ namespace Kiki {
             {
                 ZoneScopedN("Initialising descriptor sets");
 
+                initialiseShadowMatrixDescriptorSet(window, shadowMatricesBuffer.buffer, shadowMatrixDescriptors);
                 initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
                 initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
                 initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
@@ -528,6 +539,12 @@ namespace Kiki {
             // Record and submit commands for this frame
             // Prepare data for this frame
             updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
+        }
+
+        {
+            ZoneScopedN("Updating shadow matrices");
+
+            updateShadowMatrices(allocator, shadowMatricesBuffer, lights);
         }
 
         InterfaceUniform interfaceUniform{};
@@ -1364,6 +1381,70 @@ namespace Kiki {
         aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
 
+    void RenderManager::updateShadowMatrices(rutils::Allocator const& allocator, rutils::Buffer const& shadowMatricesBuffer, std::vector<Light>& lights) {
+		CameraComponent camComp;
+        TransformComponent transformComp;
+
+        if (debugCam.enabled) {
+            if (registry.valid(debugCam.camera)) {
+                if (registry.all_of<CameraComponent>(debugCam.camera))
+                    camComp = registry.get<CameraComponent>(debugCam.camera);
+                if (registry.all_of<TransformComponent>(debugCam.camera))
+                    transformComp = registry.get<TransformComponent>(debugCam.camera);
+            } else {
+                debugCam.reset();
+            }
+        } else {
+            auto cameras = world.Query<CameraComponent>();
+
+            for (auto cam : cameras) {
+                auto comp = registry.get<CameraComponent>(cam);
+
+                if (comp.isMain) {
+                    camComp = comp;
+                    if (registry.all_of<TransformComponent>(cam))
+                        transformComp = registry.get<TransformComponent>(cam);
+                    break;
+                }
+            }
+        }
+
+        VkDeviceSize size = sizeof(glm::mat4) * 32 * 6;
+        std::array<glm::mat4, 32 * 6> shadowMatrices{};
+
+        for (int i = 0; i < lights.size(); i++) {
+            glm::vec3 pos = glm::vec3(lights[i].position);
+
+            glm::mat4 proj = glm::perspective(
+                glm::radians(90.f),
+                1.f,
+                camComp.nearPlane,
+                camComp.farPlane
+            );
+
+            proj[1][1] *= -1.f;
+
+            shadowMatrices[(i * 6) + 0] = proj * glm::lookAt(pos, pos + glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f));
+            shadowMatrices[(i * 6) + 1] = proj * glm::lookAt(pos, pos + glm::vec3(-1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f));
+            shadowMatrices[(i * 6) + 2] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, -1.f));
+            shadowMatrices[(i * 6) + 3] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 0.f, -1.f));
+            shadowMatrices[(i * 6) + 4] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, -1.f, 0.f));
+            shadowMatrices[(i * 6) + 5] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, -1.f, 0.f));
+        }
+
+        void* mapped = nullptr;
+
+        if (auto const res = vmaMapMemory(allocator.allocator, shadowMatricesBuffer.allocation, &mapped); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to map shadow matrices buffer" "vmaMapMemory() returned {}", rutils::toString(res));
+        }
+
+        std::memcpy(mapped, shadowMatrices.data(), size);
+
+        vmaFlushAllocation(allocator.allocator, shadowMatricesBuffer.allocation, 0, size);
+        vmaUnmapMemory(allocator.allocator, shadowMatricesBuffer.allocation);
+    }
+
+
     void RenderManager::setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info) {
         info.Instance = window.instance;
         info.PhysicalDevice = window.physicalDevice;
@@ -1567,6 +1648,7 @@ namespace Kiki {
         sceneUBO = {};
         interfaceUBO = {};
         interfaceIndices = {};
+        shadowMatricesBuffer = {};
 
         gBufferLayout = {};
         sceneLayout = {};
@@ -1579,10 +1661,12 @@ namespace Kiki {
         tonemapLayout = {};
         interfaceLayout = {};
         textLayout = {};
+        shadowMatrixLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
         interfaceDescriptors = {};
+        shadowMatrixDescriptors = {};
 
         sampler = {};
         fontSampler = {};
