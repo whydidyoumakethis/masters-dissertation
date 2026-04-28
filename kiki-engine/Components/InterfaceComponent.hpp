@@ -5,10 +5,19 @@
 
 #include <entt/entt.hpp>
 #include <glm/vec3.hpp>
+struct ScaleVec2D {
+    float scaleX;
+    float x;
+    float scaleY;
+    float y;
 
+    // Absolute values should only be changed by the InterfaceSystem
+    float absoluteX;
+    float absoluteY;
+};
 struct InterfaceComponent {
-    Kiki::ScaleVec2D position;
-    Kiki::ScaleVec2D size;
+    ScaleVec2D position;
+    ScaleVec2D size;
     entt::entity parent = entt::null;
     unsigned int zindex = 1;
     

@@ -4,7 +4,7 @@
 #include "system/CharacterSystem.h"
 #include "system/ThirdPersonCameraSystem.h"
 #include "system/GoalTriggerSystem.h"
-
+#include "system/TimeLimitSystem.h"
 #include "Components/BackgroundComponent.hpp"
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
@@ -52,9 +52,10 @@ int main(int argc, char** argv) {
 	// registry.emplace<BackgroundComponent>(ui2, glm::vec3(0.0f, 1.0f, 0.0f), 0.0f);
 
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
+	
+	engine.RegisterSystem<TimeLimitSystem>();
 	// use wasd to move the character, shift to speed up, space to jump.
 	engine.RegisterSystem<CharacterSystem>();
-	// use left click to disable cursor and control camera, esc to quit.
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
 	engine.RegisterSystem<GoalTriggerSystem>();
     engine.Run();

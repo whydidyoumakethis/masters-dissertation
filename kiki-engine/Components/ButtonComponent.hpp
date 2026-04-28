@@ -4,12 +4,16 @@
 #include "interface/InterfaceSystem.hpp"
 
 #include <glm/vec4.hpp>
-
+enum ButtonState {
+    NONE,
+    HOVER,
+    BUTTON_DOWN
+};
 struct ButtonComponent {
     glm::vec4 colour;
     glm::vec4 hoverColour;
     glm::vec4 clickColour;
-    Kiki::ButtonState buttonState = Kiki::ButtonState::NONE;
+    ButtonState buttonState = ButtonState::NONE;
 };
 
 #endif

@@ -2,7 +2,11 @@
 #include <chrono>
 class Timer {
 	public:
-	Timer() : _startTime(std::chrono::steady_clock::now()) {}
+	static Timer& get() {
+		static Timer instance;
+		return instance;
+	}
+
 	// Resets the timer to zero
 	void Reset() {
 		_startTime = std::chrono::steady_clock::now();
@@ -20,6 +24,7 @@ class Timer {
 	}
 		
 	private:
+	Timer() : _startTime(std::chrono::steady_clock::now()) {}
 	std::chrono::steady_clock::time_point _startTime;
 	std::chrono::steady_clock::time_point _lastTickTime;
 

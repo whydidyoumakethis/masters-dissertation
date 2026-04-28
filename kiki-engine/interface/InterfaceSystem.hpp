@@ -8,24 +8,15 @@
 #include "RenderManager.hpp"
 #include "MessageCenter.h"
 #include "InputManager.hpp"
-
+#include "Components/InterfaceComponent.hpp"
+#include "Components/BackgroundComponent.hpp"
+#include "Components/TextComponent.hpp"
+#include "Components/ButtonComponent.hpp"
+#include "events/ButtonClickEvent.hpp"
+#include "events/ButtonHoverEvent.hpp"
 namespace Kiki {
-    struct ScaleVec2D {
-        float scaleX;
-        float x;
-        float scaleY;
-        float y;
 
-        // Absolute values should only be changed by the InterfaceSystem
-        float absoluteX;
-        float absoluteY;
-    };
 
-    enum ButtonState {
-        NONE,
-        HOVER,
-        BUTTON_DOWN
-    };
 
     class InterfaceSystem : public System {
         private:

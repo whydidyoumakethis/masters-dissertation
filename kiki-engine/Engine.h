@@ -45,6 +45,7 @@ namespace Kiki {
 		void Run() {
 			_running = true;
 			_scheduler.printSystemOrder();
+			auto _timer = Timer::get();
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
 				float dt = _timer.Tick();
 				MessageCenter::Flush();
@@ -61,6 +62,5 @@ namespace Kiki {
 	private:
 		SystemScheduler _scheduler;
 		bool            _running = false;
-		Timer           _timer;
 	};
 }
