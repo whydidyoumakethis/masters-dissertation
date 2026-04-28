@@ -86,7 +86,7 @@ namespace rutils {
         // stbi_image_free(imageData);
 
         // Create image
-        Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, VK_FORMAT_R8G8B8A8_SRGB, aContext,
+        Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, format, aContext,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
 
         // Create command buffer for data upload and begin recording

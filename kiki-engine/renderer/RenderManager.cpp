@@ -1165,7 +1165,7 @@ namespace Kiki {
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
         // roughWidth / roughHeight
         rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
-        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.normalMapWidth, textureData.normalMapHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
 
         VkDescriptorImageInfo textureInfo[3]{};
 
