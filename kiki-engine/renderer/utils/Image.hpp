@@ -83,6 +83,9 @@ namespace rutils {
 	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator);
 	Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator);
 	Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator);
+	Image createShadowCubemap(VulkanWindow const& window, Allocator const& allocator);
+	std::array<VkImageView, 6> createShadowCubemapFaceViews(VulkanWindow const& window, Image const& cubemap);
+	VkImageView createShadowCubemapArrayView(VulkanWindow const& window, Image const& cubemap);
 	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator);
 	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format);
 }

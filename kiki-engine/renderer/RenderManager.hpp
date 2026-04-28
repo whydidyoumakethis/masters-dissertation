@@ -61,6 +61,16 @@ namespace Kiki {
         rutils::CubemapPaths paths;
     };
 
+    struct Light {
+        glm::vec4 position;
+        glm::vec4 colour;
+    };
+
+    struct ShadowCubemap {
+        rutils::Image cubemap;
+        VkImageView arrayView = VK_NULL_HANDLE;
+    };
+
     struct WindowExtent {
         uint32_t width;
         uint32_t height;
@@ -86,6 +96,7 @@ namespace Kiki {
         std::filesystem::path interface_v = "interface.vert.spv";
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
+        std::filesystem::path shadowmap_v = "shadowMap.vert.spv";
     };
 
     class RenderManager {
@@ -128,6 +139,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout ssaoLayout;
         rutils::DescriptorSetLayout ssaoBlurredLayout;
         rutils::DescriptorSetLayout tonemapLayout;
+        rutils::DescriptorSetLayout shadowMatrixLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -137,11 +149,16 @@ namespace Kiki {
         VkDescriptorSet ssaoHBlurDescriptors;
         VkDescriptorSet ssaoBlurredDescriptors;
         VkDescriptorSet tonemapDescriptors;
+        VkDescriptorSet shadowMatrixDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
         rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
+        rutils::Buffer shadowMatricesBuffer;
+
+        std::vector<ShadowCubemap> shadowCubemaps;
+
         rutils::Sampler sampler;
         rutils::Sampler fontSampler;
 
@@ -162,7 +179,7 @@ namespace Kiki {
         # endif
 
         public:
-
+        std::vector<Light> lights;
 
         rutils::Allocator allocator;
         static RenderManager& get();
@@ -212,8 +229,9 @@ namespace Kiki {
             glm::mat4 camera;
             glm::mat4 projection;
             glm::mat4 projCam;
-            glm::vec4 lightPos;
-            glm::vec4 lightColour;
+            glm::vec4 lightPos[8];
+            glm::vec4 lightColour[8];
+            glm::vec4 numLights;
             glm::vec4 cameraPos;
             glm::vec4 ssaoSamples[16];
         };
@@ -235,6 +253,7 @@ namespace Kiki {
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
+        void updateShadowMatrices(rutils::Allocator const& allocator, rutils::Buffer const& shadowMatricesBuffer, std::vector<Light>& lights);
         void createSkybox(const rutils::CubemapPaths& paths);
 
         World& world = World::Get();
