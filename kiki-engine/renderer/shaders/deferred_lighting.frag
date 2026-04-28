@@ -1,6 +1,7 @@
 #version 450
 
 #define MAX_LIGHTS 8
+#define PCF_SAMPLES 20
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : require
@@ -35,6 +36,15 @@ layout(location = 0) out vec4 oColor;
 float linearise(float depth, float near, float far) {
     return (near * far) / (far - depth * (far - near));
 }
+
+// PCF sample offsets, from https://learnopengl.com/Advanced-Lighting/Shadows/Point-Shadows
+vec3 sampleOffsetDirections[20] = vec3[](
+   vec3( 1,  1,  1), vec3( 1, -1,  1), vec3(-1, -1,  1), vec3(-1,  1,  1), 
+   vec3( 1,  1, -1), vec3( 1, -1, -1), vec3(-1, -1, -1), vec3(-1,  1, -1),
+   vec3( 1,  1,  0), vec3( 1, -1,  0), vec3(-1, -1,  0), vec3(-1,  1,  0),
+   vec3( 1,  0,  1), vec3(-1,  0,  1), vec3( 1,  0, -1), vec3(-1,  0, -1),
+   vec3( 0,  1,  1), vec3( 0, -1,  1), vec3( 0, -1, -1), vec3( 0,  1, -1)
+);   
 
 vec3 reconstructWorldPos(vec2 uv) {
     float depth = texture(gDepth, uv).r;
@@ -109,15 +119,19 @@ void main()
         vec3 lightToFragment = worldSpace - lightPos;
         vec3 absLightToFragment = abs(lightToFragment);
         float distanceToFragment = max(absLightToFragment.x, max(absLightToFragment.y, absLightToFragment.z));
-        float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment).r;
-        float occluderDistance = linearise(shadowMapDepth, shadowNear, shadowFar);
         float bias = 0.05f; // to prevent shadow acne
 
-        float visibility = 1.f;
+        float viewDistance = length(uScene.cameraPos.xyz - worldSpace);
+        float diskRadius = (1.f + (viewDistance / shadowFar)) / 25.f;
 
-        // if the fragment is closer than its occluder than it is to the light, it is in shadow
-        if (distanceToFragment - bias > occluderDistance) {
-            visibility = 0.f;
+        float visibility = 1.f;
+        float visibilityPerSample = visibility / float(PCF_SAMPLES);
+        for (int s = 0; s < PCF_SAMPLES; ++s) {
+            float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment + sampleOffsetDirections[s] * diskRadius).r;
+            float occluderDistance = linearise(shadowMapDepth, shadowNear, shadowFar);
+            if (distanceToFragment - bias > occluderDistance) {
+                visibility -= visibilityPerSample;
+            }
         }
 
         vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
