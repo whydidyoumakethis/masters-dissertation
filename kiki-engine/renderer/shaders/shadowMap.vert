@@ -5,6 +5,9 @@
 #extension GL_EXT_scalar_block_layout : require
 
 layout(location = 0) in vec3 iPosition;
+layout(location = 1) in vec2 iTexCoord;
+layout(location = 2) in vec3 iNormal;
+layout(location = 3) in vec4 iTangent;
 layout(location = 4) in ivec4 iBoneIDs;
 layout(location = 5) in vec4 iWeights;
 
@@ -18,8 +21,7 @@ layout(scalar, set = 1, binding = 0) uniform BoneMatrices {
 
 layout(push_constant) uniform PushConstants {
     mat4 model;
-    int lightIndex;
-    int faceIndex;
+    ivec4 indices; // x is light index, y is face index
 } object;
 
 void main() {
@@ -36,6 +38,6 @@ void main() {
     }
 
     mat4 finalModelMat = object.model * skinMat;
-    int matrixIndex = (object.lightIndex * 6) + object.faceIndex;
+    int matrixIndex = (object.indices.x * 6) + object.indices.y;
     gl_Position = shadowMatrices.lightMatrices[matrixIndex] * finalModelMat * vec4(iPosition, 1.f);
 }

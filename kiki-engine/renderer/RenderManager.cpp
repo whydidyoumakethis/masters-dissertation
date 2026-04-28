@@ -106,6 +106,7 @@ namespace Kiki {
             pipelineLayouts.ssaoPipelineLayout = rutils::createSSAOPipelineLayout(window, sceneLayout.handle, ssaoLayout.handle);
             pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
             pipelineLayouts.tonemapPipelineLayout = rutils::createTonemapPipelineLayout(window, tonemapLayout.handle);
+            pipelineLayouts.shadowMapPipelineLayout = rutils::createShadowMapPipelineLayout(window, shadowMatrixLayout.handle, animationLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -118,6 +119,14 @@ namespace Kiki {
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
+
+            shadowCubemaps.clear();
+            for (int i = 0; i < 32; i++) {
+                ShadowCubemap shadowCubemap{};
+                shadowCubemap.cubemap = rutils::createShadowCubemap(window, allocator);
+                shadowCubemap.faceViews = rutils::createShadowCubemapFaceViews(window, shadowCubemap.cubemap);
+                shadowCubemaps.push_back(std::move(shadowCubemap));
+            }
 
             gbuffers = rutils::createAllGBufferImages(window, allocator);
 
@@ -584,6 +593,7 @@ namespace Kiki {
                 fxaaDescriptors,
                 ssrDescriptors,
                 tonemapDescriptors,
+                shadowMatrixDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
@@ -593,7 +603,9 @@ namespace Kiki {
                 interfaceUniform,
                 interfaceDescriptors,
                 interfaceIndices.buffer,
-                dummyAnimationDesc
+                dummyAnimationDesc,
+                shadowCubemaps,
+                lights
             );
         }
 
@@ -1630,6 +1642,7 @@ namespace Kiki {
         pipelines.tonemap = {};
         pipelines.interfaceShape = {};
         pipelines.interfaceText = {};
+        pipelines.shadowMap = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1640,6 +1653,17 @@ namespace Kiki {
         pipelineLayouts.tonemapPipelineLayout = {};
         pipelineLayouts.interfaceShapeLayout = {};
         pipelineLayouts.interfaceTextLayout = {};
+        pipelineLayouts.shadowMapPipelineLayout = {};
+
+        for (auto& shadowCubemap : shadowCubemaps) {
+            for (auto& faceView : shadowCubemap.faceViews) {
+                if (faceView != VK_NULL_HANDLE) {
+                    vkDestroyImageView(window.device, faceView, nullptr);
+                    faceView = VK_NULL_HANDLE;
+                }
+            }
+        }
+        shadowCubemaps.clear();
 
         depthBuffer = {};
         doneLightingImage = {};

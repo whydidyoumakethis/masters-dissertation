@@ -66,6 +66,11 @@ namespace Kiki {
         glm::vec4 colour;
     };
 
+    struct ShadowCubemap {
+        rutils::Image cubemap;
+        std::array<VkImageView, 6> faceViews;
+    };
+
     struct WindowExtent {
         uint32_t width;
         uint32_t height;
@@ -91,6 +96,7 @@ namespace Kiki {
         std::filesystem::path interface_v = "interface.vert.spv";
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
+        std::filesystem::path shadowmap_v = "shadowMap.vert.spv";
     };
 
     class RenderManager {
@@ -151,7 +157,7 @@ namespace Kiki {
         rutils::Image depthBuffer;
         rutils::Buffer shadowMatricesBuffer;
 
-        std::vector<rutils::Image> shadowMaps;
+        std::vector<ShadowCubemap> shadowCubemaps;
 
         rutils::Sampler sampler;
         rutils::Sampler fontSampler;

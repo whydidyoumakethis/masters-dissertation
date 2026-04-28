@@ -25,6 +25,7 @@ namespace rutils {
         pipelines.ssao_hblur = createSSAOHBlurPipeline(window, pipelineLayouts.ssaoBlurPipelineLayout.handle);
         pipelines.ssao_blurred = createSSAOBlurredPipeline(window, pipelineLayouts.ssaoBlurPipelineLayout.handle);
         pipelines.tonemap = createTonemapPipeline(window, pipelineLayouts.tonemapPipelineLayout.handle);
+        pipelines.shadowMap = createShadowMapPipeline(window, pipelineLayouts.shadowMapPipelineLayout.handle);
 
         pipelines.interfaceShape = createInterfacePipeline(window, pipelineLayouts.interfaceShapeLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_shape_f);
         pipelines.interfaceText = createInterfacePipeline(window, pipelineLayouts.interfaceTextLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_text_f);
@@ -273,16 +274,17 @@ namespace rutils {
         return rutils::PipelineLayout(window.device, layout);
     }                    
 
-    PipelineLayout createShadowMapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout tonemapLayout) {
+    PipelineLayout createShadowMapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout shadowMatrixLayout, VkDescriptorSetLayout boneLayout) {
         VkDescriptorSetLayout layouts[] = {
             // Order must match the set = N in the shaders
-            tonemapLayout // set 0
+            shadowMatrixLayout, // set 0
+            boneLayout // set 1
         };
 
         VkPushConstantRange pushRange{};
-        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
         pushRange.offset = 0;
-        pushRange.size = sizeof(ObjectData);
+        pushRange.size = sizeof(ShadowData);
 
         VkPipelineLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
@@ -1016,6 +1018,121 @@ namespace rutils {
 
         vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
         vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
+
+        return Pipeline(aWindow.device, pipe);
+    }
+
+    Pipeline createShadowMapPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        // load shader code
+        // we only use the vertex and fragment shaders here
+        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.shadowmap_v.string().c_str());
+
+        VkShaderModuleCreateInfo code[1]{};
+        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
+        code[0].codeSize = vShader.size()*sizeof(std::uint32_t);
+        code[0].pCode = vShader.data();
+
+        // Define shader stages in the pipeline
+        VkPipelineShaderStageCreateInfo stages[1]{};
+        VkShaderModule vertModule;
+
+        vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule);
+
+        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
+        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
+        stages[0].module = vertModule;
+        stages[0].pName = "main";
+
+        VkVertexInputBindingDescription vertexInputs[6]{};
+        VkVertexInputAttributeDescription vertexAttributes[6]{};
+        VkPipelineVertexInputStateCreateInfo inputInfo{};
+        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
+        setup_vertex_inputs(vertexInputs, vertexAttributes, &inputInfo, &assemblyInfo);
+
+        // define viewport and scissor regions
+        VkViewport viewport{};
+        VkRect2D scissor{};
+        VkPipelineViewportStateCreateInfo viewportInfo{};
+
+        // define viewport and scissor regions
+        viewport.x = 0.f;
+        viewport.y = 0.f;
+        viewport.width = float(1024);
+        viewport.height = float(1024);
+        viewport.minDepth = 0.f;
+        viewport.maxDepth = 1.f;
+
+        scissor.offset = VkOffset2D{0, 0};
+        scissor.extent = VkExtent2D{1024, 1024};
+
+        viewportInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO;
+        viewportInfo.viewportCount = 1;
+        viewportInfo.pViewports = &viewport;
+        viewportInfo.scissorCount = 1;
+        viewportInfo.pScissors = &scissor;
+
+        // define rasterisation options
+        VkPipelineRasterizationStateCreateInfo rasterInfo{};
+        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+        rasterInfo.depthClampEnable = VK_FALSE;
+        rasterInfo.rasterizerDiscardEnable = VK_FALSE;
+        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
+        rasterInfo.cullMode = VK_CULL_MODE_NONE;
+        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
+        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.lineWidth = 1.f; // required
+
+        // define multisampling state
+        VkPipelineMultisampleStateCreateInfo samplingInfo{};
+        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+        VkPipelineDepthStencilStateCreateInfo depthInfo{};
+        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
+        depthInfo.depthTestEnable = VK_TRUE;
+        depthInfo.depthWriteEnable = VK_TRUE;
+        depthInfo.depthBoundsTestEnable = VK_FALSE;
+        depthInfo.stencilTestEnable = VK_FALSE;
+        depthInfo.depthCompareOp = VK_COMPARE_OP_LESS_OR_EQUAL;
+        depthInfo.minDepthBounds = 0.f;
+        depthInfo.maxDepthBounds = 1.f;
+
+        // pipeline rendering info
+        // related to dynamic rendering (core in Vulkan 1.3)
+        VkPipelineRenderingCreateInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        
+        renderingInfo.colorAttachmentCount = 0;
+        renderingInfo.pColorAttachmentFormats = nullptr;
+        renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
+
+        // create pipeline
+        VkGraphicsPipelineCreateInfo pipeInfo{};
+        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+        pipeInfo.pNext = &renderingInfo;
+
+        pipeInfo.stageCount = 1; // vertex stage
+        pipeInfo.pStages = stages;
+
+        pipeInfo.pVertexInputState = &inputInfo;
+        pipeInfo.pInputAssemblyState = &assemblyInfo;
+        pipeInfo.pTessellationState = nullptr; // no tessellation
+        pipeInfo.pViewportState = &viewportInfo;
+        pipeInfo.pRasterizationState = &rasterInfo;
+        pipeInfo.pMultisampleState = &samplingInfo;
+        pipeInfo.pDepthStencilState = &depthInfo;
+        pipeInfo.pColorBlendState = nullptr;
+        pipeInfo.pDynamicState = nullptr; // no dynamic states
+
+        pipeInfo.layout = aPipelineLayout;
+        pipeInfo.subpass = 0; // first subpass of aRenderPass
+
+        VkPipeline pipe = VK_NULL_HANDLE;
+        if (auto const res = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create shadow map pipeline\n" "vkCreateGraphicsPipelines() returned {}", rutils::toString(res));
+        }
+
+        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
 
         return Pipeline(aWindow.device, pipe);
     }
@@ -1776,6 +1893,7 @@ namespace rutils {
         return Pipeline(aWindow.device, pipe);
     }
     
+
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath) {
         auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.interface_v.string().c_str());
         auto const fShader = rutils::loadShader(fShaderPath.string().c_str());

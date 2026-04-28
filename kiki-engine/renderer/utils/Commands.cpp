@@ -71,11 +71,12 @@ namespace rutils {
         VkDescriptorSet aSceneDescriptors,
         VkDescriptorSet ssaoDescriptors,
         VkDescriptorSet ssaoHBlurDescriptors,
-		    VkDescriptorSet ssaoBlurredDescriptors,
+        VkDescriptorSet ssaoBlurredDescriptors,
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
-		    VkDescriptorSet ssrDescriptors,
-		    VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet shadowMatrixDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
@@ -85,7 +86,9 @@ namespace rutils {
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
         VkDescriptorSet interfaceDescriptors,
         VkBuffer interfaceIndexBuffer,
-        VkDescriptorSet dummyAnimationDesc
+        VkDescriptorSet dummyAnimationDesc,
+        std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
+        std::vector<Kiki::Light> const& lights
     ) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -381,26 +384,10 @@ namespace rutils {
                             auto animComp = registry.try_get<Kiki::AnimationComponent>(e);
 
                             if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
-                                vkCmdBindDescriptorSets(
-                                    aCmdBuff,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayouts.pbrPipelineLayout.handle,
-                                    2, 
-                                    1,
-                                    &animComp->descriptorSet,
-                                    0, nullptr
-                                );
+                                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 2, 1, &animComp->descriptorSet, 0, nullptr);
                             }
                             else {
-                                vkCmdBindDescriptorSets(
-                                    aCmdBuff,
-                                    VK_PIPELINE_BIND_POINT_GRAPHICS,
-                                    pipelineLayouts.pbrPipelineLayout.handle,
-                                    2,
-                                    1,
-                                    &dummyAnimationDesc,
-                                    0, nullptr
-                                );
+                                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 2, 1, &dummyAnimationDesc, 0, nullptr);
                             }
                             // Draw mesh
                             vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
@@ -536,65 +523,107 @@ namespace rutils {
             TracyVkZone(tracyVkCtx, aCmdBuff, "Shadow map pass");
             #endif
 
-            // imageBarrier(aCmdBuff, gbuffers.ssao.image,
-            //     // before
-            //     VK_PIPELINE_STAGE_2_NONE,
-            //     VK_ACCESS_2_NONE,
-            //     VK_IMAGE_LAYOUT_UNDEFINED,
-            //     // after
-            //     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            //     VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            //     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-            // );
+            auto& shadowWorld = World::Get();
+            auto& shadowRegistry = shadowWorld.Registry();
+            auto shadowView = shadowWorld.Query<TransformComponent, MeshComponent>();
+            Kiki::SceneManager& shadowSceneManager = Kiki::SceneManager::get();
 
-            // VkRenderingAttachmentInfo ssaoColourAttach{};
-            // ssaoColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-            // ssaoColourAttach.imageView = gbuffers.ssao.view;
-            // ssaoColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            // ssaoColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-            // ssaoColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-            // ssaoColourAttach.clearValue.color.float32[0] = 0.f;
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.shadowMap.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 0, 1, &shadowMatrixDescriptors, 0, nullptr);
 
-            // VkRenderingInfo ssaoRenderInfo{};
-            // ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-            // ssaoRenderInfo.layerCount = 1;
-            // ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            // ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            for (int lightIndex = 0; lightIndex < lights.size(); lightIndex++) {
+                Kiki::ShadowCubemap const& shadowCubemap = shadowCubemaps[lightIndex];
 
-            // ssaoRenderInfo.colorAttachmentCount = 1;
-            // ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
+                for (int faceIndex = 0; faceIndex < 6; faceIndex++) {
+                    VkImageSubresourceRange faceRange{};
+                    faceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+                    faceRange.baseMipLevel = 0;
+                    faceRange.levelCount = 1;
+                    faceRange.baseArrayLayer = faceIndex;
+                    faceRange.layerCount = 1;
 
-            // vkCmdBeginRendering(aCmdBuff, &ssaoRenderInfo);
+                    rutils::imageBarrier(aCmdBuff, shadowCubemap.cubemap.image,
+                        /* Before */
+                        VK_PIPELINE_STAGE_2_NONE,
+                        VK_ACCESS_2_NONE,
+                        VK_IMAGE_LAYOUT_UNDEFINED,
+                        /* After */
+                        VK_PIPELINE_STAGE_2_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                        VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                        VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                        /* What */
+                        faceRange
+                    );
 
-            // VkDescriptorSet ssaoSets[] = {
-            //     aSceneDescriptors,
-            //     ssaoDescriptors
-            // };
+                    VkRenderingAttachmentInfo shadowDepthAttach{};
+                    shadowDepthAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                    shadowDepthAttach.imageView = shadowCubemap.faceViews[faceIndex];
+                    shadowDepthAttach.imageLayout = VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL;
+                    shadowDepthAttach.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+                    shadowDepthAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+                    shadowDepthAttach.clearValue.depthStencil.depth = 1.f;
 
-            // // draw fullscreen quad with ssao shader
-            // vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao.handle);
-            // vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
+                    VkRenderingInfo shadowMapRenderInfo{};
+                    shadowMapRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                    shadowMapRenderInfo.layerCount = 1;
+                    shadowMapRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+                    shadowMapRenderInfo.renderArea.extent = VkExtent2D{1024, 1024};
+                    shadowMapRenderInfo.colorAttachmentCount = 0;
+                    shadowMapRenderInfo.pColorAttachments = nullptr;
+                    shadowMapRenderInfo.pDepthAttachment = &shadowDepthAttach;
 
-            // SSAOSettings ssaoSettings;
-            // ssaoSettings.width = aImageExtent.width;
-            // ssaoSettings.height = aImageExtent.height;
+                    vkCmdBeginRendering(aCmdBuff, &shadowMapRenderInfo);
 
-            // vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
+                    for (auto [e, transform, meshComponent] : shadowView.each()) {
+                        if (!shadowSceneManager.validMesh(meshComponent.id)) continue;
 
-            // vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+                        Kiki::Mesh const& mesh = shadowSceneManager.getMesh(meshComponent.id);
 
-            // vkCmdEndRendering(aCmdBuff);
+                        VkBuffer buffers[6] = {
+                            mesh.positions.buffer,
+                            mesh.texCoords.buffer,
+                            mesh.normals.buffer,
+                            mesh.tangents.buffer,
+                            mesh.boneIDs.buffer,
+                            mesh.weights.buffer
+                        };
+                        VkDeviceSize offsets[6]{};
 
-            // rutils::imageBarrier(aCmdBuff, gbuffers.ssao.image,
-            //     // before
-            //     VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            //     VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            //     VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            //     // after
-            //     VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            //     VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-            //     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            // );
+                        vkCmdBindVertexBuffers(aCmdBuff, 0, 6, buffers, offsets);
+                        vkCmdBindIndexBuffer(aCmdBuff, mesh.indices.buffer, 0, VK_INDEX_TYPE_UINT32);
+
+                        auto animComp = shadowRegistry.try_get<Kiki::AnimationComponent>(e);
+                        if (animComp && animComp->descriptorSet != VK_NULL_HANDLE) {
+                            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 1, 1, &animComp->descriptorSet, 0, nullptr);
+                        } else {
+                            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 1, 1, &dummyAnimationDesc, 0, nullptr);
+                        }
+
+                        rutils::ShadowData shadowData{};
+                        shadowData.model = transform.worldMatrix;
+                        shadowData.indices = glm::ivec4(lightIndex, faceIndex, 0, 0);
+
+                        vkCmdPushConstants(aCmdBuff, pipelineLayouts.shadowMapPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof(shadowData), &shadowData);
+
+                        vkCmdDrawIndexed(aCmdBuff, mesh.indexCount, 1, 0, 0, 0);
+                    }
+
+                    vkCmdEndRendering(aCmdBuff);
+                }
+
+                rutils::imageBarrier(aCmdBuff, shadowCubemap.cubemap.image,
+                    /* Before */
+                    VK_PIPELINE_STAGE_2_LATE_FRAGMENT_TESTS_BIT,
+                    VK_ACCESS_2_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_OPTIMAL,
+                    /* After */
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    /* What */
+                    VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
+                );
+            }
 
             // end shadow map pass
         }
