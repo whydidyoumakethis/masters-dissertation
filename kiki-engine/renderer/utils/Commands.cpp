@@ -17,6 +17,7 @@
 
 #include "../../ECS/World.h"
 
+#include <algorithm>
 #include <iostream>
 #include <tracy/Tracy.hpp>
 #include <tracy/TracyVulkan.hpp>
@@ -621,6 +622,22 @@ namespace rutils {
                     VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
                     VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
                     /* What */
+                    VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
+                );
+            }
+
+            // ensure that every image is transitioned properly, even if unused
+            for (size_t lightIndex = lights.size(); lightIndex < shadowCubemaps.size(); lightIndex++) {
+                rutils::imageBarrier(aCmdBuff, shadowCubemaps[lightIndex].cubemap.image,
+                    // before
+                    VK_PIPELINE_STAGE_2_NONE,
+                    VK_ACCESS_2_NONE,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    // after
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    // what
                     VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
                 );
             }

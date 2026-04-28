@@ -1,6 +1,6 @@
 #version 450
 
-#define MAX_LIGHTS 32
+#define MAX_LIGHTS 8
 
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : require
@@ -27,8 +27,14 @@ layout(set = 1, binding = 3) uniform sampler2D gMappedNormal;
 layout(set = 1, binding = 4) uniform sampler2D gDepth;
 layout(set = 1, binding = 5) uniform samplerCube skybox;
 layout(set = 1, binding = 6) uniform sampler2D gAO;
+layout(set = 1, binding = 7) uniform samplerCube shadowCubemaps[MAX_LIGHTS];
 
 layout(location = 0) out vec4 oColor;
+
+// linearise depth sampled from a shadow cubemap
+float linearise(float depth, float near, float far) {
+    return (near * far) / (far - depth * (far - near));
+}
 
 vec3 reconstructWorldPos(vec2 uv) {
     float depth = texture(gDepth, uv).r;
@@ -82,11 +88,14 @@ void main()
     vec3 viewDirection = normalize(uScene.cameraPos.xyz - worldSpace);
 
     vec3 lighting = vec3(0.f);
-    // TODO: lights[0] will always be directional
-    // so use its position as a direction instead
+
+    // shadow near and far planes are stored in the scene uniform
+    // numLights[x] and [y]
+    float shadowNear = uScene.numLights[1];
+    float shadowFar = uScene.numLights[2];
 
     for (int i = 0; i < uScene.numLights[0]; i++) {
-        vec3 lightColour = uScene.lightColour[i].xyz;
+        vec3 lightColour = uScene.lightColour[i].xyz * uScene.lightColour[i].w;
         vec3 lightPos = uScene.lightPos[i].xyz;
 
         // vector pointing towards the light
@@ -97,8 +106,22 @@ void main()
 
         float nDotLPos = max(dot(normal, lightDirection), 0.05f);
 
+        vec3 lightToFragment = worldSpace - lightPos;
+        vec3 absLightToFragment = abs(lightToFragment);
+        float distanceToFragment = max(absLightToFragment.x, max(absLightToFragment.y, absLightToFragment.z));
+        float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment).r;
+        float occluderDistance = linearise(shadowMapDepth, shadowNear, shadowFar);
+        float bias = 0.05f; // to prevent shadow acne
+
+        float visibility = 1.f;
+
+        // if the fragment is closer than its occluder than it is to the light, it is in shadow
+        if (distanceToFragment - bias > occluderDistance) {
+            visibility = 0.f;
+        }
+
         vec3 brdfResult = brdf(lightDirection, viewDirection, normal, halfVector, roughness, metalness, baseColour);
-        lighting += brdfResult * lightColour * nDotLPos;
+        lighting += brdfResult * lightColour * nDotLPos * visibility;
     }
 
     float ambientOcclusion = texture(gAO, v2fTexCoord).r;

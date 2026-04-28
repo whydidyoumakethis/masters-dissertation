@@ -229,8 +229,8 @@ namespace Kiki {
             glm::mat4 camera;
             glm::mat4 projection;
             glm::mat4 projCam;
-            glm::vec4 lightPos[32];
-            glm::vec4 lightColour[32];
+            glm::vec4 lightPos[8];
+            glm::vec4 lightColour[8];
             glm::vec4 numLights;
             glm::vec4 cameraPos;
             glm::vec4 ssaoSamples[16];

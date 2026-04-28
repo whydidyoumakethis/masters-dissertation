@@ -3,9 +3,11 @@
 
 #include "VulkanWrapper.hpp"
 #include "VulkanWindow.hpp"
+#include "../RenderManager.hpp"
 #include "Image.hpp"
 
 #include <cstdint>
+#include <vector>
 
 namespace rutils {
     DescriptorSetLayout createSceneDescriptorLayout(VulkanWindow const& window);
@@ -21,7 +23,7 @@ namespace rutils {
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors = 2048, std::uint32_t aMaxSets = 1024);
     DescriptorSetLayout createAnimationDescriptorLayout(VulkanWindow const& window);
     VkDescriptorSet allocDescSet(VulkanWindow const& window, VkDescriptorPool aPool, VkDescriptorSetLayout aSetLayout);
-    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler);
+    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler, std::vector<Kiki::ShadowCubemap> const& shadowCubemaps);
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors);
     void initialiseSSAODescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoDescriptors);
     void initialiseSSAOHBlurDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoHBlurDescriptors);

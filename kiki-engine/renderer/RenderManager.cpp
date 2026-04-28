@@ -15,6 +15,7 @@
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
 
+#include <algorithm>
 #include <iostream>
 #include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
@@ -82,7 +83,7 @@ namespace Kiki {
 
             shadowMatricesBuffer = rutils::createBuffer(
                 allocator,
-                sizeof(glm::mat4) * 32 * 6,
+                sizeof(glm::mat4) * 8 * 6,
                 VK_BUFFER_USAGE_STORAGE_BUFFER_BIT,
                 VMA_ALLOCATION_CREATE_MAPPED_BIT | VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
                 VMA_MEMORY_USAGE_AUTO_PREFER_HOST
@@ -121,7 +122,7 @@ namespace Kiki {
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
 
             shadowCubemaps.clear();
-            for (int i = 0; i < 32; i++) {
+            for (int i = 0; i < 8; i++) {
                 ShadowCubemap shadowCubemap{};
                 shadowCubemap.cubemap = rutils::createShadowCubemap(window, allocator);
                 shadowCubemap.faceViews = rutils::createShadowCubemapFaceViews(window, shadowCubemap.cubemap);
@@ -145,7 +146,7 @@ namespace Kiki {
             initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
 
             deferredLightingDescriptors = rutils::allocDescSet(window, descriptorPool.handle, gBufferLayout.handle);
-            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+            initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
 
             ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
@@ -444,7 +445,7 @@ namespace Kiki {
                 initialiseSSAODescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoDescriptors);
                 initialiseSSAOHBlurDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoHBlurDescriptors);
                 initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
-                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+                initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
                 initialiseTonemapDescriptorSet(window, doneSSRImage, sampler, tonemapDescriptors);
@@ -1379,16 +1380,15 @@ namespace Kiki {
 
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
 
-        for (int i = 0; i < lights.size(); i++) {
-            // std::cout << i << std::endl;
+        int numLights = std::min<size_t>(lights.size(), 8);
+        for (int i = 0; i < numLights; i++) {
             aSceneUniforms.lightPos[i] = lights[i].position;
-            // std::cout << aSceneUniforms.lightPos[i].x << " " << aSceneUniforms.lightPos[i].y << " " << aSceneUniforms.lightPos[i].z << " " << aSceneUniforms.lightPos[i].w << std::endl;
-
             aSceneUniforms.lightColour[i] = lights[i].colour;
-            // std::cout << aSceneUniforms.lightColour[i].x << " " << aSceneUniforms.lightColour[i].y << " " << aSceneUniforms.lightColour[i].z << " " << aSceneUniforms.lightColour[i].w << std::endl;
         }
 
-        aSceneUniforms.numLights[0] = lights.size();
+        aSceneUniforms.numLights[0] = float(numLights);
+        aSceneUniforms.numLights[1] = camComp.nearPlane;
+        aSceneUniforms.numLights[2] = camComp.farPlane;
 
         aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
@@ -1421,24 +1421,23 @@ namespace Kiki {
             }
         }
 
-        VkDeviceSize size = sizeof(glm::mat4) * 32 * 6;
-        std::array<glm::mat4, 32 * 6> shadowMatrices{};
+        VkDeviceSize size = sizeof(glm::mat4) * 8 * 6;
+        std::array<glm::mat4, 8 * 6> shadowMatrices{};
 
-        for (int i = 0; i < lights.size(); i++) {
+        int numLights = std::min<int>(lights.size(), 8);
+        for (int i = 0; i < numLights; i++) {
             glm::vec3 pos = glm::vec3(lights[i].position);
 
-            glm::mat4 proj = glm::perspective(
+            glm::mat4 proj = glm::perspectiveRH_ZO(
                 glm::radians(90.f),
                 1.f,
                 camComp.nearPlane,
                 camComp.farPlane
             );
 
-            proj[1][1] *= -1.f;
-
             shadowMatrices[(i * 6) + 0] = proj * glm::lookAt(pos, pos + glm::vec3(1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f));
             shadowMatrices[(i * 6) + 1] = proj * glm::lookAt(pos, pos + glm::vec3(-1.f, 0.f, 0.f), glm::vec3(0.f, -1.f, 0.f));
-            shadowMatrices[(i * 6) + 2] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, -1.f));
+            shadowMatrices[(i * 6) + 2] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 1.f, 0.f), glm::vec3(0.f, 0.f, 1.f));
             shadowMatrices[(i * 6) + 3] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, -1.f, 0.f), glm::vec3(0.f, 0.f, -1.f));
             shadowMatrices[(i * 6) + 4] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, 1.f), glm::vec3(0.f, -1.f, 0.f));
             shadowMatrices[(i * 6) + 5] = proj * glm::lookAt(pos, pos + glm::vec3(0.f, 0.f, -1.f), glm::vec3(0.f, -1.f, 0.f));
@@ -1500,7 +1499,7 @@ namespace Kiki {
         skybox.paths.back = back;
 
         createSkybox(skybox.paths);
-        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler);
+        initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
     }
 
     void RenderManager::createSkybox(const rutils::CubemapPaths& paths) {
