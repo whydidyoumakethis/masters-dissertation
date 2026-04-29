@@ -32,6 +32,27 @@
 
 
 namespace Kiki {
+    struct RenderSettings {
+        int ssaoSamples = 16;
+        float ssaoRadius = 0.5f;
+
+        int ssaoBlurRange = 2;
+
+        int shadowPcfSamples = 20;
+
+        int ssrMaxSteps = 16;
+        int ssrBinarySteps = 4;
+        float ssrStepSize = 0.5f;
+        float ssrThicknessTolerance = 0.2f;
+
+        float bloomRadius_x = 0.005f;
+        float bloomRadius_y = 0.005f;
+
+        float bloomStrength = 0.04f;
+
+        float fxaaStrength = 16.f;
+    };
+
     struct Mesh {
         rutils::Buffer positions;
         rutils::Buffer texCoords;
@@ -97,6 +118,9 @@ namespace Kiki {
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
         std::filesystem::path shadowmap_v = "shadowMap.vert.spv";
+        std::filesystem::path bloom_downsample_f = "bloom_downsample.frag.spv";
+        std::filesystem::path bloom_upsample_f = "bloom_upsample.frag.spv";
+        std::filesystem::path composite_f = "composite.frag.spv";
     };
 
     class RenderManager {
@@ -140,6 +164,8 @@ namespace Kiki {
         rutils::DescriptorSetLayout ssaoBlurredLayout;
         rutils::DescriptorSetLayout tonemapLayout;
         rutils::DescriptorSetLayout shadowMatrixLayout;
+        rutils::DescriptorSetLayout bloomLayout;
+        rutils::DescriptorSetLayout compositeLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -150,11 +176,18 @@ namespace Kiki {
         VkDescriptorSet ssaoBlurredDescriptors;
         VkDescriptorSet tonemapDescriptors;
         VkDescriptorSet shadowMatrixDescriptors;
+        VkDescriptorSet compositeDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
+        rutils::Image doneCompositeImage;
         rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
+
+        std::array<rutils::Image, 6> bloomImages;
+        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets;
+        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets;
+
         rutils::Buffer shadowMatricesBuffer;
 
         std::vector<ShadowCubemap> shadowCubemaps;
@@ -250,6 +283,7 @@ namespace Kiki {
 
         ShaderPaths shaderPaths;
         SceneUniform sceneUniforms;
+        RenderSettings renderSettings;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);

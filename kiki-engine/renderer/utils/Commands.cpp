@@ -78,10 +78,12 @@ namespace rutils {
         VkDescriptorSet ssrDescriptors,
         VkDescriptorSet tonemapDescriptors,
         VkDescriptorSet shadowMatrixDescriptors,
+        VkDescriptorSet compositeDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
         Image const& doneSSRImage,
+        Image const& doneCompositeImage,
         Image const& doneTonemapImage,
         VkBuffer interfaceUBO,
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
@@ -89,7 +91,11 @@ namespace rutils {
         VkBuffer interfaceIndexBuffer,
         VkDescriptorSet dummyAnimationDesc,
         std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
-        std::vector<Kiki::Light> const& lights
+        std::vector<Kiki::Light> const& lights,
+        std::array<Image, 6> const& bloomImages,
+        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
+        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
+        Kiki::RenderSettings& renderSettings
     ) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -749,6 +755,8 @@ namespace rutils {
             SSAOSettings ssaoSettings;
             ssaoSettings.width = aImageExtent.width;
             ssaoSettings.height = aImageExtent.height;
+            ssaoSettings.samples = renderSettings.ssaoSamples;
+            ssaoSettings.radius = renderSettings.ssaoRadius;
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
 
@@ -816,6 +824,11 @@ namespace rutils {
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_hblur.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
 
+            SSAOSettings ssaoSettings;
+            ssaoSettings.blurSize = renderSettings.ssaoBlurRange;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             vkCmdEndRendering(aCmdBuff);
@@ -877,6 +890,11 @@ namespace rutils {
             // draw fullscreen quad with ssao shader
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_blurred.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
+
+            SSAOSettings ssaoSettings;
+            ssaoSettings.blurSize = renderSettings.ssaoBlurRange;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
 
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
@@ -940,6 +958,12 @@ namespace rutils {
             };
 
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
+
+            ObjectData data;
+            data.pcfSamples = renderSettings.shadowPcfSamples;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data), &data);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             vkCmdEndRendering(aCmdBuff);
@@ -1004,12 +1028,10 @@ namespace rutils {
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
 
             SSRSettings ssrSettings;
-            ssrSettings.settings.x = 16; // maxSteps
-            ssrSettings.settings.y = 4; // binarySteps
-            ssrSettings.settings.z = 0.5f; // stepSize
-            ssrSettings.settings.w = 0.2f; // thicknessTolerance
-
-            // TODO: debug, could change the ssr settings here :)
+            ssrSettings.settings.x = renderSettings.ssrMaxSteps; // maxSteps
+            ssrSettings.settings.y = renderSettings.ssrBinarySteps; // binarySteps
+            ssrSettings.settings.z = renderSettings.ssrStepSize; // stepSize
+            ssrSettings.settings.w = renderSettings.ssrThicknessTolerance; // thicknessTolerance
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ssrSettings), &ssrSettings);
 
@@ -1017,6 +1039,263 @@ namespace rutils {
 
             vkCmdEndRendering(aCmdBuff);
             // end ssr pass
+        }
+
+        {
+            ZoneScopedN("Recording bloom downsample pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Bloom downsample pass");
+            #endif
+
+            // transition the previous image (ssr result) to be sampled
+            imageBarrier(aCmdBuff, doneSSRImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+
+            // downsample passes
+            for (int i = 0; i < 6; i++) {
+                // transition the current bloom image to be written to
+                imageBarrier(aCmdBuff, bloomImages[i].image,
+                    // before
+                    VK_PIPELINE_STAGE_2_NONE,
+                    VK_ACCESS_2_NONE,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    // after
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                );
+
+                // render here
+                VkRenderingAttachmentInfo bloomColourAttach{};
+                bloomColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                bloomColourAttach.imageView = bloomImages[i].view; // render to
+                bloomColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                bloomColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+                bloomColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+                VkExtent2D bloomExtent{
+                    std::max(1u, aImageExtent.width >> i),
+                    std::max(1u, aImageExtent.height >> i)
+                };
+
+                VkRenderingInfo bloomRenderInfo{};
+                bloomRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                bloomRenderInfo.layerCount = 1;
+                bloomRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+                bloomRenderInfo.renderArea.extent = bloomExtent;
+                bloomRenderInfo.colorAttachmentCount = 1;
+                bloomRenderInfo.pColorAttachments = &bloomColourAttach;
+
+                vkCmdBeginRendering(aCmdBuff, &bloomRenderInfo);
+
+                VkDescriptorSet bloomSets[] = {
+                    bloomImageDownsampleDescriptorSets[i] // render from
+                };
+
+                // we're using dynamic viewports and scissor
+                // so set them
+                VkViewport bloomViewport{};
+                bloomViewport.x = 0.0f;
+                bloomViewport.y = 0.0f;
+                bloomViewport.width = float(bloomExtent.width);
+                bloomViewport.height = float(bloomExtent.height);
+                bloomViewport.minDepth = 0.0f;
+                bloomViewport.maxDepth = 1.0f;
+
+                VkRect2D bloomScissor{};
+                bloomScissor.offset = {0, 0};
+                bloomScissor.extent = bloomExtent;
+
+                vkCmdSetViewport(aCmdBuff, 0, 1, &bloomViewport);
+                vkCmdSetScissor(aCmdBuff, 0, 1, &bloomScissor);
+
+                // draw fullscreen quad with post-processing shader
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.bloomDownsample.handle);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.bloomPipelineLayout.handle, 0, 1, bloomSets, 0, nullptr);
+
+                BloomData bloomData;
+                bloomData.data.x = i;
+
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.bloomPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomData), &bloomData);
+
+                vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+                vkCmdEndRendering(aCmdBuff);
+
+                // finally, transition the current bloom image to be sampled
+                imageBarrier(aCmdBuff, bloomImages[i].image,
+                    // before
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    // after
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                );
+            }
+        }
+
+        {
+            ZoneScopedN("Recording bloom upsample pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Bloom upsample pass");
+            #endif
+
+            // upsample passes
+            for (int source = 5; source > 0; source--) {
+                int target = source - 1;
+
+                // transition the current bloom image to be written to
+                imageBarrier(aCmdBuff, bloomImages[target].image,
+                    // before
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    // after
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+                );
+
+                // render here
+                VkRenderingAttachmentInfo bloomColourAttach{};
+                bloomColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+                bloomColourAttach.imageView = bloomImages[target].view; // render to
+                bloomColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+                bloomColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+                bloomColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+                VkExtent2D bloomExtent{
+                    std::max(1u, aImageExtent.width >> target),
+                    std::max(1u, aImageExtent.height >> target)
+                };
+
+                VkRenderingInfo bloomRenderInfo{};
+                bloomRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+                bloomRenderInfo.layerCount = 1;
+                bloomRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+                bloomRenderInfo.renderArea.extent = bloomExtent;
+                bloomRenderInfo.colorAttachmentCount = 1;
+                bloomRenderInfo.pColorAttachments = &bloomColourAttach;
+
+                vkCmdBeginRendering(aCmdBuff, &bloomRenderInfo);
+
+                VkDescriptorSet bloomSets[] = {
+                    bloomImageUpsampleDescriptorSets[5 - source] // render from
+                };
+
+                // we're using dynamic viewports and scissor
+                // so set them
+                VkViewport bloomViewport{};
+                bloomViewport.x = 0.0f;
+                bloomViewport.y = 0.0f;
+                bloomViewport.width = float(bloomExtent.width);
+                bloomViewport.height = float(bloomExtent.height);
+                bloomViewport.minDepth = 0.0f;
+                bloomViewport.maxDepth = 1.0f;
+
+                VkRect2D bloomScissor{};
+                bloomScissor.offset = {0, 0};
+                bloomScissor.extent = bloomExtent;
+
+                vkCmdSetViewport(aCmdBuff, 0, 1, &bloomViewport);
+                vkCmdSetScissor(aCmdBuff, 0, 1, &bloomScissor);
+
+                // draw fullscreen quad with post-processing shader
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.bloomUpsample.handle);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.bloomPipelineLayout.handle, 0, 1, bloomSets, 0, nullptr);
+
+                BloomData bloomData;
+                bloomData.data.x = renderSettings.bloomRadius_x;
+                bloomData.data.y = renderSettings.bloomRadius_y;
+                bloomData.data.z = source;
+
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.bloomPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomData), &bloomData);
+
+                vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+                vkCmdEndRendering(aCmdBuff);
+
+                // finally, transition the current bloom image to be sampled
+                imageBarrier(aCmdBuff, bloomImages[target].image,
+                    // before
+                    VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                    VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                    VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                    // after
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                );
+            }
+        }
+
+
+        {
+            ZoneScopedN("Recording composite pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Composite pass");
+            #endif
+
+            // begin composite pass
+            imageBarrier(aCmdBuff, doneCompositeImage.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo compositeColourAttach{};
+            compositeColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            compositeColourAttach.imageView = doneCompositeImage.view;
+            compositeColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            compositeColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            compositeColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo compositeRenderInfo{};
+            compositeRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            compositeRenderInfo.layerCount = 1;
+            compositeRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            compositeRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+
+            compositeRenderInfo.colorAttachmentCount = 1;
+            compositeRenderInfo.pColorAttachments = &compositeColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &compositeRenderInfo);
+
+            VkDescriptorSet compositeSets[] = {
+                compositeDescriptors
+            };
+
+            // draw fullscreen quad with post-processing shader
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.composite.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.compositePipelineLayout.handle, 0, 1, compositeSets, 0, nullptr);
+
+            CompositeSettings compositeSettings;
+            compositeSettings.bloomStrength = renderSettings.bloomStrength;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.compositePipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CompositeSettings), &compositeSettings);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+            // end tonemap pass
         }
 
         {
@@ -1029,7 +1308,7 @@ namespace rutils {
             // begin tonemap pass
             // transition the image we just rendered to be sampled
             // TODO: change this once bloom is in
-            imageBarrier(aCmdBuff, doneSSRImage.image,
+            imageBarrier(aCmdBuff, doneCompositeImage.image,
                 // before
                 VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
@@ -1140,6 +1419,12 @@ namespace rutils {
             // draw fullscreen quad with post-processing shader
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.fxaa.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
+
+            FXAASettings fxaaSettings;
+            fxaaSettings.strength = renderSettings.fxaaStrength;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fxaaSettings), &fxaaSettings);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             // begin imgui pass

@@ -274,6 +274,28 @@ namespace rutils {
         return DescriptorSetLayout(window.device, layout);
     }
 
+    DescriptorSetLayout createBloomDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // input bloom or ssr layer
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorSetLayout createTonemapDescriptorLayout(VulkanWindow const& window) {
         VkDescriptorSetLayoutBinding bindings[1]{};
 
@@ -282,6 +304,34 @@ namespace rutils {
         bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[0].descriptorCount = 1;
         bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createCompositeDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[2]{};
+
+        // SSR image
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // final bloom image
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -607,12 +657,12 @@ namespace rutils {
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
     }
 
-    void initialiseTonemapDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Sampler& sampler, VkDescriptorSet& tonemapDescriptors) {
+    void initialiseTonemapDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, Sampler& sampler, VkDescriptorSet& tonemapDescriptors) {
         VkWriteDescriptorSet desc[1]{};
 
         VkDescriptorImageInfo tonemapInfo{};
         tonemapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        tonemapInfo.imageView = doneSSRImage.view;
+        tonemapInfo.imageView = doneCompositeImage.view;
         tonemapInfo.sampler = sampler.handle;
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -623,6 +673,36 @@ namespace rutils {
         desc[0].pImageInfo = &tonemapInfo;
 
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors) {
+        VkWriteDescriptorSet desc[2]{};
+
+        VkDescriptorImageInfo ssrInfo{};
+        ssrInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ssrInfo.imageView = doneSSRImage.view;
+        ssrInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo bloomInfo{};
+        bloomInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        bloomInfo.imageView = bloomResult.view;
+        bloomInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = compositeDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &ssrInfo;
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = compositeDescriptors;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &bloomInfo;
+
+        vkUpdateDescriptorSets(window.device, 2, desc, 0, nullptr);
     }
 
     void initialiseShadowMatrixDescriptorSet(VulkanWindow const& window, VkBuffer shadowMatricesBuffer, VkDescriptorSet& shadowMatrixDescriptors) {
@@ -640,6 +720,24 @@ namespace rutils {
         desc[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
         desc[0].descriptorCount = 1;
         desc[0].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseBloomImageDescriptorSet(VulkanWindow const& window, Image& prevImage, Sampler& sampler, VkDescriptorSet& bloomImageDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo bloomImageInfo{};
+        bloomImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        bloomImageInfo.imageView = prevImage.view;
+        bloomImageInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = bloomImageDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &bloomImageInfo;
 
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
     }

@@ -32,6 +32,13 @@ layout(set = 1, binding = 7) uniform samplerCube shadowCubemaps[MAX_LIGHTS];
 
 layout(location = 0) out vec4 oColor;
 
+layout(push_constant) uniform PushConstants {
+    mat4 model;
+    vec4 baseColour;
+    vec4 flags; // sprite, useTexture, roughnessFactor, metallicFactor
+    int pcfSamples;
+} lightingSettings;
+
 // linearise depth sampled from a shadow cubemap
 float linearise(float depth, float near, float far) {
     return (near * far) / (far - depth * (far - near));
@@ -104,6 +111,8 @@ void main()
     float shadowNear = uScene.numLights[1];
     float shadowFar = uScene.numLights[2];
 
+    int samples = min(PCF_SAMPLES, lightingSettings.pcfSamples);
+
     for (int i = 0; i < uScene.numLights[0]; i++) {
         vec3 lightColour = uScene.lightColour[i].xyz * uScene.lightColour[i].w;
         vec3 lightPos = uScene.lightPos[i].xyz;
@@ -125,8 +134,8 @@ void main()
         float diskRadius = (1.f + (viewDistance / shadowFar)) / 35.f;
 
         float visibility = 1.f;
-        float visibilityPerSample = visibility / float(PCF_SAMPLES);
-        for (int s = 0; s < PCF_SAMPLES; s++) {
+        float visibilityPerSample = visibility / float(samples);
+        for (int s = 0; s < samples; s++) {
             float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment + (sampleOffsetDirections[s] * diskRadius)).r;
             float occluderDistance = linearise(shadowMapDepth, shadowNear, shadowFar);
             if (distanceToFragment - bias > occluderDistance) {

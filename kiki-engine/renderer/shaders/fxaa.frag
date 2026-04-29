@@ -1,17 +1,20 @@
 #version 450
 
-// edge direction tuning
-// TODO: put this into a push constant
-#define FXAA_STRENGTH 16.f
-#define FXAA_REDUCE_MULT (0.25f * (1.f / FXAA_STRENGTH))
-#define FXAA_REDUCE_MIN (1.f / (FXAA_STRENGTH * 16.f))
-#define FXAA_SPAN_MAX FXAA_STRENGTH
-
 layout(location = 0) in vec2 v2fTexCoord;
 
 layout(set = 1, binding = 0) uniform sampler2D uSceneColour;
 
 layout(location = 0) out vec4 oColor;
+
+layout(push_constant) uniform FXAASettings {
+    float fxaaStrength;
+} fxaaSettings;
+
+// edge direction tuning
+#define FXAA_STRENGTH fxaaSettings.fxaaStrength
+#define FXAA_REDUCE_MULT (0.25f * (1.f / FXAA_STRENGTH))
+#define FXAA_REDUCE_MIN (1.f / (FXAA_STRENGTH * 16.f))
+#define FXAA_SPAN_MAX FXAA_STRENGTH
 
 float luminance(vec3 colour)
 {

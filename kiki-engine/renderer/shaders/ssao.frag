@@ -4,8 +4,6 @@
 #version 450
 
 #define MAX_LIGHTS 8
-#define RADIUS 0.5f
-#define SAMPLES 16
 #define PI 3.14159f
 
 #extension GL_EXT_scalar_block_layout : require
@@ -31,6 +29,9 @@ layout(location = 0) out float oAO;
 layout(push_constant) uniform SSAOSettings {
     int width;
     int height;
+    int samples;
+    float radius;
+    int blurSize;
 } ssaoSettings;
 
 float rand(vec2 seed) {
@@ -100,9 +101,11 @@ void main() {
 
     float occlusion = 0.f;
 
-    for (int i = 0; i < SAMPLES; i++) {
+    int samples = min(16, ssaoSettings.samples);
+
+    for (int i = 0; i < samples; i++) {
         // get sample position in view space
-        vec3 samplePos = viewPos + (TBN * vec3(uScene.ssaoSamples[i]) * RADIUS);
+        vec3 samplePos = viewPos + (TBN * vec3(uScene.ssaoSamples[i]) * ssaoSettings.radius);
 
         // get UV from sample position
         vec3 offset = reconstructUV(samplePos);
@@ -122,9 +125,9 @@ void main() {
         // add a small bias to prevent self intersections
         if (sampledPosDepth >= samplePos.z + 0.02f) {
             // weight such that near occluders contribute more
-            occlusion += smoothstep(0.f, 1.f, RADIUS / distance);
+            occlusion += smoothstep(0.f, 1.f, ssaoSettings.radius / distance);
         }    
     }
 
-    oAO = 1.f - (occlusion / float(SAMPLES));
+    oAO = 1.f - (occlusion / float(samples));
 }

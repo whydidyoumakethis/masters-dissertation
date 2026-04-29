@@ -8,6 +8,9 @@
 #include <Components/DebugComponent.hpp>
 #include <renderer/SceneManager.hpp>
 
+#include <cstdlib>
+#include <filesystem>
+
 
 namespace Kiki {
     DebugInterface& DebugInterface::get() {
@@ -114,6 +117,76 @@ namespace Kiki {
             }
 
             if (ImGui::CollapsingHeader("Render Settings")) {
+                ImGui::SeparatorText("SSAO");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Samples:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssaomaxsamples", &renderManager.renderSettings.ssaoSamples, 1, 2);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssaoradius", &renderManager.renderSettings.ssaoRadius, 0.05f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Blur size:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssaoblursize", &renderManager.renderSettings.ssaoBlurRange, 1, 1);
+
+
+                ImGui::SeparatorText("Shadows");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("PCF samples:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editshadowspcfsamples", &renderManager.renderSettings.shadowPcfSamples, 1, 2);
+
+
+                ImGui::SeparatorText("SSR");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Max steps:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssrmaxsteps", &renderManager.renderSettings.ssrMaxSteps, 1, 4);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Binary steps:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssrmaxbinarysteps", &renderManager.renderSettings.ssrBinarySteps, 1, 2);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Step size:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssrstepsize", &renderManager.renderSettings.ssrStepSize, 0.05f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Tolerance:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssrthicknesstolerance", &renderManager.renderSettings.ssrThicknessTolerance, 0.02f, 0.1f, "%.2f");
+
+
+                ImGui::SeparatorText("Bloom");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomstrength", &renderManager.renderSettings.bloomStrength, 0.01f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius (x):");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomradiusx", &renderManager.renderSettings.bloomRadius_x, 0.001f, 0.005f, "%.3f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius (y):");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomradiusy", &renderManager.renderSettings.bloomRadius_y, 0.001f, 0.005f, "%.3f");
+
+
+                ImGui::SeparatorText("FXAA");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
+
+
                 ImGui::Indent();
                 if (ImGui::CollapsingHeader("Shaders")) {
                     ImGui::Text("Shader Path:");
@@ -230,7 +303,39 @@ namespace Kiki {
                     ImGui::Separator();
 
                     if (ImGui::Button("Reload Shaders", ImVec2(150.0f, 0.0f))) {
-                        RenderManager::get().recreatePipelines();
+                        std::filesystem::path shaderDir = std::filesystem::path(PROJECT_ROOT_PATH) / "kiki-engine/renderer/shaders";
+                        std::filesystem::path outDir = std::filesystem::path(PROJECT_SHADER_PATH);
+
+                        std::error_code error;
+
+                        bool success = true;
+                        for (auto& file : std::filesystem::directory_iterator(shaderDir, error)) {
+                            const std::filesystem::path& shaderPath = file.path();
+
+                            // check that the extension is valid
+                            if (shaderPath.extension().string() != ".vert" && shaderPath.extension().string() != ".frag") {
+                                continue;
+                            }
+
+                            std::filesystem::path outputFilename = outDir / (shaderPath.filename().string() + ".spv");
+
+                            // prepare glslangValidator command and compile shader
+                            std::string cmd = "glslangValidator -V \"" + shaderPath.string() + "\" -o \"" + outputFilename.string() + "\"";
+                            spdlog::info("Compiling shader: {}", shaderPath.filename().string());
+
+                            if (std::system(cmd.c_str()) != 0) {
+                                spdlog::error("Shader compile failed for {}", shaderPath.filename().string());
+                                success = false;
+                            }
+                        }
+
+                        if (success) {
+                            RenderManager::get().recreatePipelines();
+                            spdlog::info("Successfully recreated pipelines");
+                        }
+                        else {
+                            spdlog::warn("Not recreating pipelines - at least one shader failed to compile");
+                        }
                     }
                 }
 
