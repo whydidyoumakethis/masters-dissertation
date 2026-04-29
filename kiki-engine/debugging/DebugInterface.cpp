@@ -117,6 +117,76 @@ namespace Kiki {
             }
 
             if (ImGui::CollapsingHeader("Render Settings")) {
+                ImGui::SeparatorText("SSAO");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Samples:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssaomaxsamples", &renderManager.renderSettings.ssaoSamples, 1, 2);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssaoradius", &renderManager.renderSettings.ssaoRadius, 0.05f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Blur size:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssaoblursize", &renderManager.renderSettings.ssaoBlurRange, 1, 1);
+
+
+                ImGui::SeparatorText("Shadows");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("PCF samples:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editshadowspcfsamples", &renderManager.renderSettings.shadowPcfSamples, 1, 2);
+
+
+                ImGui::SeparatorText("SSR");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Max steps:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssrmaxsteps", &renderManager.renderSettings.ssrMaxSteps, 1, 4);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Binary steps:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssrmaxbinarysteps", &renderManager.renderSettings.ssrBinarySteps, 1, 2);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Step size:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssrstepsize", &renderManager.renderSettings.ssrStepSize, 0.05f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Tolerance:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssrthicknesstolerance", &renderManager.renderSettings.ssrThicknessTolerance, 0.02f, 0.1f, "%.2f");
+
+
+                ImGui::SeparatorText("Bloom");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomstrength", &renderManager.renderSettings.bloomStrength, 0.01f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius (x):");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomradiusx", &renderManager.renderSettings.bloomRadius_x, 0.001f, 0.005f, "%.3f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius (y):");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomradiusy", &renderManager.renderSettings.bloomRadius_y, 0.001f, 0.005f, "%.3f");
+
+
+                ImGui::SeparatorText("FXAA");
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
+
+
                 ImGui::Indent();
                 if (ImGui::CollapsingHeader("Shaders")) {
                     ImGui::Text("Shader Path:");

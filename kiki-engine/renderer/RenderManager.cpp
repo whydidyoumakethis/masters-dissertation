@@ -674,7 +674,8 @@ namespace Kiki {
                 lights,
                 bloomImages,
                 bloomImageDownsampleDescriptorSets,
-                bloomImageUpsampleDescriptorSets
+                bloomImageUpsampleDescriptorSets,
+                renderSettings
             );
         }
 
@@ -1568,6 +1569,23 @@ namespace Kiki {
 
         createSkybox(skybox.paths);
         initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
+
+        for (int i = 0; i < 6; i++) {
+            bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+
+            if (i == 0) {
+                initialiseBloomImageDescriptorSet(window, doneSSRImage, skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
+            }
+            else {
+                initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
+            }
+        }
+
+        for (int i = 0; i < 5; i++) {
+            bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+
+            initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
+        }
     }
 
     void RenderManager::createSkybox(const rutils::CubemapPaths& paths) {

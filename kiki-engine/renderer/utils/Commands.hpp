@@ -52,7 +52,8 @@ namespace rutils {
         std::vector<Kiki::Light> const& lights,
         std::array<Image, 6> const& bloomImages,
         std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
-        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets
+        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
+        Kiki::RenderSettings& renderSettings
     );
 
 	void submitCommands(

@@ -94,7 +94,8 @@ namespace rutils {
         std::vector<Kiki::Light> const& lights,
         std::array<Image, 6> const& bloomImages,
         std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
-        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets
+        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
+        Kiki::RenderSettings& renderSettings
     ) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -754,6 +755,8 @@ namespace rutils {
             SSAOSettings ssaoSettings;
             ssaoSettings.width = aImageExtent.width;
             ssaoSettings.height = aImageExtent.height;
+            ssaoSettings.samples = renderSettings.ssaoSamples;
+            ssaoSettings.radius = renderSettings.ssaoRadius;
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
 
@@ -821,6 +824,11 @@ namespace rutils {
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_hblur.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
 
+            SSAOSettings ssaoSettings;
+            ssaoSettings.blurSize = renderSettings.ssaoBlurRange;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             vkCmdEndRendering(aCmdBuff);
@@ -882,6 +890,11 @@ namespace rutils {
             // draw fullscreen quad with ssao shader
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssao_blurred.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoBlurPipelineLayout.handle, 0, 1, ssaoSets, 0, nullptr);
+
+            SSAOSettings ssaoSettings;
+            ssaoSettings.blurSize = renderSettings.ssaoBlurRange;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.ssaoPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(SSAOSettings), &ssaoSettings);
 
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
@@ -945,6 +958,12 @@ namespace rutils {
             };
 
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
+
+            ObjectData data;
+            data.pcfSamples = renderSettings.shadowPcfSamples;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data), &data);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             vkCmdEndRendering(aCmdBuff);
@@ -1009,12 +1028,10 @@ namespace rutils {
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, ssrSets, 0, nullptr);
 
             SSRSettings ssrSettings;
-            ssrSettings.settings.x = 16; // maxSteps
-            ssrSettings.settings.y = 4; // binarySteps
-            ssrSettings.settings.z = 0.5f; // stepSize
-            ssrSettings.settings.w = 0.2f; // thicknessTolerance
-
-            // TODO: debug, could change the ssr settings here :)
+            ssrSettings.settings.x = renderSettings.ssrMaxSteps; // maxSteps
+            ssrSettings.settings.y = renderSettings.ssrBinarySteps; // binarySteps
+            ssrSettings.settings.z = renderSettings.ssrStepSize; // stepSize
+            ssrSettings.settings.w = renderSettings.ssrThicknessTolerance; // thicknessTolerance
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(ssrSettings), &ssrSettings);
 
@@ -1200,7 +1217,9 @@ namespace rutils {
                 vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.bloomPipelineLayout.handle, 0, 1, bloomSets, 0, nullptr);
 
                 BloomData bloomData;
-                bloomData.data.x = source;
+                bloomData.data.x = renderSettings.bloomRadius_x;
+                bloomData.data.y = renderSettings.bloomRadius_y;
+                bloomData.data.z = source;
 
                 vkCmdPushConstants(aCmdBuff, pipelineLayouts.bloomPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(BloomData), &bloomData);
 
@@ -1267,6 +1286,11 @@ namespace rutils {
             // draw fullscreen quad with post-processing shader
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.composite.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.compositePipelineLayout.handle, 0, 1, compositeSets, 0, nullptr);
+
+            CompositeSettings compositeSettings;
+            compositeSettings.bloomStrength = renderSettings.bloomStrength;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.compositePipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CompositeSettings), &compositeSettings);
 
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
@@ -1395,6 +1419,12 @@ namespace rutils {
             // draw fullscreen quad with post-processing shader
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.fxaa.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
+
+            FXAASettings fxaaSettings;
+            fxaaSettings.strength = renderSettings.fxaaStrength;
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fxaaSettings), &fxaaSettings);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             // begin imgui pass

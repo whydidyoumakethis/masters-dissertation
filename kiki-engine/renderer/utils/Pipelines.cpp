@@ -28,7 +28,7 @@ namespace rutils {
         pipelines.composite = createCompositePipeline(window, pipelineLayouts.compositePipelineLayout.handle);
         pipelines.shadowMap = createShadowMapPipeline(window, pipelineLayouts.shadowMapPipelineLayout.handle);
         pipelines.bloomDownsample = createBloomDownsamplePipeline(window, pipelineLayouts.bloomPipelineLayout.handle);
-        pipelines.bloomUpsample = createBloomDownsamplePipeline(window, pipelineLayouts.bloomPipelineLayout.handle);
+        pipelines.bloomUpsample = createBloomUpsamplePipeline(window, pipelineLayouts.bloomPipelineLayout.handle);
 
         pipelines.interfaceShape = createInterfacePipeline(window, pipelineLayouts.interfaceShapeLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_shape_f);
         pipelines.interfaceText = createInterfacePipeline(window, pipelineLayouts.interfaceTextLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_text_f);
@@ -287,7 +287,7 @@ namespace rutils {
         VkPushConstantRange pushRange{};
         pushRange.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
         pushRange.offset = 0;
-        pushRange.size = sizeof(ObjectData);
+        pushRange.size = sizeof(CompositeSettings);
 
         VkPipelineLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;

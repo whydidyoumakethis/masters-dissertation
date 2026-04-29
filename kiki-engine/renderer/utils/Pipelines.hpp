@@ -14,6 +14,7 @@ namespace rutils {
         // std::uint32_t sprite = 0;
         // std::uint32_t useTexture = 1;
         glm::vec4 flags;
+        std::uint32_t pcfSamples;
     };
 
     struct ShadowData {
@@ -36,6 +37,17 @@ namespace rutils {
     struct SSAOSettings {
         std::uint32_t width;
         std::uint32_t height;
+        std::uint32_t samples;
+        float radius;
+        std::uint32_t blurSize;
+    };
+
+    struct FXAASettings {
+        float strength;
+    };
+
+    struct CompositeSettings {
+        float bloomStrength;
     };
 
     struct ShapeData {

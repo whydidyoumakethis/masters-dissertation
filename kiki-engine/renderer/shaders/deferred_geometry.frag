@@ -20,6 +20,7 @@ layout(push_constant) uniform PushConstants {
     mat4 model;
     vec4 baseColour;
     vec4 flags; // sprite, useTexture, roughnessFactor, metallicFactor
+    int pcfSamples;
 } object;
 
 vec3 calculateMappedNormal() {

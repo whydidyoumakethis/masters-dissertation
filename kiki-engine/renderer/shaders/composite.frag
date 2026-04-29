@@ -7,6 +7,10 @@ layout(location = 0) in vec2 v2fTexCoord;
 layout(set = 0, binding = 0) uniform sampler2D uSceneColour;
 layout(set = 0, binding = 1) uniform sampler2D uBloomColour;
 
+layout(push_constant) uniform CompositeSettings {
+    float bloomStrength;
+} compositeSettings;
+
 layout(location = 0) out vec4 oColor;
 
 void main()
@@ -16,8 +20,7 @@ void main()
 
     // bloom set to a low value
     // so only bright pixels bloom noticeably
-    vec3 colour = inColour + (inBloom * 0.04f);
+    vec3 colour = inColour + (inBloom * compositeSettings.bloomStrength);
 
     oColor = vec4(colour, 1.f);
-    oColor = vec4(inBloom * 0.04f, 1.f);
 }

@@ -32,6 +32,27 @@
 
 
 namespace Kiki {
+    struct RenderSettings {
+        int ssaoSamples = 16;
+        float ssaoRadius = 0.5f;
+
+        int ssaoBlurRange = 2;
+
+        int shadowPcfSamples = 20;
+
+        int ssrMaxSteps = 16;
+        int ssrBinarySteps = 4;
+        float ssrStepSize = 0.5f;
+        float ssrThicknessTolerance = 0.2f;
+
+        float bloomRadius_x = 0.005f;
+        float bloomRadius_y = 0.005f;
+
+        float bloomStrength = 0.04f;
+
+        float fxaaStrength = 16.f;
+    };
+
     struct Mesh {
         rutils::Buffer positions;
         rutils::Buffer texCoords;
@@ -262,6 +283,7 @@ namespace Kiki {
 
         ShaderPaths shaderPaths;
         SceneUniform sceneUniforms;
+        RenderSettings renderSettings;
 
         private:
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
