@@ -444,7 +444,9 @@ namespace Kiki {
 
             //registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
             bool isPlayer = (instance.miscTag == MmiscTags::PLAYER);
-            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer, 0.0f, 0.5f, false, isPlayer);
+            float playerFriction = isPlayer ? 0.0f : 0.5f;
+            //Set the friction of the capsule body to 0, so there won't be Titanfall's wall-running.
+            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer, 0.0f, playerFriction, false, isPlayer);
             registry.emplace<PhysicalAttributesComponent>(model);
 
 			// Misc tags
