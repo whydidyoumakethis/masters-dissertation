@@ -8,6 +8,9 @@
 #include <Components/DebugComponent.hpp>
 #include <renderer/SceneManager.hpp>
 
+#include <cstdlib>
+#include <filesystem>
+
 
 namespace Kiki {
     DebugInterface& DebugInterface::get() {
@@ -230,7 +233,39 @@ namespace Kiki {
                     ImGui::Separator();
 
                     if (ImGui::Button("Reload Shaders", ImVec2(150.0f, 0.0f))) {
-                        RenderManager::get().recreatePipelines();
+                        std::filesystem::path shaderDir = std::filesystem::path(PROJECT_ROOT_PATH) / "kiki-engine/renderer/shaders";
+                        std::filesystem::path outDir = std::filesystem::path(PROJECT_SHADER_PATH);
+
+                        std::error_code error;
+
+                        bool success = true;
+                        for (auto& file : std::filesystem::directory_iterator(shaderDir, error)) {
+                            const std::filesystem::path& shaderPath = file.path();
+
+                            // check that the extension is valid
+                            if (shaderPath.extension().string() != ".vert" && shaderPath.extension().string() != ".frag") {
+                                continue;
+                            }
+
+                            std::filesystem::path outputFilename = outDir / (shaderPath.filename().string() + ".spv");
+
+                            // prepare glslangValidator command and compile shader
+                            std::string cmd = "glslangValidator -V \"" + shaderPath.string() + "\" -o \"" + outputFilename.string() + "\"";
+                            spdlog::info("Compiling shader: {}", shaderPath.filename().string());
+
+                            if (std::system(cmd.c_str()) != 0) {
+                                spdlog::error("Shader compile failed for {}", shaderPath.filename().string());
+                                success = false;
+                            }
+                        }
+
+                        if (success) {
+                            RenderManager::get().recreatePipelines();
+                            spdlog::info("Successfully recreated pipelines");
+                        }
+                        else {
+                            spdlog::warn("Not recreating pipelines - at least one shader failed to compile");
+                        }
                     }
                 }
 
