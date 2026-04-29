@@ -99,6 +99,8 @@ namespace Kiki {
             ssaoLayout = rutils::createSSAODescriptorLayout(window);
             ssaoBlurredLayout = rutils::createSSAOBlurredDescriptorLayout(window);
             tonemapLayout = rutils::createTonemapDescriptorLayout(window);
+            bloomLayout = rutils::createBloomDescriptorLayout(window);
+            compositeLayout = rutils::createCompositeDescriptorLayout(window);
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle, animationLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle, animationLayout.handle);
@@ -108,6 +110,8 @@ namespace Kiki {
             pipelineLayouts.ssaoBlurPipelineLayout = rutils::createSSAOBlurPipelineLayout(window, ssaoBlurredLayout.handle);
             pipelineLayouts.tonemapPipelineLayout = rutils::createTonemapPipelineLayout(window, tonemapLayout.handle);
             pipelineLayouts.shadowMapPipelineLayout = rutils::createShadowMapPipelineLayout(window, shadowMatrixLayout.handle, animationLayout.handle);
+            pipelineLayouts.bloomPipelineLayout = rutils::createBloomPipelineLayout(window, bloomLayout.handle);
+            pipelineLayouts.compositePipelineLayout = rutils::createCompositePipelineLayout(window, compositeLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -119,7 +123,17 @@ namespace Kiki {
             depthBuffer = rutils::createDepthBuffer(window, allocator);
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
+
+            for (int i = 0; i < 6; i++) {
+                bloomImages[i] = rutils::createBloomImage(
+                    window,
+                    allocator,
+                    window.swapchainExtent.width >> i,
+                    window.swapchainExtent.height >> i
+                );
+            }
 
             shadowCubemaps.clear();
             for (int i = 0; i < 8; i++) {
@@ -151,8 +165,27 @@ namespace Kiki {
             ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
 
+            for (int i = 0; i < 6; i++) {
+                bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+
+                if (i == 0) {
+                    initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, bloomImageDownsampleDescriptorSets[i]);
+                }
+                else {
+                    initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], sampler, bloomImageDownsampleDescriptorSets[i]);
+                }
+            }
+
+            for (int i = 0; i < 5; i++) {
+                bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+                initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], sampler, bloomImageUpsampleDescriptorSets[i]);
+            }
+
+            compositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
+            initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
+
             tonemapDescriptors = rutils::allocDescSet(window, descriptorPool.handle, tonemapLayout.handle);
-            initialiseTonemapDescriptorSet(window, doneSSRImage, sampler, tonemapDescriptors);
+            initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
 
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneTonemapImage, sampler, fxaaDescriptors);
@@ -428,6 +461,15 @@ namespace Kiki {
                 pipelines = rutils::createAllPipelines(window, pipelineLayouts);
                 depthBuffer = rutils::createDepthBuffer(window, allocator);
                 gbuffers = rutils::createAllGBufferImages(window, allocator);
+
+                for (int i = 0; i < 6; i++) {
+                    bloomImages[i] = rutils::createBloomImage(
+                        window,
+                        allocator,
+                        window.swapchainExtent.width >> i,
+                        window.swapchainExtent.height >> i
+                    );
+                }
             }
 
             {
@@ -435,6 +477,7 @@ namespace Kiki {
 
                 doneLightingImage = rutils::createPostProcessingImage(window, allocator);
                 doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+                doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
                 doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
             }
 
@@ -448,7 +491,26 @@ namespace Kiki {
                 initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
-                initialiseTonemapDescriptorSet(window, doneSSRImage, sampler, tonemapDescriptors);
+
+                for (int i = 0; i < 6; i++) {
+                    bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+
+                    if (i == 0) {
+                        initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, bloomImageDownsampleDescriptorSets[i]);
+                    }
+                    else {
+                        initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], sampler, bloomImageDownsampleDescriptorSets[i]);
+                    }
+                }
+
+                for (int i = 0; i < 5; i++) {
+                    bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+
+                    initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], sampler, bloomImageUpsampleDescriptorSets[i]);
+                }
+
+                initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
+                initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
             }
 
             auto& registry = World::Get().Registry();
@@ -595,10 +657,12 @@ namespace Kiki {
                 ssrDescriptors,
                 tonemapDescriptors,
                 shadowMatrixDescriptors,
+                compositeDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
                 doneSSRImage,
+                doneCompositeImage,
                 doneTonemapImage,
                 interfaceUBO.buffer,
                 interfaceUniform,
@@ -606,7 +670,10 @@ namespace Kiki {
                 interfaceIndices.buffer,
                 dummyAnimationDesc,
                 shadowCubemaps,
-                lights
+                lights,
+                bloomImages,
+                bloomImageDownsampleDescriptorSets,
+                bloomImageUpsampleDescriptorSets
             );
         }
 
@@ -1642,6 +1709,9 @@ namespace Kiki {
         pipelines.interfaceShape = {};
         pipelines.interfaceText = {};
         pipelines.shadowMap = {};
+        pipelines.bloomDownsample = {};
+        pipelines.bloomUpsample = {};
+        pipelines.composite = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1653,6 +1723,8 @@ namespace Kiki {
         pipelineLayouts.interfaceShapeLayout = {};
         pipelineLayouts.interfaceTextLayout = {};
         pipelineLayouts.shadowMapPipelineLayout = {};
+        pipelineLayouts.bloomPipelineLayout = {};
+        pipelineLayouts.compositePipelineLayout = {};
 
         for (auto& shadowCubemap : shadowCubemaps) {
             if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
@@ -1665,7 +1737,11 @@ namespace Kiki {
         depthBuffer = {};
         doneLightingImage = {};
         doneTonemapImage = {};
+        doneCompositeImage = {};
         doneSSRImage = {};
+        
+        for (int i = 0; i < 6; i++) bloomImages[i] = {};
+
         sceneUBO = {};
         interfaceUBO = {};
         interfaceIndices = {};
@@ -1683,11 +1759,16 @@ namespace Kiki {
         interfaceLayout = {};
         textLayout = {};
         shadowMatrixLayout = {};
+        bloomLayout = {};
+        compositeLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
         interfaceDescriptors = {};
         shadowMatrixDescriptors = {};
+        compositeDescriptors = {};
+        for (int i = 0; i < 6; i++) bloomImageDownsampleDescriptorSets[i] = {};
+        for (int i = 0; i < 6; i++) bloomImageUpsampleDescriptorSets[i] = {};
 
         sampler = {};
         fontSampler = {};

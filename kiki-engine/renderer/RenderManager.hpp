@@ -97,6 +97,9 @@ namespace Kiki {
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
         std::filesystem::path shadowmap_v = "shadowMap.vert.spv";
+        std::filesystem::path bloom_downsample_f = "bloom_downsample.frag.spv";
+        std::filesystem::path bloom_upsample_f = "bloom_upsample.frag.spv";
+        std::filesystem::path composite_f = "composite.frag.spv";
     };
 
     class RenderManager {
@@ -140,6 +143,8 @@ namespace Kiki {
         rutils::DescriptorSetLayout ssaoBlurredLayout;
         rutils::DescriptorSetLayout tonemapLayout;
         rutils::DescriptorSetLayout shadowMatrixLayout;
+        rutils::DescriptorSetLayout bloomLayout;
+        rutils::DescriptorSetLayout compositeLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -150,11 +155,18 @@ namespace Kiki {
         VkDescriptorSet ssaoBlurredDescriptors;
         VkDescriptorSet tonemapDescriptors;
         VkDescriptorSet shadowMatrixDescriptors;
+        VkDescriptorSet compositeDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
+        rutils::Image doneCompositeImage;
         rutils::Image doneTonemapImage;
         rutils::Image depthBuffer;
+
+        std::array<rutils::Image, 6> bloomImages;
+        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets;
+        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets;
+
         rutils::Buffer shadowMatricesBuffer;
 
         std::vector<ShadowCubemap> shadowCubemaps;

@@ -36,10 +36,12 @@ namespace rutils {
         VkDescriptorSet ssrDescriptors,
         VkDescriptorSet tonemapDescriptors,
         VkDescriptorSet shadowMatrixDescriptors,
+        VkDescriptorSet compositeDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
         Image const& doneSSRImage,
+        Image const& doneCompositeImage,
         Image const& doneTonemapImage,
         VkBuffer interfaceUBO,
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
@@ -47,7 +49,10 @@ namespace rutils {
         VkBuffer interfaceIndexBuffer,
         VkDescriptorSet dummyAnimationDesc,
         std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
-        std::vector<Kiki::Light> const& lights
+        std::vector<Kiki::Light> const& lights,
+        std::array<Image, 6> const& bloomImages,
+        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
+        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets
     );
 
 	void submitCommands(
