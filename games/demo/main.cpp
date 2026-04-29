@@ -4,7 +4,7 @@
 #include "system/CharacterSystem.h"
 #include "system/ThirdPersonCameraSystem.h"
 #include "system/GoalTriggerSystem.h"
-
+#include "system/TimeLimitSystem.h"
 #include "Components/BackgroundComponent.hpp"
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
@@ -22,8 +22,11 @@ int main(int argc, char** argv) {
     //auto cube = sceneManager.loadModel("CesiumMan.glb", "Cube", PhysicsType::Dynamic);
     //auto objects = world.Query<TransformComponent,TagComponent>();
 
-	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb");
+	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level_noPlayer.glb");
 	Kiki::SceneManager::get().loadScene(std::move(scene));
+
+	Mscene player = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level2.glb");
+	Kiki::SceneManager::get().loadScene(std::move(player));
 
 	// example of setting a custom skybox
 	Kiki::RenderManager::get().setCustomSkybox(
@@ -41,7 +44,7 @@ int main(int argc, char** argv) {
 	// registry.emplace<BackgroundComponent>(ui, glm::vec3(1.0f, 0.0f, 0.0f), 0.5f);
 	// registry.emplace<ButtonComponent>(ui, glm::vec4(1.0f, 0.0f, 0.0f, 0.5f), glm::vec4(0.0f, 1.0f, 0.0f, 0.5f), glm::vec4(0.0f, 0.0f, 1.0f, 0.5f));
 
-	// Kiki::FontManager::get().loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/NotoSansJP-Regular.ttf", "font", U"お茶ください");
+	 Kiki::FontManager::get().loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/NotoSans-Regular.ttf", "font");// , U"お茶ください");
 	// registry.emplace<TextComponent>(ui, "font", U"お茶ください", 48.0f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f);
 
 	// auto ui2 = world.CreateEntity();
@@ -49,9 +52,10 @@ int main(int argc, char** argv) {
 	// registry.emplace<BackgroundComponent>(ui2, glm::vec3(0.0f, 1.0f, 0.0f), 0.0f);
 
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
+	
+	engine.RegisterSystem<TimeLimitSystem>();
 	// use wasd to move the character, shift to speed up, space to jump.
 	engine.RegisterSystem<CharacterSystem>();
-	// use left click to disable cursor and control camera, esc to quit.
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
 	engine.RegisterSystem<GoalTriggerSystem>();
     engine.Run();

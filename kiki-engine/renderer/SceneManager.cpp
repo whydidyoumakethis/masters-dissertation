@@ -412,7 +412,7 @@ namespace Kiki {
                     joltHalfHeight = 0.05f;
                 }
 
-                registry.emplace<CapsuleColliderComponent>(model, radius, joltHalfHeight);
+                registry.emplace<CapsuleColliderComponent>(model, radius/2.5f, joltHalfHeight);
 
                 spdlog::info("[Physics] Calculated CAPSULE: Radius = {:.2f}, HalfHeight = {:.2f}, TotalHeight = {:.2f}",
                     radius, joltHalfHeight, sizeY);
@@ -442,7 +442,11 @@ namespace Kiki {
                 break;
             }
 
-            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+            //registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
+            bool isPlayer = (instance.miscTag == MmiscTags::PLAYER);
+            float playerFriction = isPlayer ? 0.0f : 0.5f;
+            //Set the friction of the capsule body to 0, so there won't be Titanfall's wall-running.
+            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer, 0.0f, playerFriction, false, isPlayer);
             registry.emplace<PhysicalAttributesComponent>(model);
 
 			// Misc tags

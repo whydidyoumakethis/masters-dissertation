@@ -10,7 +10,7 @@ public:
         auto objects = World::Get().Query<TransformComponent, CharacterComponent,PhysicalAttributesComponent>();
 		for (auto [entity, transform, character,ip] : objects.each()) {
             float cameraYaw = GetCameraYaw(entity);
-			HandleMovement(transform, character, cameraYaw, dt);
+			HandleMovement(transform, character, ip, cameraYaw, dt);
 			HandleJump(entity, transform, character, ip, dt);
 			HandleRotation(transform, character, dt);
             UpdateState(character,ip);
@@ -75,6 +75,7 @@ private:
     void HandleMovement(
         TransformComponent& transform,
         CharacterComponent& character,
+        PhysicalAttributesComponent& ip,
         float cameraYaw, float dt)
     {
         glm::vec2 inputDir = { 0, 0 };
@@ -83,10 +84,9 @@ private:
         if (inputManager.isKeyDown(GLFW_KEY_A)) inputDir.x -= 1.0f;
         if (inputManager.isKeyDown(GLFW_KEY_D)) inputDir.x += 1.0f;
 
-        bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT);
+        bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) && ip.isGrounded;
         float speed = isRunning ? character.runSpeed : character.walkSpeed;
 
-        // 获取底层 Jolt 物理刚体现有的速度（为了保留 Y 轴的重力和跳跃速度）
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
         JPH::Vec3 currentJoltVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
@@ -111,7 +111,6 @@ private:
             //character.targetYaw = glm::degrees(atan2(moveDir.x, moveDir.z));
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
-            // 重新设置速度，X 和 Z 用我们算好的，Y 用物理引擎的
             glm::vec3 newVel = glm::vec3(character.velocity.x, currentJoltVel.GetY(), character.velocity.z);
             physics.setEntityVelocity(playerEntity, newVel);
         }
@@ -120,7 +119,7 @@ private:
 			// or just connect with physics system
             character.velocity.x = 0.0f;
             character.velocity.z = 0.0f;
-            // 不按键时，只清零水平速度，依然保留 Y 轴物理速度
+
             glm::vec3 newVel = glm::vec3(0.0f, currentJoltVel.GetY(), 0.0f);
             physics.setEntityVelocity(playerEntity, newVel);
         }
@@ -141,7 +140,6 @@ private:
             auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
             JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 
-            // 直接给 Y 轴一个固定的起跳速度，不受质量影响
             physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
 
             character.state = CharacterState::Jumping;

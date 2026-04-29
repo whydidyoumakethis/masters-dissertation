@@ -18,7 +18,7 @@ struct TextComponent {
 
     bool dirty = true;
     std::vector<rutils::Buffer> vertices;
-
+    TextComponent() = default;
     TextComponent(TextComponent const&) = delete;
     TextComponent& operator= (TextComponent const&) = delete;
 

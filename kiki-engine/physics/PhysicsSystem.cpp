@@ -147,6 +147,16 @@ namespace Kiki {
         settings.mFriction = rb.friction;
         settings.mRestitution = rb.restitution;
         settings.mIsSensor = rb.isSensor;
+
+        if (rb.lockRotationXZ) {
+            settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
+                JPH::EAllowedDOFs::TranslationY |
+                JPH::EAllowedDOFs::TranslationZ;
+        }
+        else {
+            settings.mAllowedDOFs = JPH::EAllowedDOFs::All; 
+        }
+
         settings.mMassPropertiesOverride = settings.GetShape()->GetMassProperties(); // default mass multiplier
         auto& bi = _manager.GetBodyInterface();
         JPH::Body* body = bi.CreateBody(settings);
@@ -213,9 +223,9 @@ namespace Kiki {
 
         glm::vec3 rayOrigin = reg.get<TransformComponent>(entity).position;
 
-        rayOrigin.y += 0.5f;
+        rayOrigin.y += 0.2f;
 
-        float testRayLength = 3.0f;
+        float testRayLength = 0.3f;
 
         auto result = physic.Raycast(
             rayOrigin,

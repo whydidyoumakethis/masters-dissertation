@@ -1079,7 +1079,9 @@ namespace rutils {
         rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
         rasterInfo.cullMode = VK_CULL_MODE_FRONT_BIT;
         rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        rasterInfo.depthBiasEnable = VK_FALSE;
+        rasterInfo.depthBiasEnable = VK_TRUE;
+        rasterInfo.depthBiasConstantFactor = 0.05f;
+        rasterInfo.depthBiasSlopeFactor = 0.5f;
         rasterInfo.lineWidth = 1.f; // required
 
         // define multisampling state

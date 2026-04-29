@@ -1,11 +1,6 @@
 #include "InterfaceSystem.hpp"
 
-#include "Components/InterfaceComponent.hpp"
-#include "Components/BackgroundComponent.hpp"
-#include "Components/TextComponent.hpp"
-#include "Components/ButtonComponent.hpp"
-#include "events/ButtonClickEvent.hpp"
-#include "events/ButtonHoverEvent.hpp"
+
 
 #include <hb.h>
 
