@@ -122,12 +122,12 @@ void main()
         float bias = 0.05f; // to prevent shadow acne
 
         float viewDistance = length(uScene.cameraPos.xyz - worldSpace);
-        float diskRadius = (1.f + (viewDistance / shadowFar)) / 25.f;
+        float diskRadius = (1.f + (viewDistance / shadowFar)) / 35.f;
 
         float visibility = 1.f;
         float visibilityPerSample = visibility / float(PCF_SAMPLES);
-        for (int s = 0; s < PCF_SAMPLES; ++s) {
-            float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment + sampleOffsetDirections[s] * diskRadius).r;
+        for (int s = 0; s < PCF_SAMPLES; s++) {
+            float shadowMapDepth = texture(shadowCubemaps[i], lightToFragment + (sampleOffsetDirections[s] * diskRadius)).r;
             float occluderDistance = linearise(shadowMapDepth, shadowNear, shadowFar);
             if (distanceToFragment - bias > occluderDistance) {
                 visibility -= visibilityPerSample;
