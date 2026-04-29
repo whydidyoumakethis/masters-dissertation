@@ -66,7 +66,7 @@ namespace rutils {
 		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D
 	);
 
-    Sampler createSampler(VulkanWindow const&, bool isCubemapSampler = false);
+    Sampler createSampler(VulkanWindow const&, bool doClampToEdge = false);
 	Sampler createFontSampler(VulkanWindow const&);
 
 	Image loadCubemapTexture(

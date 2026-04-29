@@ -169,16 +169,17 @@ namespace Kiki {
                 bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
 
                 if (i == 0) {
-                    initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, bloomImageDownsampleDescriptorSets[i]);
+                    initialiseBloomImageDescriptorSet(window, doneSSRImage, skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
                 }
                 else {
-                    initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], sampler, bloomImageDownsampleDescriptorSets[i]);
+                    initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
                 }
             }
 
             for (int i = 0; i < 5; i++) {
                 bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
-                initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], sampler, bloomImageUpsampleDescriptorSets[i]);
+                // use skybox sampler as this has clamp to edge
+                initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
             }
 
             compositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
@@ -496,17 +497,17 @@ namespace Kiki {
                     bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
 
                     if (i == 0) {
-                        initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, bloomImageDownsampleDescriptorSets[i]);
+                        initialiseBloomImageDescriptorSet(window, doneSSRImage, skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
                     }
                     else {
-                        initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], sampler, bloomImageDownsampleDescriptorSets[i]);
+                        initialiseBloomImageDescriptorSet(window, bloomImages[i - 1], skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
                     }
                 }
 
                 for (int i = 0; i < 5; i++) {
                     bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
 
-                    initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], sampler, bloomImageUpsampleDescriptorSets[i]);
+                    initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
                 }
 
                 initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);

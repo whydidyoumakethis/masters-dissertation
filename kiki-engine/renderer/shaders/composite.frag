@@ -19,5 +19,5 @@ void main()
     vec3 colour = inColour + (inBloom * 0.04f);
 
     oColor = vec4(colour, 1.f);
-    oColor = vec4(inBloom, 1.f);
+    oColor = vec4(inBloom * 0.04f, 1.f);
 }

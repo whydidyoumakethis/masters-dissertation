@@ -658,7 +658,7 @@ namespace rutils {
         return Image(aAllocator.allocator, image, allocation, view);
 	}
 
-    Sampler createSampler(VulkanWindow const& aContext, bool isCubemapSampler) {
+    Sampler createSampler(VulkanWindow const& aContext, bool doClampToEdge) {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -667,7 +667,7 @@ namespace rutils {
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-        if (isCubemapSampler) {
+        if (doClampToEdge) {
             samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
             samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   
             samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   
