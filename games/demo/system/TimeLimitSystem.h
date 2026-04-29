@@ -4,7 +4,7 @@ class TimeLimitSystem : public System {
 public:
     Phase GetPhase() const override { return Phase::PreUpdate; }
     void OnUpdate(float dt) override {
-		spdlog::info("Elapsed time: {:.2f} seconds", Timer::get().Elapsed());
+		//spdlog::info("Elapsed time: {:.2f} seconds", Timer::get().Elapsed());
         auto& registry = World::Get().Registry();
         auto timerView = registry.view<InterfaceComponent>();
 
@@ -36,40 +36,6 @@ public:
         registry.emplace<BackgroundComponent>(timerUIEntity, glm::vec3(0.1f, 0.1f, 0.1f), 0.3f);
         registry.emplace<TextComponent>(timerUIEntity, "font", U"00:00.00", 24, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f);
 
-
-        //InterfaceComponent containerInterface;
-        //containerInterface.position = { 10, 10, 0.0f, 0.0f, 10, 10 };
-        //containerInterface.size = { 0, 150, 0.0f, 50.0f, 0, 0 };
-        //containerInterface.zindex = 1;
-        //containerInterface.dirty = true;
-        //containerInterface.parent = entt::null;
-        //registry.emplace<InterfaceComponent>(timerUIEntity, containerInterface);
-
-        //BackgroundComponent bgComp;
-        ////bgComp.colour = glm::vec3(0.1f, 0.1f, 0.1f);
-        ////bgComp.transparency = 0.3f;
-        //registry.emplace<BackgroundComponent>(timerUIEntity, glm::vec3(0.1f, 0.1f, 0.1f), 0.3f);
-
-        //auto timerTextEntity = registry.create();
-
-        //InterfaceComponent textInterface;
-        //textInterface.position = { 0, 0, 0.0f, 0.0f, 0, 0 };
-        //textInterface.size = { 0, 150, 0, 50, 0, 0 };
-        //textInterface.zindex = 2;
-        //textInterface.dirty = true;
-        //textInterface.parent = timerUIEntity;
-        //registry.emplace<InterfaceComponent>(timerTextEntity, textInterface);
-
-        //TextComponent textComp;
-        ////textComp.text = U"00:00.00";
-        ////textComp.font = "font_name";
-        ////textComp.size = 24;
-        ////textComp.colour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-        ////textComp.horizontalAlignment = HorizontalAlignment::CENTRE;
-        ////textComp.verticalAlignment = VerticalAlignment::CENTRE;
-        ////textComp.dirty = true;
-        //registry.emplace<TextComponent>(timerTextEntity, "font", U"00:00.00", 24, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f);
-
     }
     std::u32string formatTime(float seconds) {
         int minutes = static_cast<int>(seconds) / 60;
@@ -89,4 +55,8 @@ public:
 
         return result;
     }
+private:
+    // temp solution
+    std::vector<float> timeLimits = { 90.f,60.f,50.f,20.f };
+	std::vector<std::vector<unsigned int>> timeLimitPowers = { {0,1,2}, {0,2,3} };
 };
