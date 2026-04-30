@@ -26,6 +26,10 @@ namespace rutils {
         glm::vec4 data;
     };
 
+    struct DebugData {
+        std::uint32_t mode;
+    };
+
     struct SSRSettings {
         glm::vec4 settings = glm::vec4(64, 6, 0.25f, 0.4f);
         // x = maxSteps, int
@@ -73,6 +77,7 @@ namespace rutils {
         rutils::Pipeline bloomDownsample;
         rutils::Pipeline bloomUpsample;
         rutils::Pipeline composite;
+        rutils::Pipeline debug;
     };
 
     struct PipelineLayouts {
@@ -88,6 +93,7 @@ namespace rutils {
         PipelineLayout shadowMapPipelineLayout;
         PipelineLayout bloomPipelineLayout;
         PipelineLayout compositePipelineLayout;
+        PipelineLayout debugPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -103,6 +109,7 @@ namespace rutils {
     PipelineLayout createShadowMapPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout shadowMatrixLayout, VkDescriptorSetLayout boneLayout);
     PipelineLayout createBloomPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout bloomLayout);
     PipelineLayout createCompositePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout compositeLayout);
+    PipelineLayout createDebugPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout debugLayout);
     void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
@@ -120,6 +127,7 @@ namespace rutils {
     Pipeline createShadowMapPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createBloomDownsamplePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createBloomUpsamplePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
+    Pipeline createDebugPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
 
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }

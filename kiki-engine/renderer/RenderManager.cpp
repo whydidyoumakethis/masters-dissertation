@@ -101,6 +101,7 @@ namespace Kiki {
             tonemapLayout = rutils::createTonemapDescriptorLayout(window);
             bloomLayout = rutils::createBloomDescriptorLayout(window);
             compositeLayout = rutils::createCompositeDescriptorLayout(window);
+            debugLayout = rutils::createDebugDescriptorLayout(window);
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle, animationLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle, animationLayout.handle);
@@ -112,6 +113,7 @@ namespace Kiki {
             pipelineLayouts.shadowMapPipelineLayout = rutils::createShadowMapPipelineLayout(window, shadowMatrixLayout.handle, animationLayout.handle);
             pipelineLayouts.bloomPipelineLayout = rutils::createBloomPipelineLayout(window, bloomLayout.handle);
             pipelineLayouts.compositePipelineLayout = rutils::createCompositePipelineLayout(window, compositeLayout.handle);
+            pipelineLayouts.debugPipelineLayout = rutils::createDebugPipelineLayout(window, debugLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -125,6 +127,7 @@ namespace Kiki {
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
             doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
+            doneDebugImage = rutils::createPostTonemapImage(window, allocator);
 
             for (int i = 0; i < 6; i++) {
                 bloomImages[i] = rutils::createBloomImage(
@@ -188,8 +191,11 @@ namespace Kiki {
             tonemapDescriptors = rutils::allocDescSet(window, descriptorPool.handle, tonemapLayout.handle);
             initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
 
+            debugDescriptors = rutils::allocDescSet(window, descriptorPool.handle, debugLayout.handle);
+            initialiseDebugDescriptorSet(window, doneCompositeImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
+
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneTonemapImage, sampler, fxaaDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -480,6 +486,7 @@ namespace Kiki {
                 doneSSRImage = rutils::createPostProcessingImage(window, allocator);
                 doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
                 doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
+                doneDebugImage = rutils::createPostTonemapImage(window, allocator);
             }
 
             {
@@ -659,12 +666,14 @@ namespace Kiki {
                 tonemapDescriptors,
                 shadowMatrixDescriptors,
                 compositeDescriptors,
+                debugDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
                 doneSSRImage,
                 doneCompositeImage,
                 doneTonemapImage,
+                doneDebugImage,
                 interfaceUBO.buffer,
                 interfaceUniform,
                 interfaceDescriptors,
@@ -1731,6 +1740,7 @@ namespace Kiki {
         pipelines.bloomDownsample = {};
         pipelines.bloomUpsample = {};
         pipelines.composite = {};
+        pipelines.debug = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1744,6 +1754,7 @@ namespace Kiki {
         pipelineLayouts.shadowMapPipelineLayout = {};
         pipelineLayouts.bloomPipelineLayout = {};
         pipelineLayouts.compositePipelineLayout = {};
+        pipelineLayouts.debugPipelineLayout = {};
 
         for (auto& shadowCubemap : shadowCubemaps) {
             if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
@@ -1758,6 +1769,7 @@ namespace Kiki {
         doneTonemapImage = {};
         doneCompositeImage = {};
         doneSSRImage = {};
+        doneDebugImage = {};
         
         for (int i = 0; i < 6; i++) bloomImages[i] = {};
 
@@ -1780,12 +1792,14 @@ namespace Kiki {
         shadowMatrixLayout = {};
         bloomLayout = {};
         compositeLayout = {};
+        debugLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
         interfaceDescriptors = {};
         shadowMatrixDescriptors = {};
         compositeDescriptors = {};
+        debugDescriptors = {};
         for (int i = 0; i < 6; i++) bloomImageDownsampleDescriptorSets[i] = {};
         for (int i = 0; i < 6; i++) bloomImageUpsampleDescriptorSets[i] = {};
 

@@ -32,6 +32,18 @@
 
 
 namespace Kiki {
+    enum RenderMode {
+        STANDARD,
+        TEXTURE_COLOUR,
+        MAPPED_NORMALS,
+        GEOMETRIC_NORMALS,
+        DEPTH,
+        METALNESS,
+        ROUGHNESS,
+        SSAO,
+        BLOOM
+    };
+
     struct RenderSettings {
         int ssaoSamples = 16;
         float ssaoRadius = 0.5f;
@@ -56,6 +68,8 @@ namespace Kiki {
 
         float fxaaStrength = 16.f;
         bool fxaaEnabled = true;
+
+        RenderMode renderMode = STANDARD;
     };
 
     struct Mesh {
@@ -126,6 +140,7 @@ namespace Kiki {
         std::filesystem::path bloom_downsample_f = "bloom_downsample.frag.spv";
         std::filesystem::path bloom_upsample_f = "bloom_upsample.frag.spv";
         std::filesystem::path composite_f = "composite.frag.spv";
+        std::filesystem::path debug_f = "debug.frag.spv";
     };
 
     class RenderManager {
@@ -171,6 +186,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout shadowMatrixLayout;
         rutils::DescriptorSetLayout bloomLayout;
         rutils::DescriptorSetLayout compositeLayout;
+        rutils::DescriptorSetLayout debugLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -182,11 +198,13 @@ namespace Kiki {
         VkDescriptorSet tonemapDescriptors;
         VkDescriptorSet shadowMatrixDescriptors;
         VkDescriptorSet compositeDescriptors;
+        VkDescriptorSet debugDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
         rutils::Image doneCompositeImage;
         rutils::Image doneTonemapImage;
+        rutils::Image doneDebugImage;
         rutils::Image depthBuffer;
 
         std::array<rutils::Image, 6> bloomImages;

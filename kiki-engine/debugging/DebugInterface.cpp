@@ -117,6 +117,14 @@ namespace Kiki {
             }
 
             if (ImGui::CollapsingHeader("Render Settings")) {
+                ImGui::Text("Mode:");
+                ImGui::SameLine(110.f);
+                const char* modes[] = {"Standard", "Base colour", "Normals (mapped)", "Normals (geometric)", "Depth", "Metalness", "Roughness", "SSAO", "Bloom"};
+                int currentMode = static_cast<int>(renderManager.renderSettings.renderMode);
+                if (ImGui::Combo("##editrendermode", &currentMode, modes, IM_ARRAYSIZE(modes))) {
+                    renderManager.renderSettings.renderMode = static_cast<Kiki::RenderMode>(currentMode);
+                }
+
                 ImGui::SeparatorText("SSAO");
 
                 ImGui::AlignTextToFramePadding();
