@@ -1,23 +1,7 @@
 #pragma once
 #include <glm/glm.hpp>
-enum class CharacterState {
-    Idle,
-    Walking,
-    Running,
-    Jumping,
-//    Falling,
-//    Landing,
-};
+#include "Animation/AnimationComponent.h"
 
-inline std::string to_string(CharacterState state) {
-    switch (state) {
-    case CharacterState::Idle:    return "Idle";
-    case CharacterState::Walking: return "Walking";
-    case CharacterState::Running: return "Running";
-    case CharacterState::Jumping: return "Jumping";
-    default:                      return "Unknown";
-    }
-}
 enum class Ability {
     Null,
     DoubleJump,
@@ -34,7 +18,9 @@ struct CharacterComponent {
 
     float jumpTimer = 0.0f;
 
-    CharacterState state = CharacterState::Idle;
+    Kiki::CharacterState state = Kiki::CharacterState::Idle;
+
+    //CharacterState state = CharacterState::Idle;
     std::vector< Ability> ablities = { Ability::Null };
     glm::vec3      velocity = { 0, 0, 0 };
 	glm::vec3      spawnPosition = { 0, 0, 0 }; // for respawning after falling off the level

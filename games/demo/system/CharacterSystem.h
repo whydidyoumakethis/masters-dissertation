@@ -2,6 +2,7 @@
 #include <kiki.h>
 #include "../component/CharacterComponent.h"
 #include "../component/ThirdPersonCameraComponent.hpp"
+#include "Animation/AnimationComponent.h"
 class CharacterSystem : public System {
 public:
     Phase GetPhase() const override { return Phase::Update; }
@@ -141,20 +142,20 @@ private:
         transform.dirty = true;
     }
     void HandleJump(
-		Entity entity,
+        Entity entity,
         TransformComponent& transform,
         CharacterComponent& character,
         PhysicalAttributesComponent& ip,
         float dt)
     {
-        if (inputManager.isKeyDown(GLFW_KEY_SPACE) && character.state != CharacterState::Jumping) {
+        if (inputManager.isKeyDown(GLFW_KEY_SPACE) && character.state != Kiki::CharacterState::Jumping) {
             PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
             auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
             JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 
             physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
 
-            character.state = CharacterState::Jumping;
+            character.state = Kiki::CharacterState::Jumping;
             character.jumpTimer = 0.15f;
         }
     }
@@ -194,23 +195,32 @@ private:
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
         float realVy = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID).GetY();
 
-        if (character.state == CharacterState::Jumping) {
+        if (character.state == Kiki::CharacterState::Jumping) {
             if (character.jumpTimer <= 0.0f && pa.isGrounded) {
-                character.state = isMoving ? CharacterState::Walking : CharacterState::Idle;
-            }
-            return;
-        }
-
-        if (isMoving) {
-            if (currentSpeed > character.walkSpeed + 1.0f) {
-                character.state = CharacterState::Running;
-            }
-            else {
-                character.state = CharacterState::Walking;
+                character.state = isMoving ? Kiki::CharacterState::Walking : Kiki::CharacterState::Idle;
             }
         }
         else {
-            character.state = CharacterState::Idle;
+            if (isMoving) {
+                if (currentSpeed > character.walkSpeed + 1.0f) {
+                    character.state = Kiki::CharacterState::Running;
+                }
+                else {
+                    character.state = Kiki::CharacterState::Walking;
+                }
+            }
+            else {
+                character.state = Kiki::CharacterState::Idle;
+            }
+        }
+
+        Kiki::AnimationComponent* animComp = World::Get().GetComponent<Kiki::AnimationComponent>(playerEntity);
+        if (animComp) {
+            bool shouldLoop = (character.state != Kiki::CharacterState::Jumping);
+
+            if (animComp->currentState != character.state) {
+                animComp->ChangeState(character.state, shouldLoop);
+            }
         }
     }
 };

@@ -12,9 +12,25 @@
 #include "Animation/Animation.h"
 #include "Animation/Animator.h"
 #include "renderer/utils/Buffer.hpp" 
-#include "../../games/demo/component/CharacterComponent.h"
 
 namespace Kiki {
+
+    enum class CharacterState {
+        Idle,
+        Walking,
+        Running,
+        Jumping,
+    };
+
+    inline std::string to_string(CharacterState state) {
+        switch (state) {
+        case CharacterState::Idle:    return "Idle";
+        case CharacterState::Walking: return "Walking";
+        case CharacterState::Running: return "Running";
+        case CharacterState::Jumping: return "Jumping";
+        default:                      return "Unknown";
+        }
+    }
 
     struct AnimationComponent {
         std::unique_ptr<Skeleton> skeleton;
@@ -47,7 +63,7 @@ namespace Kiki {
         bool isBlending = false;       
         float previousPlaybackTime = 0.0f;
 
-        void ChangeState(CharacterState newState) {
+        void ChangeState(CharacterState newState, bool loop = true) {
             if (currentState == newState || animations.find(newState) == animations.end()) {
                 return;
             }

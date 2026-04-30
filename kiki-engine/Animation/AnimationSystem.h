@@ -3,7 +3,6 @@
 #include "Animation/Animator.h"
 #include "renderer/RenderManager.hpp"
 #include "ECS/World.h"
-#include "../../games/demo/component/CharacterComponent.h"
 #include "Animation.h"
 
 class AnimationSystem : public System {
@@ -13,13 +12,10 @@ public:
     }
 
     void OnUpdate(float dt) override {
-        auto view = World::Get().Query<CharacterComponent, Kiki::AnimationComponent>();
+        auto view = World::Get().Query<Kiki::AnimationComponent>();
 
-        for (auto [entity, charComp, animComp] : view.each()) {
+        for (auto [entity, animComp] : view.each()) {
 
-            if (animComp.currentState != charComp.state) {
-                animComp.ChangeState(charComp.state);
-            }
 
             if (animComp.isPlaying && animComp.skeleton) {
                 auto currentIt = animComp.animations.find(animComp.currentState);
@@ -27,7 +23,6 @@ public:
                 if (currentIt != animComp.animations.end() && currentIt->second) {
                     Kiki::Animation* currentAnim = currentIt->second.get();
 
-                    // if need blending
                     if (animComp.isBlending) {
                         animComp.blendTimer += dt * animComp.playbackSpeed;
                         float blendFactor = animComp.blendTimer / animComp.blendDuration;
