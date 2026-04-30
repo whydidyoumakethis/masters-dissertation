@@ -22,6 +22,7 @@ public:
 		auto objects = World::Get().Query<TransformComponent, ThirdPersonCameraComponent, CameraComponent>();
 		for (auto [entity, transform, tpscam,cam] : objects.each()) {
 			HandleCameraRotation( tpscam,transform);
+			HandleCameraZoom(tpscam);
 			HandleCameraPosition(transform, cam, tpscam, dt);
 		
 		}
@@ -59,6 +60,14 @@ private:
 		//trans.rotation = rotation;
 		//trans.dirty = true;
 	}
+
+	void HandleCameraZoom(ThirdPersonCameraComponent& cam) {
+		float scroll = inputManager.getMouseScrollDelta();
+		if (scroll == 0.0f) return;
+		cam.distance -= scroll * cam.zoomSensitivity;
+		cam.distance = glm::clamp(cam.distance, cam.minDistance, cam.maxDistance);
+	}
+
 	void HandleCameraPosition(TransformComponent& camTransform,
 		CameraComponent& camera,
 		ThirdPersonCameraComponent& tpsCam,

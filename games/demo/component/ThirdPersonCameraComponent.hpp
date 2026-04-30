@@ -17,6 +17,7 @@ struct ThirdPersonCameraComponent {
     float   minPitch = -20.0f;
     float   maxPitch = 70.0f;
     float   rotateSensitivity = 0.15f;
+    float zoomSensitivity = 0.5f;
 
 	// run-time variables
 	glm::vec3 currentPos = { 0, 0, 0 };  // current camera position after smoothing

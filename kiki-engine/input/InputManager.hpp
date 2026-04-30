@@ -24,6 +24,7 @@ namespace Kiki {
             float y = 0.f;
             float dx = 0.f;
             float dy = 0.f;
+            float scroll = 0.f;
         };
 
         struct GamepadState {
@@ -60,9 +61,14 @@ namespace Kiki {
             InputManager::get().handleMouseMotion(window, (float)xPos, (float)yPos);
         }
 
+        static void setMouseScrollState(GLFWwindow* window, double xOffset, double yOffset) {
+            InputManager::get().handleMouseScroll(window, (float)xOffset, (float)yOffset);
+        }
+
         void handleKey(GLFWwindow* window, int key, int scanCode, int action, int modifierFlags);
         void handleMouseButton(GLFWwindow* window, int button, int action, int modifierFlags);
         void handleMouseMotion(GLFWwindow* window, float xPos, float yPos);
+        void handleMouseScroll(GLFWwindow* window, float xOffset, float yOffset);
 
         public:
         static InputManager& get() {
@@ -85,6 +91,7 @@ namespace Kiki {
 
         void getMousePosition(float &x, float &y);
         void getMouseDeltaPosition(float &x, float &y);
+        float getMouseScrollDelta();
 
 		//FOR GAMEPAD
         bool isGamepadConnected() const { return gamepad.connected; }

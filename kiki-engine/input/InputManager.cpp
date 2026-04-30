@@ -7,6 +7,7 @@ namespace Kiki {
         glfwSetKeyCallback(window, setKeyState);
         glfwSetMouseButtonCallback(window, setMouseButtonState);
         glfwSetCursorPosCallback(window, setMouseMovementState);
+        glfwSetScrollCallback(window, setMouseScrollState);
 
         for (int i = 0; i < GLFW_KEY_LAST; i++) {
             keyStates[i] = KeyState::RELEASED;
@@ -62,6 +63,7 @@ namespace Kiki {
         // reset mouse delta
         mouse.dx = 0.f;
         mouse.dy = 0.f;
+        mouse.scroll = 0.f;
 
         glfwPollEvents();
 
@@ -143,6 +145,10 @@ namespace Kiki {
         mouse.y = yPos;
     }
 
+    void InputManager::handleMouseScroll(GLFWwindow* window, float xOffset, float yOffset) {
+        mouse.scroll += yOffset;
+    }
+
     bool InputManager::isKeyDown(int key) { return keyStates[key] == KeyState::DOWN || keyStates[key] == KeyState::JUST_DOWN; }
     bool InputManager::isKeyJustDown(int key) { return keyStates[key] == KeyState::JUST_DOWN; }
     bool InputManager::isKeyUp(int key) { return keyStates[key] == KeyState::RELEASED || keyStates[key] == KeyState::JUST_RELEASED; }
@@ -161,6 +167,10 @@ namespace Kiki {
     void InputManager::getMouseDeltaPosition(float &x, float &y) {
         x = mouse.dx;
         y = mouse.dy;
+    }
+
+    float InputManager::getMouseScrollDelta() {
+        return mouse.scroll;
     }
 
     bool InputManager::isGamepadButtonDown(int b) {
