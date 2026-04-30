@@ -18,7 +18,12 @@ inline std::string to_string(CharacterState state) {
     default:                      return "Unknown";
     }
 }
-
+enum class Ability {
+    Null,
+    DoubleJump,
+    Dash,
+    DoubleSpeed
+};
 struct CharacterComponent {
     float walkSpeed = 2.0f;
     float runSpeed = 5.0f;
@@ -26,6 +31,7 @@ struct CharacterComponent {
 	float rotateSpeed = 10.0f; // character rotation speed (for interpolating facing direction)
 
     CharacterState state = CharacterState::Idle;
+    std::vector< Ability> ablities = { Ability::Null };
     glm::vec3      velocity = { 0, 0, 0 };
 	glm::vec3      spawnPosition = { 0, 0, 0 }; // for respawning after falling off the level
 

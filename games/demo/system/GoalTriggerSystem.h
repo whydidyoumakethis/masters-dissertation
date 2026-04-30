@@ -39,6 +39,7 @@ public:
 		
 		if ((e.entity1 == playerEntity && e.entity2 == goalEntity) || (e.entity1 == goalEntity && e.entity2 == playerEntity)) {
 			spdlog::info("Player reached the goal! You win!");
+			Timer::get().Reset();
 			goalReached = true;
 		}
 	}
