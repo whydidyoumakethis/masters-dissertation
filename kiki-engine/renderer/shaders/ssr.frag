@@ -81,7 +81,8 @@ void main()
     float metalness = texture(gRoughnessMetalness, v2fTexCoord).g;
 
     // skip skybox and non-metallic surfaces
-    if (depth >= 1.f || metalness <= 0.01f) {
+    // skip where maxSteps == 0
+    if (depth >= 1.f || metalness <= 0.01f || ssrMaxSteps <= 0) {
         oColor = vec4(sceneColour, 1.f);
         return;
     }

@@ -522,7 +522,7 @@ namespace rutils {
             }
         }
 
-        {
+        if (renderSettings.shadowsEnabled) {
             // shadow map pass
             ZoneScopedN("Recording shadow map pass");
 
@@ -624,7 +624,7 @@ namespace rutils {
             }
 
             // ensure that every image is transitioned properly, even if unused
-            for (size_t lightIndex = lights.size(); lightIndex < shadowCubemaps.size(); lightIndex++) {
+            for (int lightIndex = lights.size(); lightIndex < shadowCubemaps.size(); lightIndex++) {
                 rutils::imageBarrier(aCmdBuff, shadowCubemaps[lightIndex].cubemap.image,
                     // before
                     VK_PIPELINE_STAGE_2_NONE,
@@ -640,6 +640,23 @@ namespace rutils {
             }
 
             // end shadow map pass
+        }
+        else {
+            // shadows disabled, still need to transition empty images
+            for (int lightIndex = 0; lightIndex < shadowCubemaps.size(); lightIndex++) {
+                rutils::imageBarrier(aCmdBuff, shadowCubemaps[lightIndex].cubemap.image,
+                    // before
+                    VK_PIPELINE_STAGE_2_NONE,
+                    VK_ACCESS_2_NONE,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    // after
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+                    // what
+                    VkImageSubresourceRange{VK_IMAGE_ASPECT_DEPTH_BIT, 0, 1, 0, 6}
+                );
+            }
         }
 
         {
@@ -705,7 +722,7 @@ namespace rutils {
             );
         }
 
-        {
+        if (renderSettings.ssaoEnabled) {
             // ssao pass
             ZoneScopedN("Recording SSAO pass");
 
@@ -779,7 +796,7 @@ namespace rutils {
         }
 
         // ssao horizontal blur pass
-        {
+        if (renderSettings.ssaoEnabled) {
             ZoneScopedN("Recording SSAO horizontal blur pass");
 
             #ifdef TRACY_VK_ENABLE
@@ -846,7 +863,7 @@ namespace rutils {
         }
 
         // ssao vertical blur pass
-        {
+        if (renderSettings.ssaoEnabled) {
             ZoneScopedN("Recording SSAO vertical blur pass");
 
             #ifdef TRACY_VK_ENABLE
@@ -911,6 +928,39 @@ namespace rutils {
                 VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
             );
         }
+        else {
+            // ssao disabled
+            // reset ssao image to white
+            imageBarrier(aCmdBuff, gbuffers.ssao_blurred.image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+            );
+
+            VkClearColorValue white{};
+            white.float32[0] = 1.f;
+            white.float32[1] = 1.f;
+            white.float32[2] = 1.f;
+            white.float32[3] = 1.f;
+            VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdClearColorImage(aCmdBuff, gbuffers.ssao_blurred.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &white, 1, &range);
+
+            imageBarrier(aCmdBuff, gbuffers.ssao_blurred.image,
+                // before
+                VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
 
 
         // deferred lighting pass
@@ -960,7 +1010,7 @@ namespace rutils {
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.deferredPipelineLayout.handle, 0, 2, sets, 0, nullptr);
 
             ObjectData data;
-            data.pcfSamples = renderSettings.shadowPcfSamples;
+            data.pcfSamples = renderSettings.shadowsEnabled ? renderSettings.shadowPcfSamples : 0;
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.pbrPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(data), &data);
 
@@ -1029,6 +1079,9 @@ namespace rutils {
 
             SSRSettings ssrSettings;
             ssrSettings.settings.x = renderSettings.ssrMaxSteps; // maxSteps
+
+            if (!renderSettings.ssrEnabled) ssrSettings.settings.x = 0; // essentially disables ssr
+
             ssrSettings.settings.y = renderSettings.ssrBinarySteps; // binarySteps
             ssrSettings.settings.z = renderSettings.ssrStepSize; // stepSize
             ssrSettings.settings.w = renderSettings.ssrThicknessTolerance; // thicknessTolerance
@@ -1041,24 +1094,26 @@ namespace rutils {
             // end ssr pass
         }
 
-        {
+        // transition ssr image even if ssr was disabled
+        // bc ssr being disabled just sets the steps to 0
+        // ssr still runs and an image is still output
+        imageBarrier(aCmdBuff, doneSSRImage.image,
+            // before
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            // after
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        if (renderSettings.bloomEnabled) {
             ZoneScopedN("Recording bloom downsample pass");
 
             #ifdef TRACY_VK_ENABLE
             TracyVkZone(tracyVkCtx, aCmdBuff, "Bloom downsample pass");
             #endif
-
-            // transition the previous image (ssr result) to be sampled
-            imageBarrier(aCmdBuff, doneSSRImage.image,
-                // before
-                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-                // after
-                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-            );
 
             // downsample passes
             for (int i = 0; i < 6; i++) {
@@ -1145,7 +1200,7 @@ namespace rutils {
             }
         }
 
-        {
+        if (renderSettings.bloomEnabled) {
             ZoneScopedN("Recording bloom upsample pass");
 
             #ifdef TRACY_VK_ENABLE
@@ -1240,7 +1295,34 @@ namespace rutils {
                 );
             }
         }
+        else {
+            // bloom disabled, clear bloom[0] to black and transition it
+            imageBarrier(aCmdBuff, bloomImages[0].image,
+                // before
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                // after
+                VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL
+            );
 
+            VkClearColorValue black{};
+            VkImageSubresourceRange range{VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1};
+            vkCmdClearColorImage(aCmdBuff, bloomImages[0].image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &black, 1, &range);
+
+            imageBarrier(aCmdBuff, bloomImages[0].image,
+                // before
+                VK_PIPELINE_STAGE_2_CLEAR_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                // after
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
 
         {
             ZoneScopedN("Recording composite pass");
@@ -1289,6 +1371,8 @@ namespace rutils {
 
             CompositeSettings compositeSettings;
             compositeSettings.bloomStrength = renderSettings.bloomStrength;
+
+            if (!renderSettings.bloomEnabled) compositeSettings.bloomStrength = 0; // essentially disables bloom
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.compositePipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CompositeSettings), &compositeSettings);
 
@@ -1422,6 +1506,11 @@ namespace rutils {
 
             FXAASettings fxaaSettings;
             fxaaSettings.strength = renderSettings.fxaaStrength;
+            fxaaSettings.isEnabled = 1;
+
+            if (!renderSettings.fxaaEnabled) {
+                fxaaSettings.isEnabled = 0;
+            }
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.postprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(fxaaSettings), &fxaaSettings);
 

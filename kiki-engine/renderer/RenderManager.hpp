@@ -35,22 +35,27 @@ namespace Kiki {
     struct RenderSettings {
         int ssaoSamples = 16;
         float ssaoRadius = 0.5f;
+        bool ssaoEnabled = true;
 
         int ssaoBlurRange = 2;
 
         int shadowPcfSamples = 20;
+        bool shadowsEnabled = true;
 
         int ssrMaxSteps = 16;
         int ssrBinarySteps = 4;
         float ssrStepSize = 0.5f;
         float ssrThicknessTolerance = 0.2f;
+        bool ssrEnabled = true;
 
         float bloomRadius_x = 0.005f;
         float bloomRadius_y = 0.005f;
 
         float bloomStrength = 0.04f;
+        bool bloomEnabled = true;
 
         float fxaaStrength = 16.f;
+        bool fxaaEnabled = true;
     };
 
     struct Mesh {

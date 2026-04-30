@@ -44,6 +44,7 @@ namespace rutils {
 
     struct FXAASettings {
         float strength;
+        int isEnabled;
     };
 
     struct CompositeSettings {

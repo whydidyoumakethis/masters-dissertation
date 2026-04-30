@@ -118,6 +118,12 @@ namespace Kiki {
 
             if (ImGui::CollapsingHeader("Render Settings")) {
                 ImGui::SeparatorText("SSAO");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##ssaoenabled", &renderManager.renderSettings.ssaoEnabled);
+
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Samples:");
                 ImGui::SameLine(110.f);
@@ -135,6 +141,12 @@ namespace Kiki {
 
 
                 ImGui::SeparatorText("Shadows");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##shadowsenabled", &renderManager.renderSettings.shadowsEnabled);
+
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("PCF samples:");
                 ImGui::SameLine(110.f);
@@ -142,6 +154,12 @@ namespace Kiki {
 
 
                 ImGui::SeparatorText("SSR");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##ssrenabled", &renderManager.renderSettings.ssrEnabled);
+
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Max steps:");
                 ImGui::SameLine(110.f);
@@ -164,6 +182,12 @@ namespace Kiki {
 
 
                 ImGui::SeparatorText("Bloom");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##bloomenabled", &renderManager.renderSettings.bloomEnabled);
+
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Strength:");
                 ImGui::SameLine(110.f);
@@ -181,6 +205,12 @@ namespace Kiki {
 
 
                 ImGui::SeparatorText("FXAA");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##fxaaenabled", &renderManager.renderSettings.fxaaEnabled);
+
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Strength:");
                 ImGui::SameLine(110.f);

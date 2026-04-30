@@ -8,6 +8,7 @@ layout(location = 0) out vec4 oColor;
 
 layout(push_constant) uniform FXAASettings {
     float fxaaStrength;
+    int isEnabled;
 } fxaaSettings;
 
 // edge direction tuning
@@ -24,6 +25,11 @@ float luminance(vec3 colour)
 
 void main()
 {
+    if (fxaaSettings.isEnabled == 0) {
+        oColor = vec4(texture(uSceneColour, v2fTexCoord).rgb, 1.f);
+        return;
+    }
+
     vec2 texelSize = vec2(textureSize(uSceneColour, 0));
 
     // sample center pixel and its 4 diagonal neighbours
