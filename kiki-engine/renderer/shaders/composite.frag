@@ -20,7 +20,7 @@ void main()
 
     // bloom set to a low value
     // so only bright pixels bloom noticeably
-    vec3 colour = inColour + (inBloom * compositeSettings.bloomStrength);
+    vec3 colour = mix(inColour, inBloom, compositeSettings.bloomStrength);
 
     oColor = vec4(colour, 1.f);
 }
