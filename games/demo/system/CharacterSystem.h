@@ -9,6 +9,10 @@ public:
     void OnUpdate(float dt) override {
         auto objects = World::Get().Query<TransformComponent, CharacterComponent,PhysicalAttributesComponent>();
 		for (auto [entity, transform, character,ip] : objects.each()) {
+            if (character.jumpTimer > 0.0f) {
+                character.jumpTimer -= dt;
+            }
+
             float cameraYaw = GetCameraYaw(entity);
 			HandleMovement(transform, character, ip, cameraYaw, dt);
 			HandleJump(entity, transform, character, ip, dt);
@@ -84,8 +88,11 @@ private:
         if (inputManager.isKeyDown(GLFW_KEY_A)) inputDir.x -= 1.0f;
         if (inputManager.isKeyDown(GLFW_KEY_D)) inputDir.x += 1.0f;
 
-        bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) && ip.isGrounded;
-        float speed = isRunning ? character.runSpeed : character.walkSpeed;
+        if (ip.isGrounded) {
+            character.currentMaxSpeed = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) ? character.runSpeed : character.walkSpeed;
+        }
+        //bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) && ip.isGrounded;
+        float speed = character.currentMaxSpeed;
 
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
@@ -117,11 +124,16 @@ private:
         else {
 			// TODO: apply friction to slow down instead of stopping immediately
 			// or just connect with physics system
-            character.velocity.x = 0.0f;
-            character.velocity.z = 0.0f;
-
-            glm::vec3 newVel = glm::vec3(0.0f, currentJoltVel.GetY(), 0.0f);
-            physics.setEntityVelocity(playerEntity, newVel);
+            if (ip.isGrounded) {
+                character.velocity.x = 0.0f;
+                character.velocity.z = 0.0f;
+                glm::vec3 newVel = glm::vec3(0.0f, currentJoltVel.GetY(), 0.0f);
+                physics.setEntityVelocity(playerEntity, newVel);
+            }
+            else {
+                character.velocity.x = currentJoltVel.GetX();
+                character.velocity.z = currentJoltVel.GetZ();
+            }
         }
         transform.position += character.velocity * dt;
 		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
@@ -143,6 +155,7 @@ private:
             physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
 
             character.state = CharacterState::Jumping;
+            character.jumpTimer = 0.15f;
         }
     }
 	// smoothly rotate character to face movement direction
@@ -182,7 +195,7 @@ private:
         float realVy = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID).GetY();
 
         if (character.state == CharacterState::Jumping) {
-            if (realVy <= 0.1f && pa.isGrounded) {
+            if (character.jumpTimer <= 0.0f && pa.isGrounded) {
                 character.state = isMoving ? CharacterState::Walking : CharacterState::Idle;
             }
             return;

@@ -30,6 +30,10 @@ struct CharacterComponent {
     float jumpForce = 3.0f;
 	float rotateSpeed = 10.0f; // character rotation speed (for interpolating facing direction)
 
+    float currentMaxSpeed = walkSpeed;
+
+    float jumpTimer = 0.0f;
+
     CharacterState state = CharacterState::Idle;
     std::vector< Ability> ablities = { Ability::Null };
     glm::vec3      velocity = { 0, 0, 0 };
