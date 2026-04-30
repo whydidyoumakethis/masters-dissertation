@@ -63,8 +63,11 @@ namespace Kiki {
         float bloomRadius_x = 0.005f;
         float bloomRadius_y = 0.005f;
 
-        float bloomStrength = 0.04f;
+        float bloomStrength = 0.02f;
         bool bloomEnabled = true;
+
+        float tonemapMaxWhite = 4.f;
+        bool tonemapEnabled = true;
 
         float fxaaStrength = 16.f;
         bool fxaaEnabled = true;

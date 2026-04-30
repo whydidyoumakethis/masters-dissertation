@@ -266,9 +266,10 @@ namespace Kiki {
                 rLight.colour.z /= 54351.4f;
                 rLight.colour.w /= 54351.4f;
 
-                std::cout << "Point light:" << std::endl;
-                std::cout << "Colour " << rLight.colour.x << ", " << rLight.colour.y << ", " << rLight.colour.z << ", " << rLight.colour.w << " " << std::endl;
-                std::cout << "Position " << rLight.position.x << ", " << rLight.position.y << ", " << rLight.position.z << ", " << rLight.position.w << " " << std::endl;
+                spdlog::info("[Scene] Loaded point light with colour ({:.3f}, {:.3f}, {:.3f}, {:.3f}) and position ({:.3f}, {:.3f}, {:.3f})",
+                    rLight.colour.x, rLight.colour.y, rLight.colour.z, rLight.colour.w,
+                    rLight.position.x, rLight.position.y, rLight.position.z
+                );
 
                 RenderManager::get().lights.emplace_back(rLight);
             }

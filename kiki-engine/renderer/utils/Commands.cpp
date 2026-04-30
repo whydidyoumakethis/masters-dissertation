@@ -1442,6 +1442,16 @@ namespace rutils {
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.tonemap.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.tonemapPipelineLayout.handle, 0, 1, tonemapSets, 0, nullptr);
 
+            TonemapSettings tonemapSettings;
+            tonemapSettings.maxWhite = renderSettings.tonemapMaxWhite;
+            tonemapSettings.isEnabled = 1;
+
+            if (!renderSettings.tonemapEnabled) {
+                tonemapSettings.isEnabled = 0;
+            }
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.tonemapPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(tonemapSettings), &tonemapSettings);
+
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
             vkCmdEndRendering(aCmdBuff);

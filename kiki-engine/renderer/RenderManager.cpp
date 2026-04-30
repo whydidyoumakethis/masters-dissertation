@@ -192,7 +192,7 @@ namespace Kiki {
             initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
 
             debugDescriptors = rutils::allocDescSet(window, descriptorPool.handle, debugLayout.handle);
-            initialiseDebugDescriptorSet(window, doneCompositeImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
+            initialiseDebugDescriptorSet(window, doneTonemapImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
 
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);

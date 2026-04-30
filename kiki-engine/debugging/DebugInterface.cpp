@@ -212,6 +212,19 @@ namespace Kiki {
                 ImGui::InputFloat("##editbloomradiusy", &renderManager.renderSettings.bloomRadius_y, 0.001f, 0.005f, "%.3f");
 
 
+                ImGui::SeparatorText("Tonemapping");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##tonemapenabled", &renderManager.renderSettings.tonemapEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Max white:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##edittonemapmaxwhite", &renderManager.renderSettings.tonemapMaxWhite, 0.5f, 1.f, "%.2f");
+
+
                 ImGui::SeparatorText("FXAA");
 
                 ImGui::AlignTextToFramePadding();

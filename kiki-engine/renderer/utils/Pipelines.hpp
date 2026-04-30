@@ -55,6 +55,11 @@ namespace rutils {
         float bloomStrength;
     };
 
+    struct TonemapSettings {
+        float maxWhite;
+        std::uint32_t isEnabled;
+    };
+
     struct ShapeData {
         glm::vec4 colour;
     };
