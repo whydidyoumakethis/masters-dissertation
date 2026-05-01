@@ -14,7 +14,9 @@ public:
             if (character.jumpTimer > 0.0f) {
                 character.jumpTimer -= dt;
             }
-
+			if (dashTimer > 0.0f) {
+				dashTimer -= dt;
+            }
             float cameraYaw = GetCameraYaw(entity);
 			HandleMovement(transform, character, ip, cameraYaw, dt);
 			HandleJump(entity, transform, character, ip, dt);
@@ -128,6 +130,10 @@ private:
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
             glm::vec3 newVel = glm::vec3(character.velocity.x, currentJoltVel.GetY(), character.velocity.z);
+			if (character.hasAbility(Ability::Dash) && inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) && dashTimer <= 0.0f) {
+                newVel += moveDir * speed * 100.0f; // Dash adds a burst of speed in the movement direction
+                dashTimer = 1.0f; // Dash cooldown
+            }
             physics.setEntityVelocity(playerEntity, newVel);
         }
         else {
