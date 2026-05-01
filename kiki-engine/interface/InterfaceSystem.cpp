@@ -19,6 +19,124 @@ namespace Kiki {
                 });
         }
 
+        {
+            ZoneScopedN("Interface animations");
+
+            auto animComponents = world.Query<InterfaceAnimationComponent>();
+
+            for (auto [e, animationComponent] : animComponents.each()) {
+                if (registry.all_of<InterfaceComponent>(e)) {
+                    auto& interfaceComponent = registry.get<InterfaceComponent>(e);
+
+                    if (!animationComponent.init) {
+                        animationComponent.positionDiff = ScaleVec2D(animationComponent.targetPosition.scaleX - interfaceComponent.position.scaleX,
+                                                                     animationComponent.targetPosition.x - interfaceComponent.position.x,
+                                                                     animationComponent.targetPosition.scaleY - interfaceComponent.position.scaleY,
+                                                                     animationComponent.targetPosition.y - interfaceComponent.position.y);
+                        animationComponent.sizeDiff = ScaleVec2D(animationComponent.targetSize.scaleX - interfaceComponent.size.scaleX,
+                                                                 animationComponent.targetSize.x - interfaceComponent.size.x,
+                                                                 animationComponent.targetSize.scaleY - interfaceComponent.size.scaleY,
+                                                                 animationComponent.targetSize.y - interfaceComponent.size.y);
+                        animationComponent.rotationDiff = animationComponent.targetRotation - interfaceComponent.rotation;
+
+                        if (registry.all_of<BackgroundComponent>(e)) {
+                            auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+
+                            animationComponent.backgroundColourDiff = animationComponent.targetBackgroundColour - backgroundComponent.colour;
+                            animationComponent.backgroundTransparencyDiff = animationComponent.targetBackgroundTransparency - backgroundComponent.transparency;
+                        }
+
+                        if (registry.all_of<TextComponent>(e)) {
+                            auto& textComponent = registry.get<TextComponent>(e);
+
+                            animationComponent.textColourDiff = animationComponent.targetTextColour - textComponent.colour;
+                            animationComponent.textTransparencyDiff = animationComponent.targetTextTransparency - textComponent.transparency;
+                            animationComponent.textSizeDiff = animationComponent.targetTextSize - textComponent.size;
+                        }
+
+                        animationComponent.init = true;
+                    }
+
+                    float prevT = std::min(1.0f, animationComponent.elapsed / animationComponent.time);
+                    animationComponent.elapsed += dt;
+                    float t = std::min(1.0f, animationComponent.elapsed / animationComponent.time);
+
+                    switch (animationComponent.interpolation) {
+                    case InterfaceInterpolationType::LINEAR:
+                        break;
+                    case InterfaceInterpolationType::EASE_IN:
+                        t = t * t;
+                        prevT = prevT * prevT;
+                        break;
+                    case InterfaceInterpolationType::EASE_OUT:
+                        t = 2.0f * t - t * t;
+                        prevT = 2.0f * prevT - prevT * prevT;
+                        break;
+                    case InterfaceInterpolationType::EASE_IN_OUT:
+                        if (t < 0.5) {
+                            t = 2.0f * t * t;
+                        } else {
+                            t = -1.0f + (4.0f - 2.0f * t) * t;
+                        }
+
+                        if (prevT < 0.5) {
+                            prevT = 2.0f * prevT * prevT;
+                        } else {
+                            prevT = -1.0f + (4.0f - 2.0f * prevT) * prevT;
+                        }
+                        break;
+                    }
+
+                    if (animationComponent.reversing) {
+                        t = 1.0f - t;
+                        prevT = 1.0f - prevT;
+                    }
+
+                    interfaceComponent.position = ScaleVec2D(interfaceComponent.position.scaleX - (prevT * animationComponent.positionDiff.scaleX) + (t * animationComponent.positionDiff.scaleX),
+                                                             interfaceComponent.position.x - (prevT * animationComponent.positionDiff.x) + (t * animationComponent.positionDiff.x),
+                                                             interfaceComponent.position.scaleY - (prevT * animationComponent.positionDiff.scaleY) + (t * animationComponent.positionDiff.scaleY),
+                                                             interfaceComponent.position.y - (prevT * animationComponent.positionDiff.y) + (t * animationComponent.positionDiff.y));
+                    interfaceComponent.size = ScaleVec2D(interfaceComponent.size.scaleX - (prevT * animationComponent.sizeDiff.scaleX) + (t * animationComponent.sizeDiff.scaleX),
+                                                             interfaceComponent.size.x - (prevT * animationComponent.sizeDiff.x) + (t * animationComponent.sizeDiff.x),
+                                                             interfaceComponent.size.scaleY - (prevT * animationComponent.sizeDiff.scaleY) + (t * animationComponent.sizeDiff.scaleY),
+                                                             interfaceComponent.size.y - (prevT * animationComponent.sizeDiff.y) + (t * animationComponent.sizeDiff.y));
+                    interfaceComponent.rotation = interfaceComponent.rotation - (prevT * animationComponent.rotationDiff) + (t * animationComponent.rotationDiff);
+                    interfaceComponent.dirty = true;
+
+                    if (registry.all_of<BackgroundComponent>(e)) {
+                            auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+
+                            backgroundComponent.colour = backgroundComponent.colour - (prevT * animationComponent.backgroundColourDiff) + (t * animationComponent.backgroundColourDiff);
+                            backgroundComponent.transparency = backgroundComponent.transparency - (prevT * animationComponent.backgroundTransparencyDiff) + (t * animationComponent.backgroundTransparencyDiff);
+                        }
+
+                        if (registry.all_of<TextComponent>(e)) {
+                            auto& textComponent = registry.get<TextComponent>(e);
+
+                            textComponent.colour = textComponent.colour - (prevT * animationComponent.textColourDiff) + (t * animationComponent.textColourDiff);
+                            textComponent.transparency = textComponent.transparency - (prevT * animationComponent.textTransparencyDiff) + (t * animationComponent.textTransparencyDiff);
+                            textComponent.size = textComponent.size - (prevT * animationComponent.textSizeDiff) + (t * animationComponent.textSizeDiff);
+
+                            textComponent.dirty = true;
+                        }
+
+                    if (animationComponent.elapsed >= animationComponent.time) {
+                        if (animationComponent.loop && !animationComponent.reverse) {
+                            animationComponent.elapsed = 0.0f;
+                        } else if (animationComponent.loop && animationComponent.reverse) {
+                            animationComponent.elapsed = 0.0f;
+                            animationComponent.reversing = !animationComponent.reversing;
+                        } else if (!animationComponent.loop && animationComponent.reverse && !animationComponent.reversing) {
+                            animationComponent.elapsed = 0.0f;
+                            animationComponent.reversing = true;
+                        } else {
+                            registry.remove<InterfaceAnimationComponent>(e);
+                        }
+                    }
+                }
+            }
+        }
+
         auto uiComponents = world.Query<InterfaceComponent>();
         WindowExtent extent = renderManager.getWindowExtent();
 
@@ -53,6 +171,11 @@ namespace Kiki {
                     glm::mat4 model = glm::mat4(1.0f);
 
                     model = glm::translate(model, glm::vec3(interfaceComponent.position.absoluteX, interfaceComponent.position.absoluteY, 0.0f));
+
+                    model = glm::translate(model, glm::vec3(0.5f * interfaceComponent.size.absoluteX, 0.5f * interfaceComponent.size.absoluteY, 0.0f));
+                    model = glm::rotate(model, glm::radians(interfaceComponent.rotation), glm::vec3(0.0f, 0.0f, 1.0f));
+                    model = glm::translate(model, glm::vec3(-0.5f * interfaceComponent.size.absoluteX, -0.5f * interfaceComponent.size.absoluteY, 0.0f));
+
                     model = glm::scale(model, glm::vec3(interfaceComponent.size.absoluteX, interfaceComponent.size.absoluteY, 1.0f));
 
                     interfaceComponent.model = model;

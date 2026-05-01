@@ -1,6 +1,14 @@
 #ifndef KIKI_INTERFACE_INTERFACESYSTEM
 #define KIKI_INTERFACE_INTERFACESYSTEM
 
+#include "Components/InterfaceComponent.hpp"
+#include "Components/BackgroundComponent.hpp"
+#include "Components/TextComponent.hpp"
+#include "Components/ButtonComponent.hpp"
+#include "events/ButtonClickEvent.hpp"
+#include "events/ButtonHoverEvent.hpp"
+#include "Components/InterfaceAnimationComponent.hpp"
+
 #include "ECS/World.h"
 #include "ECS/System.h"
 #include "FontManager.hpp"
@@ -8,12 +16,6 @@
 #include "RenderManager.hpp"
 #include "MessageCenter.h"
 #include "InputManager.hpp"
-#include "Components/InterfaceComponent.hpp"
-#include "Components/BackgroundComponent.hpp"
-#include "Components/TextComponent.hpp"
-#include "Components/ButtonComponent.hpp"
-#include "events/ButtonClickEvent.hpp"
-#include "events/ButtonHoverEvent.hpp"
 
 namespace Kiki {
     class InterfaceSystem : public System {

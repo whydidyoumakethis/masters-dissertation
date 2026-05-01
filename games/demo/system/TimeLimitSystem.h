@@ -43,6 +43,21 @@ public:
         registry.emplace<BackgroundComponent>(timerUIEntity, glm::vec3(0.1f, 0.1f, 0.1f), 0.3f);
         registry.emplace<TextComponent>(timerUIEntity, "font", U"00:00.00", 24, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f);
 
+        InterfaceAnimationComponent animComp;
+        animComp.targetPosition = ScaleVec2D(0, 10, 0, 10);
+        animComp.targetSize = ScaleVec2D(0, 150, 0, 50);
+        animComp.targetBackgroundColour = glm::vec3(0.1f, 0.1f, 0.1f);
+        animComp.targetBackgroundTransparency = 0.3f;
+        animComp.targetTextColour = glm::vec3(1.0f, 1.0f, 1.0f);
+        animComp.targetTextTransparency = 0.0f;
+        animComp.targetTextSize = 32;
+        animComp.time = 0.5;
+        animComp.loop = true;
+        animComp.reverse = true;
+        animComp.interpolation = InterfaceInterpolationType::EASE_IN_OUT;
+
+        registry.emplace<InterfaceAnimationComponent>(timerUIEntity, animComp);
+
     }
     void createTimeLimitPanel() {
         auto& registry = World::Get().Registry();
