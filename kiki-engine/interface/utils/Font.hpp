@@ -2,6 +2,7 @@
 #define KIKI_INTERFACE_FONT
 
 #include "renderer/utils/Image.hpp"
+#include "renderer/utils/Buffer.hpp"
 
 #include <msdfgen.h>
 #include <msdfgen-ext.h>
@@ -18,6 +19,7 @@ namespace iutils {
         float uMin, uMax, vMin, vMax;
         float width, height;
         float l, r, t, b;
+        rutils::Buffer vertices;
     };
 
     class Font {

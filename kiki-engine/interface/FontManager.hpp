@@ -52,7 +52,6 @@ namespace Kiki {
 
         iutils::Font& getFont(std::string name);
         std::string loadFont(std::filesystem::path path, std::string name = "", std::u32string characters = LATIN_ALPHABET, int baseSize = 48);
-        void addCharacters(iutils::Font* font, std::u32string characters);
         void deleteFont(std::string name);
         void deleteAllFonts();
     };

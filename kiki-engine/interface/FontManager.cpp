@@ -120,7 +120,16 @@ namespace Kiki {
                     info.t = tempGlyphs[i].t;
                     info.b = tempGlyphs[i].b;
 
-                    font.glyphs[tempGlyphs[i].glyphId] = info;
+                    std::vector<float> positions = {
+                        0.0f, 0.0f, info.uMin, info.vMin,
+                        info.width, 0.0f, info.uMax, info.vMin,
+                        info.width, -info.height, info.uMax, info.vMax,
+                        0.0f, -info.height, info.uMin, info.vMax
+                    };
+
+                    info.vertices = renderManager.updateInterfaceVertices(positions);
+
+                    font.glyphs[tempGlyphs[i].glyphId] = std::move(info);
                 }
 
                 renderManager.loadFontAtlas(&font, atlas);
@@ -131,10 +140,6 @@ namespace Kiki {
         }
       
         return key;
-    }
-
-    void FontManager::addCharacters(iutils::Font* font, std::u32string characters) {
-
     }
 
     iutils::Font& FontManager::getFont(std::string name) {

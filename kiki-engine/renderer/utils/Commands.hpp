@@ -55,7 +55,9 @@ namespace rutils {
         std::array<Image, 6> const& bloomImages,
         std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
         std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
-        Kiki::RenderSettings& renderSettings
+        Kiki::RenderSettings& renderSettings,
+        VkBuffer debugLineVertexBuffer,
+        std::uint32_t debugLineVertexCount
     );
 
 	void submitCommands(

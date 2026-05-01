@@ -7,6 +7,11 @@
 #include <vector>
 #include <string>
 
+struct CharacterTransform {
+    rutils::Buffer& buffer;
+    glm::mat4 transform;
+};
+
 struct TextComponent {
     std::string font;
     std::u32string text;
@@ -17,7 +22,7 @@ struct TextComponent {
     Kiki::VerticalAlignment verticalAlignment = Kiki::VerticalAlignment::CENTRE;
 
     bool dirty = true;
-    std::vector<rutils::Buffer> vertices;
+    std::vector<CharacterTransform> characters;
     TextComponent() = default;
     TextComponent(TextComponent const&) = delete;
     TextComponent& operator= (TextComponent const&) = delete;

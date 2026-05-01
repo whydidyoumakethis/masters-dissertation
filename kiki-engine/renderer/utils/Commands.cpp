@@ -97,7 +97,9 @@ namespace rutils {
         std::array<Image, 6> const& bloomImages,
         std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
         std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
-        Kiki::RenderSettings& renderSettings
+        Kiki::RenderSettings& renderSettings,
+		VkBuffer debugLineVertexBuffer,
+		std::uint32_t debugLineVertexCount
     ) {
         // Begin recording commands
         VkCommandBufferBeginInfo begInfo{};
@@ -1596,6 +1598,16 @@ namespace rutils {
 
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
+            if (debugLineVertexBuffer != VK_NULL_HANDLE && debugLineVertexCount > 1) {
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.debug_line.handle);
+                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.pbrPipelineLayout.handle, 0, 1, &aSceneDescriptors, 0, nullptr);
+
+                VkBuffer buffers[1] = { debugLineVertexBuffer };
+                VkDeviceSize offsets[1] = { 0 };
+                vkCmdBindVertexBuffers(aCmdBuff, 0, 1, buffers, offsets);
+                vkCmdDraw(aCmdBuff, debugLineVertexCount, 1, 0, 0);
+            }
+
             // begin imgui pass
     #       ifndef NDEBUG
             {
@@ -1653,12 +1665,12 @@ namespace rutils {
 
                     vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
 
-                    ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)));
-                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+                    for (auto characterTransform : textComponent.characters) {
+                        ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)), characterTransform.transform);
+                        vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
 
-                    for (auto& buffer : textComponent.vertices) {
                         VkDeviceSize offsets[1]{};
-                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &buffer.buffer, offsets);
+                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &characterTransform.buffer.buffer, offsets);
                         vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
                         vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
                     }

@@ -3,6 +3,7 @@ target_sources(kiki
 	PhysicsManager.cpp
 	PhysicsSystem.cpp
 	PhysicsContactListener.cpp
+	PhysicsDebugRenderer.cpp
 
   PUBLIC
 	FILE_SET physicsPublicHeaders
@@ -13,4 +14,5 @@ target_sources(kiki
 	  PhysicsComponents.hpp
 	  PhysicsSystem.hpp
 	  PhysicsContactListener.hpp
+	  PhysicsDebugRenderer.hpp
 )
