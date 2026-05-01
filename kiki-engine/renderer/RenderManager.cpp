@@ -15,6 +15,7 @@
 #include "Components/BackgroundComponent.hpp"
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
+#include "interface/TextureManager.hpp"
 
 #include <algorithm>
 #include <iostream>
@@ -50,6 +51,7 @@ namespace Kiki {
 
             interfaceLayout = rutils::createInterfaceDescriptorLayout(window);
             textLayout = rutils::createInterfaceTextDescriptorLayout(window);
+            textureLayout = rutils::createInterfaceTextureDescriptorLayout(window);
             
             allocator = rutils::createAllocator(window);
 
@@ -115,7 +117,7 @@ namespace Kiki {
             pipelineLayouts.bloomPipelineLayout = rutils::createBloomPipelineLayout(window, bloomLayout.handle);
             pipelineLayouts.compositePipelineLayout = rutils::createCompositePipelineLayout(window, compositeLayout.handle);
             pipelineLayouts.debugPipelineLayout = rutils::createDebugPipelineLayout(window, debugLayout.handle);
-            rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, &pipelineLayouts);
+            rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, textureLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
             commandPool = rutils::createCommandPool(window, VK_COMMAND_POOL_CREATE_TRANSIENT_BIT | VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT);
@@ -1337,6 +1339,33 @@ namespace Kiki {
         return Material(std::move(texture), std::move(roughnessMetalness), std::move(normalMap), std::move(descriptorSet), textureData.hastexture, textureData.hasNormalMap);
     }
 
+    iutils::InterfaceTexture RenderManager::loadInterfaceTexture(stbi_uc* imageData, int width, int height) {
+        //  width / height
+        rutils::Image texture = rutils::loadImageTexture(imageData, width, height, window, tempTextureCmdPool.handle, allocator);
+
+        VkDescriptorImageInfo textureInfo[1]{};
+
+        // base
+        textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        textureInfo[0].imageView = texture.view;
+        textureInfo[0].sampler = sampler.handle;
+
+        VkDescriptorSet descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, textureLayout.handle);
+
+        VkWriteDescriptorSet desc[1]{};
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = descriptorSet;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &textureInfo[0];
+
+        constexpr auto numSets = sizeof(desc) / sizeof(desc[0]);
+        vkUpdateDescriptorSets( window.device, numSets, desc, 0, nullptr );
+
+        return iutils::InterfaceTexture(std::move(texture), std::move(descriptorSet));
+    }
+
     void RenderManager::loadFontAtlas(iutils::Font* font, std::vector<uint8_t> atlas) {
         {
             ZoneScopedN("Upload font atlas");
@@ -1720,6 +1749,7 @@ namespace Kiki {
             }
         }
 
+        TextureManager::get().shutdown();
         FontManager::get().shutdown();
         SceneManager::get().shutdown();
         dummyAnimationBuffer = {};
@@ -1775,6 +1805,7 @@ namespace Kiki {
         pipelines.tonemap = {};
         pipelines.interfaceShape = {};
         pipelines.interfaceText = {};
+        pipelines.interfaceTexture = {};
         pipelines.shadowMap = {};
         pipelines.bloomDownsample = {};
         pipelines.bloomUpsample = {};
@@ -1791,6 +1822,7 @@ namespace Kiki {
         pipelineLayouts.tonemapPipelineLayout = {};
         pipelineLayouts.interfaceShapeLayout = {};
         pipelineLayouts.interfaceTextLayout = {};
+        pipelineLayouts.interfaceTextureLayout = {};
         pipelineLayouts.shadowMapPipelineLayout = {};
         pipelineLayouts.bloomPipelineLayout = {};
         pipelineLayouts.compositePipelineLayout = {};
@@ -1834,6 +1866,7 @@ namespace Kiki {
         tonemapLayout = {};
         interfaceLayout = {};
         textLayout = {};
+        textureLayout = {};
         shadowMatrixLayout = {};
         bloomLayout = {};
         compositeLayout = {};

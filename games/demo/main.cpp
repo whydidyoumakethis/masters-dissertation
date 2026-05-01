@@ -10,7 +10,9 @@
 #include "Components/TextComponent.hpp"
 #include "Components/ButtonComponent.hpp"
 #include "Components/InterfaceAnimationComponent.hpp"
+#include "Components/InterfaceTextureComponent.hpp"
 #include "interface/FontManager.hpp"
+#include "interface/TextureManager.hpp"
 
 #include "GltfLoader/GltfLoaderAssimp.h"
 

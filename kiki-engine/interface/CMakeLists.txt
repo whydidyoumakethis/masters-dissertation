@@ -20,4 +20,5 @@ target_sources(kiki
     TYPE HEADERS
     FILES 
       utils/Font.hpp     
+      utils/InterfaceTexture.hpp
 )

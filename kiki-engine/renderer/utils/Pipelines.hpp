@@ -81,6 +81,7 @@ namespace rutils {
         rutils::Pipeline tonemap;
         rutils::Pipeline interfaceShape;
         rutils::Pipeline interfaceText;
+        rutils::Pipeline interfaceTexture;
         rutils::Pipeline shadowMap;
         rutils::Pipeline bloomDownsample;
         rutils::Pipeline bloomUpsample;
@@ -99,6 +100,7 @@ namespace rutils {
         PipelineLayout tonemapPipelineLayout;
         PipelineLayout interfaceShapeLayout;
         PipelineLayout interfaceTextLayout;
+        PipelineLayout interfaceTextureLayout;
         PipelineLayout shadowMapPipelineLayout;
         PipelineLayout bloomPipelineLayout;
         PipelineLayout compositePipelineLayout;
@@ -119,7 +121,7 @@ namespace rutils {
     PipelineLayout createBloomPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout bloomLayout);
     PipelineLayout createCompositePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout compositeLayout);
     PipelineLayout createDebugPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout debugLayout);
-    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, PipelineLayouts* layouts);
+    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, VkDescriptorSetLayout textureLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     

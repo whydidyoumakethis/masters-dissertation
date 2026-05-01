@@ -168,6 +168,18 @@ namespace Kiki {
                     interfaceComponent.size.absoluteX = (width * interfaceComponent.size.scaleX) + interfaceComponent.size.x;
                     interfaceComponent.size.absoluteY = (height * interfaceComponent.size.scaleY) + interfaceComponent.size.y;
 
+                    if (registry.all_of<AspectRatioComponent>(e)) {
+                        auto& aspectRatioComp = registry.get<AspectRatioComponent>(e);
+
+                        float aspectRatio = interfaceComponent.size.absoluteX / interfaceComponent.size.absoluteY;
+
+                        if (aspectRatio > aspectRatioComp.aspectRatio) {
+                            interfaceComponent.size.absoluteX = aspectRatioComp.aspectRatio * interfaceComponent.size.absoluteY;
+                        } else if (aspectRatio < aspectRatioComp.aspectRatio) {
+                            interfaceComponent.size.absoluteY = interfaceComponent.size.absoluteX / aspectRatioComp.aspectRatio;
+                        }
+                    }
+
                     glm::mat4 model = glm::mat4(1.0f);
 
                     model = glm::translate(model, glm::vec3(interfaceComponent.position.absoluteX, interfaceComponent.position.absoluteY, 0.0f));

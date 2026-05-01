@@ -18,6 +18,7 @@
 #include "utils/Pipelines.hpp"
 #include "GltfLoader/GltfLoaderAssimp.h"
 #include "debugging/DebugCamera.hpp"
+#include "interface/utils/InterfaceTexture.hpp"
 
 
 #include <glm/glm.hpp>
@@ -141,6 +142,7 @@ namespace Kiki {
         std::filesystem::path interface_v = "interface.vert.spv";
         std::filesystem::path interface_shape_f = "interface_shape.frag.spv";
         std::filesystem::path interface_text_f = "interface_text.frag.spv";
+        std::filesystem::path interface_texture_f = "interface_texture.frag.spv";
         std::filesystem::path shadowmap_v = "shadowMap.vert.spv";
         std::filesystem::path bloom_downsample_f = "bloom_downsample.frag.spv";
         std::filesystem::path bloom_upsample_f = "bloom_upsample.frag.spv";
@@ -190,6 +192,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout sceneLayout;
         rutils::DescriptorSetLayout interfaceLayout;
         rutils::DescriptorSetLayout textLayout;
+        rutils::DescriptorSetLayout textureLayout;
         rutils::DescriptorSetLayout materialLayout;
         rutils::DescriptorSetLayout cubemapLayout;
         rutils::DescriptorSetLayout ssaoLayout;
@@ -289,6 +292,7 @@ namespace Kiki {
         void setDebugInterfaceInit(ImGui_ImplVulkan_InitInfo& info);
         void recreatePipelines();
 
+        iutils::InterfaceTexture loadInterfaceTexture(stbi_uc* imageData, int width, int height);
         void loadFontAtlas(iutils::Font* font, std::vector<uint8_t> atlas);
         rutils::Buffer updateInterfaceVertices(std::vector<float> positions);
         WindowExtent getWindowExtent();

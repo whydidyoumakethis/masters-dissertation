@@ -35,6 +35,7 @@ namespace rutils {
 
         pipelines.interfaceShape = createInterfacePipeline(window, pipelineLayouts.interfaceShapeLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_shape_f);
         pipelines.interfaceText = createInterfacePipeline(window, pipelineLayouts.interfaceTextLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_text_f);
+        pipelines.interfaceTexture = createInterfacePipeline(window, pipelineLayouts.interfaceTextureLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_texture_f);
 
         return pipelines;
     }
@@ -394,7 +395,7 @@ namespace rutils {
         return rutils::PipelineLayout(window.device, layout);
     }
 
-    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textDescriptorLayout, PipelineLayouts* layouts) {
+    void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textDescriptorLayout, VkDescriptorSetLayout textureDescriptorLayout, PipelineLayouts* layouts) {
         VkDescriptorSetLayout shapeLayout[] = {
             interfaceLayout
         };
@@ -445,6 +446,32 @@ namespace rutils {
         }
 
         layouts->interfaceTextLayout = rutils::PipelineLayout(window.device, tempTextLayout);
+
+        VkDescriptorSetLayout textureLayout[] = {
+            interfaceLayout,
+            textureDescriptorLayout
+        };
+
+        VkPushConstantRange textureConstants{};
+        textureConstants.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+        textureConstants.offset = 0;
+        textureConstants.size = sizeof(ShapeData);
+
+        VkPipelineLayoutCreateInfo textureLayoutInfo{};
+        textureLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+        textureLayoutInfo.setLayoutCount = 2;
+        textureLayoutInfo.pSetLayouts = textureLayout;
+        textureLayoutInfo.pushConstantRangeCount = 1;
+        textureLayoutInfo.pPushConstantRanges = &textureConstants;
+
+        VkPipelineLayout tempTextureLayout = VK_NULL_HANDLE;
+        if (auto const res = vkCreatePipelineLayout(window.device, &textureLayoutInfo, nullptr, &tempTextureLayout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create pipeline layout\n"
+                "vkCreatePipelineLayout() returned {}", toString(res)
+            );
+        }
+
+        layouts->interfaceTextureLayout = rutils::PipelineLayout(window.device, tempTextureLayout);
     }
 
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout) {

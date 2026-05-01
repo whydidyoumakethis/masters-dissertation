@@ -8,6 +8,7 @@
 #include "events/ButtonClickEvent.hpp"
 #include "events/ButtonHoverEvent.hpp"
 #include "Components/InterfaceAnimationComponent.hpp"
+#include "Components/AspectRatioComponent.hpp"
 
 #include "ECS/World.h"
 #include "ECS/System.h"

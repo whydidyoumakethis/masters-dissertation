@@ -10,7 +10,9 @@
 #include "Components/InterfaceComponent.hpp"
 #include "Components/TextComponent.hpp"
 #include "Components/BackgroundComponent.hpp"
+#include "Components/InterfaceTextureComponent.hpp"
 #include "interface/FontManager.hpp"
+#include "interface/TextureManager.hpp"
 #include "../../logging/FatalError.hpp"
 #include "../RenderManager.hpp"
 #include "../SceneManager.hpp"
@@ -1655,6 +1657,24 @@ namespace rutils {
 
                     vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
                     
+                }
+
+                if (registry.all_of<InterfaceTextureComponent>(e)) {
+                    auto& textureComponent = registry.get<InterfaceTextureComponent>(e);
+                    auto& texture = Kiki::TextureManager::get().getTexture(textureComponent.texture);
+
+                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceTexture.handle);
+
+                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextureLayout.handle, 1, 1, &texture.descriptorSet, 0, nullptr);
+
+                    VkDeviceSize offsets[1]{};
+                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &shapeVertexBuffer, offsets);
+                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                    ShapeData shapeData = ShapeData(textureComponent.colour, interfaceComponent.model);
+                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
                 }
 
                 if (registry.all_of<TextComponent>(e)) {

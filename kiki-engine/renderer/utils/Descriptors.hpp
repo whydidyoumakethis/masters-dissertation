@@ -39,6 +39,7 @@ namespace rutils {
 
     DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createInterfaceTextureDescriptorLayout(VulkanWindow const& window);
 }
 
 #endif
