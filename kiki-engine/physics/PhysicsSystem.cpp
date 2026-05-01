@@ -266,7 +266,7 @@ namespace Kiki {
 
         rayOrigin.y += 0.2f;
 
-        float testRayLength = 3.3f;
+        float testRayLength = 0.3f;
 
         auto result = physic.Raycast(
             rayOrigin,
