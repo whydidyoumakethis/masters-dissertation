@@ -130,7 +130,7 @@ namespace Kiki {
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
             doneDebugImage = rutils::createPostTonemapImage(window, allocator);
 
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                 bloomImages[i] = rutils::createBloomImage(
                     window,
                     allocator,
@@ -169,7 +169,7 @@ namespace Kiki {
             ssrDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
 
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                 bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
 
                 if (i == 0) {
@@ -180,10 +180,10 @@ namespace Kiki {
                 }
             }
 
-            for (int i = 0; i < 5; i++) {
+            for (int i = 0; i < N_BLOOM_IMAGES - 1; i++) {
                 bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
                 // use skybox sampler as this has clamp to edge
-                initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
+                initialiseBloomImageDescriptorSet(window, bloomImages[(N_BLOOM_IMAGES - 1) - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
             }
 
             compositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
@@ -479,7 +479,7 @@ namespace Kiki {
                 depthBuffer = rutils::createDepthBuffer(window, allocator);
                 gbuffers = rutils::createAllGBufferImages(window, allocator);
 
-                for (int i = 0; i < 6; i++) {
+                for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                     bloomImages[i] = rutils::createBloomImage(
                         window,
                         allocator,
@@ -508,11 +508,8 @@ namespace Kiki {
                 initialiseSSAOBlurredDescriptorSet(window, gbuffers, depthBuffer, sampler, ssaoBlurredDescriptors);
                 initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneLightingImage, sampler, ssrDescriptors);
-                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneSSRImage, sampler, fxaaDescriptors);
 
-                for (int i = 0; i < 6; i++) {
-                    bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
-
+                for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                     if (i == 0) {
                         initialiseBloomImageDescriptorSet(window, doneSSRImage, skybox.sampler, bloomImageDownsampleDescriptorSets[i]);
                     }
@@ -521,14 +518,14 @@ namespace Kiki {
                     }
                 }
 
-                for (int i = 0; i < 5; i++) {
-                    bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
-
-                    initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
+                for (int i = 0; i < N_BLOOM_IMAGES - 1; i++) {
+                    initialiseBloomImageDescriptorSet(window, bloomImages[(N_BLOOM_IMAGES - 1) - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
                 }
 
                 initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
                 initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
+                initialiseDebugDescriptorSet(window, doneTonemapImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
+                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
             }
 
             auto& registry = World::Get().Registry();
@@ -1633,7 +1630,7 @@ namespace Kiki {
         createSkybox(skybox.paths);
         initialiseDeferredLightingDescriptorSet(window, gbuffers, depthBuffer, sampler, deferredLightingDescriptors, skybox.cubemap, skybox.sampler, shadowCubemaps);
 
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < N_BLOOM_IMAGES; i++) {
             bloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
 
             if (i == 0) {
@@ -1644,10 +1641,10 @@ namespace Kiki {
             }
         }
 
-        for (int i = 0; i < 5; i++) {
+        for (int i = 0; i < N_BLOOM_IMAGES - 1; i++) {
             bloomImageUpsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
 
-            initialiseBloomImageDescriptorSet(window, bloomImages[5 - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
+            initialiseBloomImageDescriptorSet(window, bloomImages[(N_BLOOM_IMAGES - 1) - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
         }
     }
 
@@ -1814,7 +1811,7 @@ namespace Kiki {
         doneSSRImage = {};
         doneDebugImage = {};
         
-        for (int i = 0; i < 6; i++) bloomImages[i] = {};
+        for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImages[i] = {};
 
         sceneUBO = {};
         interfaceUBO = {};
@@ -1848,8 +1845,8 @@ namespace Kiki {
         shadowMatrixDescriptors = {};
         compositeDescriptors = {};
         debugDescriptors = {};
-        for (int i = 0; i < 6; i++) bloomImageDownsampleDescriptorSets[i] = {};
-        for (int i = 0; i < 6; i++) bloomImageUpsampleDescriptorSets[i] = {};
+        for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImageDownsampleDescriptorSets[i] = {};
+        for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImageUpsampleDescriptorSets[i] = {};
 
         sampler = {};
         fontSampler = {};

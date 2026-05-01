@@ -51,6 +51,8 @@ struct CharacterComponent {
             U"dash",
             U"completed"
     };
+    std::vector<bool> isDone = {false,false,false,false};
+
     bool hasAbility(Ability ability) const {
         return (abilities & ability) == ability;
     }

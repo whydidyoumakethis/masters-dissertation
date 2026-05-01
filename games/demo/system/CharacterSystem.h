@@ -14,7 +14,9 @@ public:
             if (character.jumpTimer > 0.0f) {
                 character.jumpTimer -= dt;
             }
-
+			if (dashTimer > 0.0f) {
+				dashTimer -= dt;
+            }
             float cameraYaw = GetCameraYaw(entity);
 			HandleMovement(transform, character, ip, cameraYaw, dt);
 			HandleJump(entity, transform, character, ip, dt);
@@ -99,6 +101,9 @@ private:
         }
         //bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) && ip.isGrounded;
         float speed = character.currentMaxSpeed;
+        if (character.hasAbility(Ability::SpeedBoost)) {
+            speed *= 2;
+        }
 
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
@@ -125,6 +130,10 @@ private:
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
             glm::vec3 newVel = glm::vec3(character.velocity.x, currentJoltVel.GetY(), character.velocity.z);
+			if (character.hasAbility(Ability::Dash) && inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) && dashTimer <= 0.0f) {
+                newVel += moveDir * speed * 100.0f; // Dash adds a burst of speed in the movement direction
+                dashTimer = 1.0f; // Dash cooldown
+            }
             physics.setEntityVelocity(playerEntity, newVel);
         }
         else {
@@ -141,9 +150,14 @@ private:
                 character.velocity.z = currentJoltVel.GetZ();
             }
         }
-        transform.position += character.velocity * dt;
+        //if (character.hasAbility(Ability::SpeedBoost)) {
+        //    transform.position += character.velocity * dt * 1.5f; // Apply speed boost multiplier
+        //}
+        //else transform.position += character.velocity * dt;
 		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
   //              physics.setEntityVelocity(playerEntity, character.velocity);
+
+        //transform.position += character.velocity * dt;
         transform.dirty = true;
     }
     void HandleJump(
@@ -196,7 +210,6 @@ private:
         if (diff < -180.0f) diff += 360.0f;
 
         character.facingYaw += diff * character.rotateSpeed * dt;
-
         float modelRotationOffset = 180.0f;
 
 		// update transform rotation to match facing direction
@@ -248,22 +261,26 @@ private:
         std::vector<float>& timelimits = cc->timeLimits;
         float elapsed = e.elapsedTime;
         for (size_t i = 0; i < timelimits.size(); ++i) {
+			if (cc->isDone[i]) continue; // skip already completed tiers
             if (timelimits[i] > elapsed) {
-
+                cc->isDone[i] = true;
                 spdlog::info("You completed the level in {:.2f} seconds! You earned a new ability!", elapsed);
-				// todo: move isDone from TimeLimitSystem to CharacterComponent to track which abilities have been earned, and only grant the next unearned ability here
                 if (i == 0) {
                     cc->grantAbility(Ability::DoubleJump);
+					spdlog::info("You earned the double jump ability!");
                 }
                 else if (i == 1) {
                     cc->grantAbility(Ability::SpeedBoost);
+					spdlog::info("You earned the speed boost ability!");
                 }
                 else if (i == 2) {
                     cc->grantAbility(Ability::Dash);
+					spdlog::info("You earned the dash ability!");
                 }
-     //           else if (i == 3) {
-					//spdlog::info("Congratulations! You completed the level with the best time! You earned all abilities!");
-     //           }
+                else if (i == 3) {
+					// completed level logic here
+					spdlog::info("Congratulations! You completed the level! ");
+                }
                 break;
             }
         }

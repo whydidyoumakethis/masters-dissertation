@@ -36,10 +36,13 @@ namespace Kiki {
             if (transform.dirty) {
                 JPH::RVec3 jPos = bodyInterface.GetPosition(rb.bodyID);
                 if (glm::distance(transform.position, ToGLM(jPos)) > 0.01f) {
-                    bodyInterface.SetPositionAndRotation(
-                        rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
+                    bodyInterface.SetPosition(
+                        rb.bodyID, ToJPHR(transform.position), JPH::EActivation::Activate
                     );
                 }
+                bodyInterface.SetRotation(
+                    rb.bodyID, ToJPH(transform.rotation), JPH::EActivation::Activate
+				);
             }
             if (ip.impulse != glm::vec3(0) ) {
                 bodyInterface.AddImpulse(rb.bodyID, ToJPH(ip.impulse));
