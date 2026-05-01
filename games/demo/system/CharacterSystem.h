@@ -99,6 +99,9 @@ private:
         }
         //bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) && ip.isGrounded;
         float speed = character.currentMaxSpeed;
+        if (character.hasAbility(Ability::SpeedBoost)) {
+            speed *= 2;
+        }
 
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
@@ -141,12 +144,14 @@ private:
                 character.velocity.z = currentJoltVel.GetZ();
             }
         }
-        if (character.hasAbility(Ability::SpeedBoost)) {
-            transform.position += character.velocity * dt * 1.5f; // Apply speed boost multiplier
-        }
-        else transform.position += character.velocity * dt;
+        //if (character.hasAbility(Ability::SpeedBoost)) {
+        //    transform.position += character.velocity * dt * 1.5f; // Apply speed boost multiplier
+        //}
+        //else transform.position += character.velocity * dt;
 		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
   //              physics.setEntityVelocity(playerEntity, character.velocity);
+
+        //transform.position += character.velocity * dt;
         transform.dirty = true;
     }
     void HandleJump(
@@ -199,7 +204,6 @@ private:
         if (diff < -180.0f) diff += 360.0f;
 
         character.facingYaw += diff * character.rotateSpeed * dt;
-
         float modelRotationOffset = 180.0f;
 
 		// update transform rotation to match facing direction
