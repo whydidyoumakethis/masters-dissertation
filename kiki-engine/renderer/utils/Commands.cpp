@@ -95,9 +95,9 @@ namespace rutils {
         VkDescriptorSet dummyAnimationDesc,
         std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
         std::vector<Kiki::Light> const& lights,
-        std::array<Image, 6> const& bloomImages,
-        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
-        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
+        std::array<Image, N_BLOOM_IMAGES> const& bloomImages,
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets,
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageUpsampleDescriptorSets,
         Kiki::RenderSettings& renderSettings,
 		VkBuffer debugLineVertexBuffer,
 		std::uint32_t debugLineVertexCount
@@ -1121,7 +1121,7 @@ namespace rutils {
             #endif
 
             // downsample passes
-            for (int i = 0; i < 6; i++) {
+            for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                 // transition the current bloom image to be written to
                 imageBarrier(aCmdBuff, bloomImages[i].image,
                     // before
@@ -1213,7 +1213,7 @@ namespace rutils {
             #endif
 
             // upsample passes
-            for (int source = 5; source > 0; source--) {
+            for (int source = N_BLOOM_IMAGES - 1; source > 0; source--) {
                 int target = source - 1;
 
                 // transition the current bloom image to be written to
@@ -1252,7 +1252,7 @@ namespace rutils {
                 vkCmdBeginRendering(aCmdBuff, &bloomRenderInfo);
 
                 VkDescriptorSet bloomSets[] = {
-                    bloomImageUpsampleDescriptorSets[5 - source] // render from
+                    bloomImageUpsampleDescriptorSets[(N_BLOOM_IMAGES - 1) - source] // render from
                 };
 
                 // we're using dynamic viewports and scissor

@@ -53,9 +53,9 @@ namespace rutils {
         VkDescriptorSet dummyAnimationDesc,
         std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
         std::vector<Kiki::Light> const& lights,
-        std::array<Image, 6> const& bloomImages,
-        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets,
-        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets,
+        std::array<Image, N_BLOOM_IMAGES> const& bloomImages,
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets,
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageUpsampleDescriptorSets,
         Kiki::RenderSettings& renderSettings,
         VkBuffer debugLineVertexBuffer,
         std::uint32_t debugLineVertexCount
