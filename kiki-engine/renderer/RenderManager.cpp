@@ -628,7 +628,11 @@ namespace Kiki {
         }
 
         InterfaceUniform interfaceUniform{};
-        interfaceUniform.projection = glm::ortho(0.0f, (float) window.swapchainExtent.width, 0.0f, (float) window.swapchainExtent.height);
+
+        {
+            ZoneScopedN("Updating interface uniform")
+            interfaceUniform.projection = glm::ortho(0.0f, (float)window.swapchainExtent.width, 0.0f, (float)window.swapchainExtent.height);
+        }
 
         // std::cout << sceneUniforms.lightColour.r << std::endl;
     
@@ -1293,123 +1297,129 @@ namespace Kiki {
     }
 
     void RenderManager::loadFontAtlas(iutils::Font* font, std::vector<uint8_t> atlas) {
-        font->atlas = rutils::loadFontAtlas(atlas, font->atlasSize, window, tempTextureCmdPool.handle, allocator);
-        font->descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, textLayout.handle);
+        {
+            ZoneScopedN("Upload font atlas");
+            font->atlas = rutils::loadFontAtlas(atlas, font->atlasSize, window, tempTextureCmdPool.handle, allocator);
+            font->descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, textLayout.handle);
 
-        VkDescriptorImageInfo textureInfo[1]{};
-        textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        textureInfo[0].imageView = font->atlas.view;
-        textureInfo[0].sampler = fontSampler.handle;
+            VkDescriptorImageInfo textureInfo[1]{};
+            textureInfo[0].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            textureInfo[0].imageView = font->atlas.view;
+            textureInfo[0].sampler = fontSampler.handle;
 
-        VkWriteDescriptorSet desc[1]{};
-        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        desc[0].dstSet = font->descriptorSet;
-        desc[0].dstBinding = 0;
-        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-        desc[0].descriptorCount = 1;
-        desc[0].pImageInfo = &textureInfo[0];
+            VkWriteDescriptorSet desc[1]{};
+            desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+            desc[0].dstSet = font->descriptorSet;
+            desc[0].dstBinding = 0;
+            desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+            desc[0].descriptorCount = 1;
+            desc[0].pImageInfo = &textureInfo[0];
 
-        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+            vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+        }
     }
 
     rutils::Buffer RenderManager::updateInterfaceVertices(std::vector<float> positions) {
-        int posSize = positions.size() * sizeof(float);
+        {
+            ZoneScopedN("Updating interface vertex buffer");
+            int posSize = positions.size() * sizeof(float);
 
-        // Create on GPU vertex buffer
-        rutils::Buffer vertexPosGPU = rutils::createBuffer(
-            allocator,
-            posSize,
-            VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-            0, // no additional VmaAllocationCreateFlags
-            VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
-        );
-
-        // Create staging buffers
-        rutils::Buffer posStaging = rutils::createBuffer(
-            allocator,
-            posSize,
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-            VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
-        );
-
-        void* posPtr = nullptr;
-        if (auto const res = vmaMapMemory(allocator.allocator, posStaging.allocation, &posPtr); VK_SUCCESS != res) {
-            throw FatalError("Mapping memory for writing\n"
-                "vmaMapMemory() returned {}", rutils::toString(res)
+            // Create on GPU vertex buffer
+            rutils::Buffer vertexPosGPU = rutils::createBuffer(
+                allocator,
+                posSize,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+                0, // no additional VmaAllocationCreateFlags
+                VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE // or just VMA MEMORY USAGE AUTO
             );
-        }
-        std::memcpy(posPtr, positions.data(), posSize);
-        vmaUnmapMemory(allocator.allocator, posStaging.allocation);
 
-        // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
-        // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
-        // transfers, let these take place in the background while performing other tasks.
-        rutils::Fence uploadComplete = rutils::createFence(window.device);
-
-        // Queue data uploads from staging buffers to the final buffers.
-        // This uses a separate command pool for simplicity.
-        rutils::CommandPool uploadPool = rutils::createCommandPool(window);
-        VkCommandBuffer uploadCmd = rutils::allocCommandBuffer(window, uploadPool.handle);
-
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = 0;
-        beginInfo.pInheritanceInfo = nullptr;
-
-        if (auto const res = vkBeginCommandBuffer(uploadCmd, &beginInfo); VK_SUCCESS != res) {
-            throw FatalError("Beginning command buffer recording\n"
-                "vkBeginCommandBuffer() returned {}", rutils::toString(res)
+            // Create staging buffers
+            rutils::Buffer posStaging = rutils::createBuffer(
+                allocator,
+                posSize,
+                VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT
             );
-        }
 
-        VkBufferCopy pcopy{};
-        pcopy.size = posSize;
+            void* posPtr = nullptr;
+            if (auto const res = vmaMapMemory(allocator.allocator, posStaging.allocation, &posPtr); VK_SUCCESS != res) {
+                throw FatalError("Mapping memory for writing\n"
+                    "vmaMapMemory() returned {}", rutils::toString(res)
+                );
+            }
+            std::memcpy(posPtr, positions.data(), posSize);
+            vmaUnmapMemory(allocator.allocator, posStaging.allocation);
 
-        vkCmdCopyBuffer(uploadCmd, posStaging.buffer, vertexPosGPU.buffer, 1, &pcopy);
+            // We need to ensure that the Vulkan resources are alive until all the transfers have completed. For simplicity,
+            // we will just wait for the operations to complete with a fence. A more complex solution might want to queue
+            // transfers, let these take place in the background while performing other tasks.
+            rutils::Fence uploadComplete = rutils::createFence(window.device);
 
-        rutils::bufferBarrier(uploadCmd, vertexPosGPU.buffer,
-            /* Before */
-            VK_PIPELINE_STAGE_2_COPY_BIT,
-            VK_ACCESS_2_TRANSFER_WRITE_BIT,
-            /* A f t e r */
-            VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
-            VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
-        );
+            // Queue data uploads from staging buffers to the final buffers.
+            // This uses a separate command pool for simplicity.
+            rutils::CommandPool uploadPool = rutils::createCommandPool(window);
+            VkCommandBuffer uploadCmd = rutils::allocCommandBuffer(window, uploadPool.handle);
 
-        if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
-            throw FatalError("Ending command buffer recording\n"
-                "vkEndCommandBuffer() returned {}", rutils::toString(res)
+            VkCommandBufferBeginInfo beginInfo{};
+            beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+            beginInfo.flags = 0;
+            beginInfo.pInheritanceInfo = nullptr;
+
+            if (auto const res = vkBeginCommandBuffer(uploadCmd, &beginInfo); VK_SUCCESS != res) {
+                throw FatalError("Beginning command buffer recording\n"
+                    "vkBeginCommandBuffer() returned {}", rutils::toString(res)
+                );
+            }
+
+            VkBufferCopy pcopy{};
+            pcopy.size = posSize;
+
+            vkCmdCopyBuffer(uploadCmd, posStaging.buffer, vertexPosGPU.buffer, 1, &pcopy);
+
+            rutils::bufferBarrier(uploadCmd, vertexPosGPU.buffer,
+                /* Before */
+                VK_PIPELINE_STAGE_2_COPY_BIT,
+                VK_ACCESS_2_TRANSFER_WRITE_BIT,
+                /* A f t e r */
+                VK_PIPELINE_STAGE_2_VERTEX_INPUT_BIT,
+                VK_ACCESS_2_VERTEX_ATTRIBUTE_READ_BIT
             );
+
+            if (auto const res = vkEndCommandBuffer(uploadCmd); VK_SUCCESS != res) {
+                throw FatalError("Ending command buffer recording\n"
+                    "vkEndCommandBuffer() returned {}", rutils::toString(res)
+                );
+            }
+
+            // Submit transfer commands
+            VkCommandBufferSubmitInfo submit[1]{};
+            submit[0].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+            submit[0].commandBuffer = uploadCmd;
+
+            VkSubmitInfo2 submitInfo{};
+            submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+            submitInfo.commandBufferInfoCount = 1;
+            submitInfo.pCommandBufferInfos = submit;
+
+            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", rutils::toString(res)
+                );
+            }
+
+            // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
+            // buffers, command pool, ...)
+            //
+            // The code doesn’t destory the resources implicitly – the resources are destroyed by the destructors of the
+            // labutils wrappers for the various objects once we leave the function’s scope.
+            if (auto const res = vkWaitForFences(window.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
+                throw FatalError("Waiting for upload to complete\n"
+                    "vkWaitForFences() returned {}", rutils::toString(res)
+                );
+            }
+
+            return vertexPosGPU;
         }
-
-        // Submit transfer commands
-        VkCommandBufferSubmitInfo submit[1]{};
-        submit[0].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        submit[0].commandBuffer = uploadCmd;
-
-        VkSubmitInfo2 submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submitInfo.commandBufferInfoCount = 1;
-        submitInfo.pCommandBufferInfos = submit;
-
-        if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw FatalError("Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", rutils::toString(res)
-            );
-        }
-
-        // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
-        // buffers, command pool, ...)
-        //
-        // The code doesn’t destory the resources implicitly – the resources are destroyed by the destructors of the
-        // labutils wrappers for the various objects once we leave the function’s scope.
-        if (auto const res = vkWaitForFences(window.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
-            throw FatalError("Waiting for upload to complete\n"
-                "vkWaitForFences() returned {}", rutils::toString(res)
-            );
-        }
-
-        return vertexPosGPU;
     }
 
     WindowExtent RenderManager::getWindowExtent() {
