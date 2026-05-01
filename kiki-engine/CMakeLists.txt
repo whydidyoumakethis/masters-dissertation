@@ -33,6 +33,8 @@ add_subdirectory(interface)
 
 add_subdirectory(Animation)
 
+add_subdirectory(Audio)
+
 target_link_libraries(kiki
   PUBLIC
     KikiDeps

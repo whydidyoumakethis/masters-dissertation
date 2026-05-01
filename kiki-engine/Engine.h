@@ -15,6 +15,7 @@
 #include <spdlog/spdlog.h>
 #include "debugging/DebugSystem.hpp"
 #include "interface/InterfaceSystem.hpp"
+#include "Audio/AudioSystem.h"
 
 #include "Timer/Timer.h"
 
@@ -29,6 +30,8 @@ namespace Kiki {
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
 			_scheduler.RegisterSystem<Kiki::DebugSystem>();
 			_scheduler.RegisterSystem<Kiki::InterfaceSystem>();
+
+			_scheduler.RegisterSystem<Kiki::AudioSystem>();
 		}
 
 		// for game layer to register systems
@@ -54,7 +57,9 @@ namespace Kiki {
 				World::Get().FlushDestroy();
 			}
 
+			Kiki::AudioManager::get().shutdown();
 			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
+
 		}
 	void Quit() {
 		_running = false;

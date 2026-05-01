@@ -153,6 +153,9 @@ private:
             auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
             JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 
+            //AUDIO TEST!!!
+            Kiki::AudioSystem::PlayOneShot("sounds/cao.mp3");
+
             physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
 
             character.state = Kiki::CharacterState::Jumping;

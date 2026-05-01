@@ -47,6 +47,13 @@ set(TARGET_HELLO_WORLD OFF CACHE INTERNAL "")
 
 include(FetchContent)
 
+# miniaudio
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY "https://github.com/mackron/miniaudio.git"
+    GIT_TAG        "0.11.25"
+)
+
 # Jolt Physics
 FetchContent_Declare(
     JoltPhysics
@@ -98,7 +105,7 @@ FetchContent_Declare(
 )
 
 FetchContent_MakeAvailable(
-    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog 
+    JoltPhysics volk VulkanMemoryAllocator glfw glm entt spdlog miniaudio
 )
 
 # --- Shader Compilation ---
@@ -302,6 +309,7 @@ target_include_directories(KikiDeps INTERFACE
     ${stb_SOURCE_DIR}
     ${msdfgen_SOURCE_DIR}
     ${msdfgen_BINARY_DIR}
+    ${miniaudio_SOURCE_DIR}
 )
 target_compile_definitions(KikiDeps INTERFACE
     PROJECT_ROOT_PATH=\"${CMAKE_SOURCE_DIR}\"
