@@ -8,7 +8,7 @@
 #include <string>
 
 struct CharacterTransform {
-    rutils::Buffer& buffer;
+    rutils::Buffer* buffer;
     glm::mat4 transform;
 };
 

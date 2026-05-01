@@ -1670,9 +1670,12 @@ namespace rutils {
                         vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
 
                         VkDeviceSize offsets[1]{};
-                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &characterTransform.buffer.buffer, offsets);
-                        vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                        vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+
+                        if (characterTransform.buffer->buffer != VK_NULL_HANDLE) {
+                            vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &characterTransform.buffer->buffer, offsets);
+                            vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                            vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                        }
                     }
                 }
             }

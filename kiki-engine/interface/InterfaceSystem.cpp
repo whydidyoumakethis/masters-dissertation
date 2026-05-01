@@ -210,22 +210,10 @@ namespace Kiki {
                             float offsetX = glyphPosition[i].x_offset * scale;
                             float offsetY = glyphPosition[i].y_offset * scale;
 
-                            model = glm::translate(model, glm::vec3(cursorX + offsetX, cursorY - offsetY, 0.0f));
+                            model = glm::translate(model, glm::vec3(cursorX + offsetX + msdfInfo.l * scale, cursorY - offsetY - msdfInfo.b * scale, 0.0f));
                             model = glm::scale(model, glm::vec3(scale, scale, 1.0f));
 
-                            //float x0 = cursorX + offsetX + (msdfInfo.l * scale);
-                            //float y0 = cursorY - offsetY - (msdfInfo.t * scale);
-                            //float x1 = x0 + (msdfInfo.width * scale);
-                            //float y1 = y0 + (msdfInfo.height * scale);
-
-                            //std::vector<float> positions = {
-                            //    x0, y0, msdfInfo.uMin, msdfInfo.vMax,
-                            //    x1, y0, msdfInfo.uMax, msdfInfo.vMax,
-                            //    x1, y1, msdfInfo.uMax, msdfInfo.vMin,
-                            //    x0, y1, msdfInfo.uMin, msdfInfo.vMin
-                            //};
-
-                            textComponent.characters.push_back(CharacterTransform(msdfInfo.vertices, model));
+                            textComponent.characters.push_back(CharacterTransform(&msdfInfo.vertices, model));
                         }
 
                         cursorX += (glyphPosition[i].x_advance / 64.0f) * scale;
