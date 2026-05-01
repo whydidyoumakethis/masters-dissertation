@@ -63,6 +63,8 @@ namespace rutils {
     struct ShapeData {
         glm::vec4 colour;
         glm::mat4 model = glm::mat4(1.0f);
+        glm::vec2 size;
+        float radius;
     };
 
     struct Pipelines {

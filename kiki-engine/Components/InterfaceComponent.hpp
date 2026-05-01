@@ -5,6 +5,7 @@
 
 #include <entt/entt.hpp>
 #include <glm/vec3.hpp>
+
 struct ScaleVec2D {
     float scaleX;
     float x;
@@ -15,12 +16,14 @@ struct ScaleVec2D {
     float absoluteX;
     float absoluteY;
 };
+
 struct InterfaceComponent {
     ScaleVec2D position;
     ScaleVec2D size;
     entt::entity parent = entt::null;
     unsigned int zindex = 1;
     
+    glm::mat4 model;
     bool dirty = true;
 };
 

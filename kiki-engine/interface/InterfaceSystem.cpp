@@ -50,17 +50,12 @@ namespace Kiki {
                     interfaceComponent.size.absoluteX = (width * interfaceComponent.size.scaleX) + interfaceComponent.size.x;
                     interfaceComponent.size.absoluteY = (height * interfaceComponent.size.scaleY) + interfaceComponent.size.y;
 
-                    if (registry.all_of<BackgroundComponent>(e)) {
-                        auto& backgroundComponent = registry.get<BackgroundComponent>(e);
-                        std::vector<float> positions = {
-                            interfaceComponent.position.absoluteX, interfaceComponent.position.absoluteY, 0.0f, 0.0f,
-                            interfaceComponent.position.absoluteX + interfaceComponent.size.absoluteX, interfaceComponent.position.absoluteY, 1.0f, 0.0f,
-                            interfaceComponent.position.absoluteX + interfaceComponent.size.absoluteX, interfaceComponent.position.absoluteY + interfaceComponent.size.absoluteY, 1.0f, 1.0f,
-                            interfaceComponent.position.absoluteX, interfaceComponent.position.absoluteY + interfaceComponent.size.absoluteY, 0.0f, 1.0f
-                        };
+                    glm::mat4 model = glm::mat4(1.0f);
 
-                        backgroundComponent.vertices = renderManager.updateInterfaceVertices(positions);
-                    }
+                    model = glm::translate(model, glm::vec3(interfaceComponent.position.absoluteX, interfaceComponent.position.absoluteY, 0.0f));
+                    model = glm::scale(model, glm::vec3(interfaceComponent.size.absoluteX, interfaceComponent.size.absoluteY, 1.0f));
+
+                    interfaceComponent.model = model;
 
                     if (registry.all_of<TextComponent>(e)) {
                         auto& textComponent = registry.get<TextComponent>(e);

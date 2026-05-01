@@ -173,6 +173,7 @@ namespace Kiki {
         rutils::Buffer sceneUBO;
         rutils::Buffer interfaceUBO;
         rutils::Buffer interfaceIndices;
+        rutils::Buffer interfaceShapeVertices;
 
 		rutils::Buffer debugLineVertexBuffer;
 		VkDeviceSize debugLineVertexBufferSize = 0;

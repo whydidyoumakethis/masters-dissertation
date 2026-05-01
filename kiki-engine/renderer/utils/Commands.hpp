@@ -49,6 +49,7 @@ namespace rutils {
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
         VkDescriptorSet interfaceDescriptors,
         VkBuffer interfaceIndexBuffer,
+        VkBuffer shapeVertexBuffer,
         VkDescriptorSet dummyAnimationDesc,
         std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
         std::vector<Kiki::Light> const& lights,

@@ -438,6 +438,15 @@ namespace Kiki {
                     );
                 }
             }
+
+            std::vector<float> positions = {
+                0.0f, 0.0f, 0.0f, 0.0f,
+                1.0f, 0.0f, 1.0f, 0.0f,
+                1.0f, 1.0f, 1.0f, 1.0f,
+                0.0f, 1.0f, 0.0f, 1.0f
+            };
+
+            interfaceShapeVertices = updateInterfaceVertices(positions);
         }
     }
 
@@ -684,6 +693,7 @@ namespace Kiki {
                 interfaceUniform,
                 interfaceDescriptors,
                 interfaceIndices.buffer,
+                interfaceShapeVertices.buffer,
                 dummyAnimationDesc,
                 shadowCubemaps,
                 lights,
@@ -1713,12 +1723,6 @@ namespace Kiki {
             }
         }
 
-        auto bgView = registry.view<BackgroundComponent>();
-
-        for (auto [e, comp] : bgView.each()) {
-            comp.vertices = {};
-        }
-
         FontManager::get().shutdown();
         SceneManager::get().shutdown();
         dummyAnimationBuffer = {};
@@ -1815,6 +1819,7 @@ namespace Kiki {
         sceneUBO = {};
         interfaceUBO = {};
         interfaceIndices = {};
+        interfaceShapeVertices = {};
         shadowMatricesBuffer = {};
 
 		debugLineVertexBuffer = {};
