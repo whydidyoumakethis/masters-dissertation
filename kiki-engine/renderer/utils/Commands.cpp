@@ -1628,55 +1628,59 @@ namespace rutils {
         }
 
         // TODO: ui pass should go here, after fxaa :)
-        //vkCmdBeginRendering(aCmdBuff, &renderInfo);
+        {
+            ZoneScopedN("Recording interface pass");
 
-        // UI PASS: TODO check in right place after merge
-        vkCmdBindPipeline( aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle );
-        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Interface pass");
+            #endif
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
 
-        auto uiComponents = world.Query<InterfaceComponent>();
+            auto uiComponents = world.Query<InterfaceComponent>();
 
-        for (auto [e, interfaceComponent] : uiComponents.each()) {
-            if (registry.all_of<BackgroundComponent>(e)) {
-                auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+            for (auto [e, interfaceComponent] : uiComponents.each()) {
+                if (registry.all_of<BackgroundComponent>(e)) {
+                    auto& backgroundComponent = registry.get<BackgroundComponent>(e);
 
-                if (backgroundComponent.vertices.buffer != VK_NULL_HANDLE) {
-                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
+                    if (backgroundComponent.vertices.buffer != VK_NULL_HANDLE) {
+                        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
 
-                    VkDeviceSize offsets[1]{};
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &backgroundComponent.vertices.buffer, offsets);
-                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                        VkDeviceSize offsets[1]{};
+                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &backgroundComponent.vertices.buffer, offsets);
+                        vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-                    ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)));
+                        ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)));
+                        vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                        vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                    }
+                }
+
+                if (registry.all_of<TextComponent>(e)) {
+                    auto& textComponent = registry.get<TextComponent>(e);
+                    auto& font = Kiki::FontManager::get().getFont(textComponent.font);
+
+                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceText.handle);
+
+                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
+
+                    ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)));
                     vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
-                    
-                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+
+                    for (auto& buffer : textComponent.vertices) {
+                        VkDeviceSize offsets[1]{};
+                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &buffer.buffer, offsets);
+                        vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                        vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                    }
                 }
             }
 
-            if (registry.all_of<TextComponent>(e)) {
-                auto& textComponent = registry.get<TextComponent>(e);
-                auto& font = Kiki::FontManager::get().getFont(textComponent.font);
+            // END OF UI PASS
 
-                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceText.handle);
-
-                vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
-
-                ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)));
-                vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
-
-                for (auto& buffer : textComponent.vertices) {
-                    VkDeviceSize offsets[1]{};
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &buffer.buffer, offsets);
-                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
-                }
-            }
+            vkCmdEndRendering(aCmdBuff);
         }
-
-        // END OF UI PASS
-
-        vkCmdEndRendering(aCmdBuff);
 
         {
             ZoneScopedN("Presentation barrier");

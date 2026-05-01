@@ -14,10 +14,8 @@
 #include "Components/ButtonComponent.hpp"
 #include "events/ButtonClickEvent.hpp"
 #include "events/ButtonHoverEvent.hpp"
+
 namespace Kiki {
-
-
-
     class InterfaceSystem : public System {
         private:
         FontManager& fontManager = FontManager::get();
