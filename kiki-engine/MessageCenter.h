@@ -39,7 +39,7 @@ private:
     friend class MessageCenter;
 };
 
-//for ui and game audio
+// break the order of system update, allow systems to trigger events that will be handled in the same frame or the next frame
 class MessageCenter {
 public:
     static MessageCenter& Get() {
@@ -79,11 +79,13 @@ public:
         Get()._dispatcher.sink<TEvent>().template disconnect<MemberFn>(instance);
     }
 
+	// immediately trigger the event, all subscribers will receive it in the same frame
     template<typename TEvent>
     static void Publish(TEvent&& message) {
         Get()._dispatcher.trigger(std::forward<TEvent>(message));
     }
 
+	// trigger the event in a deferred way, all subscribers will receive it in the next frame when Flush() is called.
     template<typename TEvent>
     static void PublishDeferred(TEvent&& message) {
         Get()._dispatcher.enqueue(std::forward<TEvent>(message));

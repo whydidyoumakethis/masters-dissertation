@@ -53,10 +53,11 @@ int main(int argc, char** argv) {
 
 	// resigster after loading the character component to avoid potential issues with systems trying to access the character component before it's added to the entity
 	
-	engine.RegisterSystem<TimeLimitSystem>();
 	// use wasd to move the character, shift to speed up, space to jump.
 	engine.RegisterSystem<CharacterSystem>();
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
 	engine.RegisterSystem<GoalTriggerSystem>();
+	engine.RegisterSystem<TimeLimitSystem>();
+
     engine.Run();
 }
