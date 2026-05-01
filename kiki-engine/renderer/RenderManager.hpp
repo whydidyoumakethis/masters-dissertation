@@ -1,7 +1,7 @@
 #ifndef KIKI_RENDERER
 #define KIKI_RENDERER
 
-#define N_BLOOM_IMAGES 8
+#define N_BLOOM_IMAGES 6
 
 #include "Components/MaterialComponent.hpp"
 #include "Components/MeshComponent.hpp"

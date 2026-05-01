@@ -67,28 +67,52 @@ namespace Kiki {
         }
 
         //write back the results to ECS
-        for (auto [entity, transform, rb,ip] : view.each()) {
+        for (auto [entity, transform, rb, ip] : view.each()) {
             if (rb.motionType == JPH::EMotionType::Dynamic) {
                 bool isActive = bodyInterface.IsActive(rb.bodyID);
 
-                if (!isActive) {
-                    static bool loggedSleep = false;
-                    if (!loggedSleep) {
-                        spdlog::warn("=== [PHYSICS DEACTIVATED] Entity {} is now SLEEPING. ===", (uint32_t)entity);
-                        loggedSleep = true;
-                    }
-                }
-
                 if (isActive) {
+                    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(rb.bodyID);
+                    bool needsClamp = false;
+
+                    float horizontalSpeedSq = vel.GetX() * vel.GetX() + vel.GetZ() * vel.GetZ();
+                    float maxSafeHorizontalSq = 1600.0f; // (40m/s)^2
+
+                    if (horizontalSpeedSq > maxSafeHorizontalSq) {
+                        vel.SetX(0.0f);
+                        vel.SetZ(0.0f);
+                        needsClamp = true;
+                    }
+
+                    float maxSafeUpwardSpeed = 10.0f;
+
+                    if (vel.GetY() > maxSafeUpwardSpeed) {
+                        vel.SetY(0.0f);
+                        needsClamp = true;
+                    }
+
+                    if (needsClamp) {
+                        bodyInterface.SetLinearVelocity(rb.bodyID, vel);
+                        //spdlog::warn("=== [PHYSICS CLAMP] Clamped! H-Sq: {:.2f}, V-Up: {:.2f} ===", horizontalSpeedSq, vel.GetY());
+                    }
+
                     JPH::RVec3 pos; JPH::Quat rot;
                     bodyInterface.GetPositionAndRotation(rb.bodyID, pos, rot);
                     transform.position = ToGLM(pos);
                     transform.rotation = ToGLM(rot);
                     transform.dirty = true;
                 }
+                else {
+                    static bool loggedSleep = false;
+                    if (!loggedSleep) {
+                        //spdlog::warn("=== [PHYSICS DEACTIVATED] Entity {} is now SLEEPING. ===", (uint32_t)entity);
+                        loggedSleep = true;
+                    }
+                }
             }
+
             if (ip.isGroundedNeedsUpdate) {
-				UpdateIsGrounded(entity);
+                UpdateIsGrounded(entity);
             }
         }
     }
