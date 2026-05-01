@@ -3,6 +3,7 @@
 #include "../component/CharacterComponent.h"
 #include "../component/ThirdPersonCameraComponent.hpp"
 #include "Animation/AnimationComponent.h"
+#include"../Events.h"
 class CharacterSystem : public System {
 public:
     Phase GetPhase() const override { return Phase::Update; }
@@ -59,6 +60,8 @@ public:
                 physics->isGroundedNeedsUpdate = true;
 			}
         }
+        MessageCenter::Subscribe<TimerTriggerEvent, &CharacterSystem::OnTimerTrigger>(this);
+
     }
     void OnStop() override {
        
@@ -66,6 +69,8 @@ public:
 private:
     InputManager& inputManager = Kiki::InputManager::get();
 	Entity playerEntity = NullEntity;
+	bool isDoubleJumping = false;
+	float dashTimer = 0.0f;// for dash ability cooldown
     float GetCameraYaw(Entity targetEntity) {
         float yaw = 0.0f;
         auto camView = World::Get().Query<ThirdPersonCameraComponent>();
@@ -148,18 +153,29 @@ private:
         PhysicalAttributesComponent& ip,
         float dt)
     {
-        if (inputManager.isKeyDown(GLFW_KEY_SPACE) && character.state != Kiki::CharacterState::Jumping) {
-            PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
-            auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
-            JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
+        if (inputManager.isKeyJustDown(GLFW_KEY_SPACE) ){
+            if (character.state != Kiki::CharacterState::Jumping) {
+                PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+                auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
+                JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 
-            //AUDIO TEST!!!
-            //Kiki::AudioSystem::PlayOneShot("sounds/cao.mp3");
+                //AUDIO TEST!!!
+                //Kiki::AudioSystem::PlayOneShot("sounds/cao.mp3");
 
-            physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
+                physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
 
-            character.state = Kiki::CharacterState::Jumping;
-            character.jumpTimer = 0.15f;
+                character.state = Kiki::CharacterState::Jumping;
+                character.jumpTimer = 0.15f;
+            }
+            else if (character.hasAbility(Ability::DoubleJump) && !isDoubleJumping) {
+                PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+                auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
+                JPH::Vec3 currentVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
+                physics._manager.GetBodyInterface().SetLinearVelocity(rb->bodyID, JPH::Vec3(currentVel.GetX(), character.jumpForce, currentVel.GetZ()));
+                character.state = Kiki::CharacterState::Jumping;
+                character.jumpTimer = 0.15f;
+                isDoubleJumping = true; // prevent further double jumps until grounded again
+			}
         }
     }
 	// smoothly rotate character to face movement direction
@@ -201,6 +217,7 @@ private:
         if (character.state == Kiki::CharacterState::Jumping) {
             if (character.jumpTimer <= 0.0f && pa.isGrounded) {
                 character.state = isMoving ? Kiki::CharacterState::Walking : Kiki::CharacterState::Idle;
+                isDoubleJumping = false; // reset double jump when grounded
             }
         }
         else {
@@ -223,6 +240,31 @@ private:
 
             if (animComp->currentState != character.state) {
                 animComp->ChangeState(character.state, shouldLoop);
+            }
+        }
+    }
+     void OnTimerTrigger(const TimerTriggerEvent& e) {
+        auto* cc = World::Get().GetComponent<CharacterComponent>(playerEntity);
+        std::vector<float>& timelimits = cc->timeLimits;
+        float elapsed = e.elapsedTime;
+        for (size_t i = 0; i < timelimits.size(); ++i) {
+            if (timelimits[i] > elapsed) {
+
+                spdlog::info("You completed the level in {:.2f} seconds! You earned a new ability!", elapsed);
+				// todo: move isDone from TimeLimitSystem to CharacterComponent to track which abilities have been earned, and only grant the next unearned ability here
+                if (i == 0) {
+                    cc->grantAbility(Ability::DoubleJump);
+                }
+                else if (i == 1) {
+                    cc->grantAbility(Ability::SpeedBoost);
+                }
+                else if (i == 2) {
+                    cc->grantAbility(Ability::Dash);
+                }
+     //           else if (i == 3) {
+					//spdlog::info("Congratulations! You completed the level with the best time! You earned all abilities!");
+     //           }
+                break;
             }
         }
     }

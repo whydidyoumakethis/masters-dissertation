@@ -1,6 +1,6 @@
 #pragma once
 #include <kiki.h>
-
+#include "../Events.h"
 class GoalTriggerSystem : public System {
 public:
 	Phase GetPhase() const override { return Phase::PostUpdate; }
@@ -38,7 +38,8 @@ public:
 		//spdlog::info("Collision detected between entity {} and entity {}", (uint32_t)e.entity1, (uint32_t)e.entity2);
 		
 		if ((e.entity1 == playerEntity && e.entity2 == goalEntity) || (e.entity1 == goalEntity && e.entity2 == playerEntity)) {
-			spdlog::info("Player reached the goal! You win!");
+			//spdlog::info("Player reached the goal! You win!");
+			MessageCenter::Publish(TimerTriggerEvent{ Timer::get().Elapsed() });
 			Timer::get().Reset();
 			goalReached = true;
 		}
