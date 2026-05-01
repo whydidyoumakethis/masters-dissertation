@@ -9,9 +9,14 @@ layout(scalar, set = 0, binding = 0) uniform UInterface {
     mat4 projection;
 } uInterface;
 
+layout(push_constant) uniform PushConstants {
+    vec4 colour;
+    mat4 model;
+} pc;
+
 layout(location = 0) out vec2 oUv;
 
 void main() {
     oUv = uv;
-    gl_Position = uInterface.projection * vec4(position, 0.0, 1.0);
+    gl_Position = uInterface.projection * pc.model * vec4(position, 0.0, 1.0);
 }

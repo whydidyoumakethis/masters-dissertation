@@ -1685,12 +1685,6 @@ namespace Kiki {
             comp.vertices = {};
         }
 
-        auto textView = registry.view<TextComponent>();
-
-        for (auto [e, comp] : textView.each()) {
-            comp.vertices.clear();
-        }
-
         FontManager::get().shutdown();
         SceneManager::get().shutdown();
         dummyAnimationBuffer = {};

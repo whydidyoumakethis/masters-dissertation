@@ -1,6 +1,8 @@
 #include "InterfaceSystem.hpp"
 
 #include <tracy/Tracy.hpp>
+#include <glm/gtx/transform.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include <hb.h>
 
 namespace Kiki {
@@ -133,7 +135,7 @@ namespace Kiki {
                     auto& interfaceComponent = registry.get<InterfaceComponent>(e);
                     auto& font = fontManager.getFont(textComponent.font);
 
-                    textComponent.vertices.clear();
+                    textComponent.characters.clear();
 
                     hb_buffer_t* buffer = hb_buffer_create();
                     hb_buffer_add_utf32(
@@ -159,7 +161,7 @@ namespace Kiki {
                     for (int i = 0; i < numGlyphs; i++) {
                         width += (glyphPosition[i].x_advance / 64.0f) * scale;
 
-                        iutils::GlyphInfo msdfInfo = font.glyphs[glyphInfo[i].codepoint];
+                        iutils::GlyphInfo& msdfInfo = font.glyphs[glyphInfo[i].codepoint];
                         float top = msdfInfo.t * scale;
                         float bottom = msdfInfo.b * scale;
 
@@ -202,24 +204,28 @@ namespace Kiki {
                         uint32_t gid = glyphInfo[i].codepoint;
 
                         if (font.glyphs.contains(gid)) {
-                            iutils::GlyphInfo msdfInfo = font.glyphs[gid];
+                            glm::mat4 model = glm::mat4(1.0f);
+                            iutils::GlyphInfo& msdfInfo = font.glyphs[gid];
 
                             float offsetX = glyphPosition[i].x_offset * scale;
                             float offsetY = glyphPosition[i].y_offset * scale;
 
-                            float x0 = cursorX + offsetX + (msdfInfo.l * scale);
-                            float y0 = cursorY - offsetY - (msdfInfo.t * scale);
-                            float x1 = x0 + (msdfInfo.width * scale);
-                            float y1 = y0 + (msdfInfo.height * scale);
+                            model = glm::translate(model, glm::vec3(cursorX + offsetX, cursorY - offsetY, 0.0f));
+                            model = glm::scale(model, glm::vec3(scale, scale, 1.0f));
 
-                            std::vector<float> positions = {
-                                x0, y0, msdfInfo.uMin, msdfInfo.vMax,
-                                x1, y0, msdfInfo.uMax, msdfInfo.vMax,
-                                x1, y1, msdfInfo.uMax, msdfInfo.vMin,
-                                x0, y1, msdfInfo.uMin, msdfInfo.vMin
-                            };
+                            //float x0 = cursorX + offsetX + (msdfInfo.l * scale);
+                            //float y0 = cursorY - offsetY - (msdfInfo.t * scale);
+                            //float x1 = x0 + (msdfInfo.width * scale);
+                            //float y1 = y0 + (msdfInfo.height * scale);
 
-                            textComponent.vertices.push_back(std::move(renderManager.updateInterfaceVertices(positions)));
+                            //std::vector<float> positions = {
+                            //    x0, y0, msdfInfo.uMin, msdfInfo.vMax,
+                            //    x1, y0, msdfInfo.uMax, msdfInfo.vMax,
+                            //    x1, y1, msdfInfo.uMax, msdfInfo.vMin,
+                            //    x0, y1, msdfInfo.uMin, msdfInfo.vMin
+                            //};
+
+                            textComponent.characters.push_back(CharacterTransform(msdfInfo.vertices, model));
                         }
 
                         cursorX += (glyphPosition[i].x_advance / 64.0f) * scale;
