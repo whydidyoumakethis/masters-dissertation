@@ -9,6 +9,7 @@
 #include <stb_image.h>
 #include <Components/ColourComponent.hpp>
 #include <assimp/GltfMaterial.h>
+#include <spdlog/spdlog.h>
 #include "Animation/Skeleton.h"
 #include "Animation/AnimationLoader.h"
 
@@ -455,10 +456,10 @@ namespace Kiki {
 				emptyInstance.bodyType = MbodyType::STATIC; // Default to static for empty instances
 				emptyInstance.colliderType = McolliderType::NONE; // Default to no collider for empty instances
 				emptyInstance.miscTag = miscTag;
-				std::cout << "Empty instance for node " << node->mName.C_Str() << " with misc tag: " << static_cast<int>(miscTag) << std::endl;
-				std::cout << "Transform for empty instance: " << std::endl;
+				spdlog::info("Empty instance for node {} with misc tag: {}", node->mName.C_Str(), static_cast<int>(miscTag));
+				spdlog::info("Transform for empty instance:");
 				for (int i = 0; i < 4; i++) {
-					std::cout << worldTransform[i][0] << " " << worldTransform[i][1] << " " << worldTransform[i][2] << " " << worldTransform[i][3] << std::endl;
+					spdlog::info("{} {} {} {}", worldTransform[i][0], worldTransform[i][1], worldTransform[i][2], worldTransform[i][3]);
 				}
 				out.emptyInstances.push_back(emptyInstance);
 			}
