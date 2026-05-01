@@ -8,6 +8,7 @@ target_sources(kiki
 	FILES 
 	  AudioSystem.h
 	  AudioManager.h
+	  AudioCache.h
 	  
 	  
 )
