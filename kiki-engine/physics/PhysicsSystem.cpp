@@ -1,4 +1,5 @@
 #include "physics/PhysicsSystem.hpp"
+#include "physics/PhysicsDebugRenderer.hpp"
 
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
@@ -48,6 +49,19 @@ namespace Kiki {
 
         // Pure physics simulation
         _manager.Update(dt);
+
+		auto& debugRenderer = PhysicsDebugRenderer::get();
+		debugRenderer.clear();
+		if (debugRenderer.enabled) {
+            if (debugRenderer.drawBodies) {
+                JPH::BodyManager::DrawSettings settings;
+                settings.mDrawShape = true;
+                settings.mDrawShapeWireframe = true;
+                settings.mDrawBoundingBox = debugRenderer.drawBoundingBoxes;
+                settings.mDrawVelocity = debugRenderer.drawVelocity;
+                _manager.GetSystem()->DrawBodies(settings, &debugRenderer);
+            }
+        }
 
         //write back the results to ECS
         for (auto [entity, transform, rb,ip] : view.each()) {

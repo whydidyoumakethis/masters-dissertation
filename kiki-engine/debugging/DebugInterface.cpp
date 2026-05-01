@@ -7,6 +7,7 @@
 #include <renderer/RenderManager.hpp>
 #include <Components/DebugComponent.hpp>
 #include <renderer/SceneManager.hpp>
+#include <physics/PhysicsDebugRenderer.hpp>
 
 #include <cstdlib>
 #include <filesystem>
@@ -461,6 +462,16 @@ namespace Kiki {
                 ImGui::Spacing();
                 if (ImGui::Button("Reset"))
                     debugCam.reset();
+            }
+
+			if (ImGui::CollapsingHeader("Physics Debug")) {
+				auto& physicsDebugRenderer = PhysicsDebugRenderer::get();
+
+                ImGui::Checkbox("Draw wireframes", &physicsDebugRenderer.enabled);
+                ImGui::Checkbox("Bodies", &physicsDebugRenderer.drawBodies);
+                ImGui::Checkbox("Bounding boxes", &physicsDebugRenderer.drawBoundingBoxes);
+                ImGui::Checkbox("Velocity", &physicsDebugRenderer.drawVelocity);
+                ImGui::Text("Lines: %zu", physicsDebugRenderer.getVertices().size() / 2);
             }
 
             if (ImGui::CollapsingHeader("Scene Settings")) {

@@ -83,6 +83,7 @@ namespace rutils {
         rutils::Pipeline bloomUpsample;
         rutils::Pipeline composite;
         rutils::Pipeline debug;
+        rutils::Pipeline debug_line;
     };
 
     struct PipelineLayouts {
@@ -133,6 +134,7 @@ namespace rutils {
     Pipeline createBloomDownsamplePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createBloomUpsamplePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createDebugPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
+    Pipeline createDebugLinePipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
 
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
