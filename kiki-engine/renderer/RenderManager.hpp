@@ -1,6 +1,8 @@
 #ifndef KIKI_RENDERER
 #define KIKI_RENDERER
 
+#define N_BLOOM_IMAGES 8
+
 #include "Components/MaterialComponent.hpp"
 #include "Components/MeshComponent.hpp"
 #include "Components/TransparencyComponent.hpp"
@@ -63,7 +65,7 @@ namespace Kiki {
         float bloomRadius_x = 0.005f;
         float bloomRadius_y = 0.005f;
 
-        float bloomStrength = 0.02f;
+        float bloomStrength = 0.04f;
         bool bloomEnabled = true;
 
         float tonemapMaxWhite = 4.f;
@@ -217,9 +219,9 @@ namespace Kiki {
         rutils::Image doneDebugImage;
         rutils::Image depthBuffer;
 
-        std::array<rutils::Image, 6> bloomImages;
-        std::array<VkDescriptorSet, 6> bloomImageDownsampleDescriptorSets;
-        std::array<VkDescriptorSet, 6> bloomImageUpsampleDescriptorSets;
+        std::array<rutils::Image, N_BLOOM_IMAGES> bloomImages;
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets;
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageUpsampleDescriptorSets;
 
         rutils::Buffer shadowMatricesBuffer;
 
