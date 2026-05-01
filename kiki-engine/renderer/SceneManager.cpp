@@ -231,7 +231,7 @@ namespace Kiki {
 
 
     void SceneManager::loadScene(Mscene scene) {
-        // TEMP SOLUTION
+       
 
         // // renderLights[0] must be directional
         // if (RenderManager::get().lights.size() == 0) {

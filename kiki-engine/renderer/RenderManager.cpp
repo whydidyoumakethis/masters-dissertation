@@ -10,6 +10,7 @@
 #include "utils/Image.hpp"
 #include "../logging/FatalError.hpp"
 #include "SceneManager.hpp"
+#include "physics/PhysicsDebugRenderer.hpp"
 #include "Animation/AnimationComponent.h"
 #include "Components/BackgroundComponent.hpp"
 #include "Components/InterfaceComponent.hpp"
@@ -619,6 +620,7 @@ namespace Kiki {
             // Record and submit commands for this frame
             // Prepare data for this frame
             updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
+            updateDebugLineBuffer();
         }
 
         {
@@ -688,7 +690,9 @@ namespace Kiki {
                 bloomImages,
                 bloomImageDownsampleDescriptorSets,
                 bloomImageUpsampleDescriptorSets,
-                renderSettings
+                renderSettings,
+				debugLineVertexBuffer.buffer,
+				debugLineVertexCount
             );
         }
 
@@ -1242,6 +1246,36 @@ namespace Kiki {
         pipelines = rutils::createAllPipelines(window, pipelineLayouts);
     }
 
+    void RenderManager::updateDebugLineBuffer() {
+        const auto& vertices = PhysicsDebugRenderer::get().getVertices();
+        debugLineVertexCount = static_cast<std::uint32_t>(vertices.size());
+
+        if (vertices.empty()) {
+            return;
+        }
+
+        const VkDeviceSize requiredSize = sizeof(DebugLineVertex) * vertices.size();
+        if (debugLineVertexBuffer.buffer == VK_NULL_HANDLE || debugLineVertexBufferSize < requiredSize) {
+            debugLineVertexBuffer = rutils::createBuffer(
+                allocator,
+                requiredSize,
+                VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT,
+                VMA_MEMORY_USAGE_AUTO
+            );
+            debugLineVertexBufferSize = requiredSize;
+        }
+
+        void* data = nullptr;
+        if (auto const res = vmaMapMemory(allocator.allocator, debugLineVertexBuffer.allocation, &data); VK_SUCCESS != res) {
+            throw FatalError("Mapping debug line buffer\n"
+                "vmaMapMemory() returned {}", rutils::toString(res)
+            );
+        }
+        std::memcpy(data, vertices.data(), static_cast<std::size_t>(requiredSize));
+        vmaUnmapMemory(allocator.allocator, debugLineVertexBuffer.allocation);
+    }
+
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {
         //  width / height
         rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
@@ -1745,6 +1779,7 @@ namespace Kiki {
         pipelines.bloomUpsample = {};
         pipelines.composite = {};
         pipelines.debug = {};
+		pipelines.debug_line = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1781,6 +1816,10 @@ namespace Kiki {
         interfaceUBO = {};
         interfaceIndices = {};
         shadowMatricesBuffer = {};
+
+		debugLineVertexBuffer = {};
+		debugLineVertexBufferSize = 0;
+		debugLineVertexCount = 0;
 
         gBufferLayout = {};
         sceneLayout = {};

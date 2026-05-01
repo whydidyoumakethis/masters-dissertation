@@ -144,6 +144,8 @@ namespace Kiki {
         std::filesystem::path bloom_upsample_f = "bloom_upsample.frag.spv";
         std::filesystem::path composite_f = "composite.frag.spv";
         std::filesystem::path debug_f = "debug.frag.spv";
+		std::filesystem::path debug_line_v = "debug_line.vert.spv";
+        std::filesystem::path debug_line_f = "debug_line.frag.spv";
     };
 
     class RenderManager {
@@ -171,6 +173,10 @@ namespace Kiki {
         rutils::Buffer sceneUBO;
         rutils::Buffer interfaceUBO;
         rutils::Buffer interfaceIndices;
+
+		rutils::Buffer debugLineVertexBuffer;
+		VkDeviceSize debugLineVertexBufferSize = 0;
+		std::uint32_t debugLineVertexCount = 0;
 
         std::size_t frameIndex = 0;
         std::vector<VkCommandBuffer> commandBuffers;
@@ -315,6 +321,7 @@ namespace Kiki {
         void updateSceneUniforms(SceneUniform& aSceneUniforms, std::uint32_t aFramebufferWidth, std::uint32_t aFramebufferHeight);
         void updateShadowMatrices(rutils::Allocator const& allocator, rutils::Buffer const& shadowMatricesBuffer, std::vector<Light>& lights);
         void createSkybox(const rutils::CubemapPaths& paths);
+		void updateDebugLineBuffer();
 
         World& world = World::Get();
         entt::registry& registry = world.Registry();
