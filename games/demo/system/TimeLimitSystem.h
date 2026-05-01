@@ -69,7 +69,6 @@ public:
         for (int i = 0; i < (int)timeLimits.size() && i < (int)labels.size(); i++) {
             auto rowEntity = registry.create();
 			rows.push_back(rowEntity);
-			isDone.push_back(false);
 			float yPos = 42.0f + i * 30.0f;  // 30f per row
 
             registry.emplace<InterfaceComponent>(rowEntity,
@@ -117,7 +116,18 @@ public:
     }
     void OnTimeLimitReached(TimerTriggerEvent e) {
         auto& registry = World::Get().Registry();
+        
+        entt::entity targetEntity = entt::null;
 
+        auto object = registry.view<CharacterComponent>();
+        for (auto [entity, chara] : object.each()) {
+            targetEntity = entity;
+            break;
+        }
+
+        
+        auto& isDone = registry.get<CharacterComponent>(targetEntity).isDone;
+        
         for (size_t i = 0; i < rows.size(); ++i) {
             auto rowEntity = rows[i];
             if (rowEntity == entt::null || !registry.valid(rowEntity)) continue;
@@ -131,7 +141,6 @@ public:
                 auto& textComp = registry.get<TextComponent>(rows[i]);
                 textComp.colour = glm::vec3(0.35f, 0.65f, 0.35f);
                 textComp.dirty = true;
-                isDone[i] = true;
                 //std::u32string completed = textComp.text + U"✓";
                 //textComp.text = completed;
                 if (registry.all_of<InterfaceComponent>(rowEntity)) {
@@ -160,7 +169,6 @@ public:
 private:
     entt::entity  timerTextEntity = entt::null;
 	std::vector<Entity> rows = {};
-	std::vector<bool> isDone = {};
     // temp solution
     std::vector<float> timeLimits = { };
     std::vector<std::u32string> labels = {};

@@ -141,7 +141,10 @@ private:
                 character.velocity.z = currentJoltVel.GetZ();
             }
         }
-        transform.position += character.velocity * dt;
+        if (character.hasAbility(Ability::SpeedBoost)) {
+            transform.position += character.velocity * dt * 1.5f; // Apply speed boost multiplier
+        }
+        else transform.position += character.velocity * dt;
 		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
   //              physics.setEntityVelocity(playerEntity, character.velocity);
         transform.dirty = true;
@@ -248,22 +251,26 @@ private:
         std::vector<float>& timelimits = cc->timeLimits;
         float elapsed = e.elapsedTime;
         for (size_t i = 0; i < timelimits.size(); ++i) {
+			if (cc->isDone[i]) continue; // skip already completed tiers
             if (timelimits[i] > elapsed) {
-
+                cc->isDone[i] = true;
                 spdlog::info("You completed the level in {:.2f} seconds! You earned a new ability!", elapsed);
-				// todo: move isDone from TimeLimitSystem to CharacterComponent to track which abilities have been earned, and only grant the next unearned ability here
                 if (i == 0) {
                     cc->grantAbility(Ability::DoubleJump);
+					spdlog::info("You earned the double jump ability!");
                 }
                 else if (i == 1) {
                     cc->grantAbility(Ability::SpeedBoost);
+					spdlog::info("You earned the speed boost ability!");
                 }
                 else if (i == 2) {
                     cc->grantAbility(Ability::Dash);
+					spdlog::info("You earned the dash ability!");
                 }
-     //           else if (i == 3) {
-					//spdlog::info("Congratulations! You completed the level with the best time! You earned all abilities!");
-     //           }
+                else if (i == 3) {
+					// completed level logic here
+					spdlog::info("Congratulations! You completed the level! ");
+                }
                 break;
             }
         }
