@@ -479,17 +479,17 @@ namespace Kiki {
 					instance.miscTag = parseMiscTag(node);
 
 					instance.simpleAnim = parseSimpleAnimType(node);
-					aiString animDistanceStr;
-					if (node->mMetaData->Get("anim_distance", animDistanceStr)) {
-						instance.anim_distance = std::stof(animDistanceStr.C_Str());
+					float animDistance;
+					if (node->mMetaData->Get("anim_distance", animDistance)) {
+						instance.anim_distance = animDistance;
 					}
-					aiString animSpeedStr;
-					if (node->mMetaData->Get("anim_speed", animSpeedStr)) {
-						instance.anim_speed = std::stof(animSpeedStr.C_Str());
+					float animSpeed;
+					if (node->mMetaData->Get("anim_speed", animSpeed)) {
+						instance.anim_speed = animSpeed;
 					}
-					aiString animRotationSpeedStr;
-					if (node->mMetaData->Get("anim_rotation_speed", animRotationSpeedStr)) {
-						instance.anim_rotation_speed = std::stof(animRotationSpeedStr.C_Str());
+					float animRotationSpeed;
+					if (node->mMetaData->Get("anim_rotation_speed", animRotationSpeed)) {
+						instance.anim_rotation_speed = animRotationSpeed;
 					}
 				}
 

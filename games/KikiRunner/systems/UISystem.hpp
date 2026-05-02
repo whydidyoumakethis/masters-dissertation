@@ -10,12 +10,23 @@ enum ScreenType {
 	LEVEL
 };
 
-struct ScreenBase {};
+struct ScreenBase {
+	virtual ~ScreenBase() {};
+};
 
 struct SplashScreen : ScreenBase {
-	entt::entity background;
-	entt::entity engineLogo;
-	entt::entity gameLogo;
+	entt::entity background = entt::null;
+	entt::entity engineLogo = entt::null;
+	entt::entity gameLogo = entt::null;
+
+	SplashScreen() = default;
+	~SplashScreen() {
+		World& world = World::Get();
+
+		world.DestroyEntity(background);
+		world.DestroyEntity(engineLogo);
+		world.DestroyEntity(gameLogo);
+	};
 };
 
 class UISystem : public System {
@@ -24,6 +35,14 @@ class UISystem : public System {
 
 	void OnStart() override {
 		createSplashScreen();
+
+		std::thread([this]() {
+			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/DynaPuff-Bold.ttf", "dynapuff-bold");
+			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/DynaPuff-Regular.ttf", "dynapuff-regular");
+
+			createMainMenu();
+			initialised = true;
+		}).detach();
 
 		MessageCenter::Subscribe<AnimationEndEvent, &UISystem::OnTriggerEnter>(this);
 	}
@@ -35,7 +54,7 @@ class UISystem : public System {
 			nextReady = true;
 		}
 
-		if (nextReady && !changingScreen) {
+		if (nextReady && !changingScreen && initialised) {
 			changingScreen = true;
 			SplashScreen* screen = static_cast<SplashScreen*>(currentScreen);
 			InterfaceAnimationComponent animComp;
@@ -73,6 +92,8 @@ class UISystem : public System {
 				animComp.time = 2.0f;
 				animComp.interpolation = InterfaceInterpolationType::EASE_OUT;
 				registry.emplace<InterfaceAnimationComponent>(screen->background, animComp);
+			} else if (e.entity == screen->background) {
+				delete currentScreen;
 			}
 		}
 	}
@@ -81,11 +102,13 @@ class UISystem : public System {
 	World& world = World::Get();
 	entt::registry& registry = world.Registry();
 	TextureManager& textureManager = Kiki::TextureManager::get();
+	FontManager& fontManager = Kiki::FontManager::get();
 
 	ScreenBase* currentScreen;
 	ScreenBase* nextScreen;
 	ScreenType currentScreenType;
 	ScreenType nextScreenType;
+	bool initialised = false;
 	bool nextReady = false;
 	bool changingScreen = false;
 
@@ -93,6 +116,7 @@ class UISystem : public System {
 
 	void createSplashScreen() {
 		currentScreen = new SplashScreen();
+		currentScreenType = ScreenType::SPLASH;
 		SplashScreen* screen = static_cast<SplashScreen*>(currentScreen);
 
 		screen->background = world.CreateEntity();
@@ -113,6 +137,10 @@ class UISystem : public System {
 	}
 
 	void createLoadingScreen() {
+
+	}
+
+	void createMainMenu() {
 
 	}
 };

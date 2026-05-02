@@ -4,6 +4,7 @@
 #include <volk.h>
 #include <vk_mem_alloc.h>
 #include <stb_image.h>
+#include <mutex>
 
 #include "VulkanWrapper.hpp"
 #include "Allocator.hpp"
@@ -50,8 +51,8 @@ namespace rutils {
     };
 
 
-	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
-	Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator);
+	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&, std::mutex& queueMutex, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+	Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, std::mutex& queueMutex);
 	Image createFontAtlasTexture(Allocator const& aAllocator, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat aFormat, VulkanWindow const& window, VkImageUsageFlags aUsage);
 
 	Image createImageTexture(
@@ -75,7 +76,8 @@ namespace rutils {
 		uint32_t height,
 		VulkanWindow const& context,
 		VkCommandPool commandPool,
-		Allocator const& allocator
+		Allocator const& allocator, 
+		std::mutex& queueMutex
 	);
 
 	std::uint32_t computeMipLevelCount(std::uint32_t aWidth, std::uint32_t aHeight);

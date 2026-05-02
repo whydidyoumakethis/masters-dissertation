@@ -162,6 +162,8 @@ namespace Kiki {
         bool recreateSwapchain = false;
         bool initialised = false;
 
+        std::mutex queueMutex;
+
         rutils::VulkanWindow window;
 
         rutils::PipelineLayouts pipelineLayouts;

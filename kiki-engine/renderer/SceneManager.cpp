@@ -277,17 +277,26 @@ namespace Kiki {
         }
 
         for (int i = 0; i < scene.instances.size(); i++) {
-           auto model = World::Get().CreateEntity();
+            entt::entity model;
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                model = World::Get().CreateEntity();
+            }
             auto& registry = World::Get().Registry();
 			const auto& instance = scene.instances[i];
             const Mmesh& mesh = scene.meshes[instance.meshIndex];
             const Mtexture& texture = scene.textures[mesh.matIndex];
-            auto& transform = registry.emplace<TransformComponent>(model);
-            glm::vec3 skew;
-            glm::vec4 perspective;
-			glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
-            transform.rotation = glm::conjugate(transform.rotation);
-            //transform.scale = {0.3, 0.3, 0.3}; // TODO: this is a temp fix, will probably cause issues
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                auto& transform = registry.emplace<TransformComponent>(model);
+                glm::vec3 skew;
+                glm::vec4 perspective;
+                glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
+                transform.rotation = glm::conjugate(transform.rotation);
+                //transform.scale = {0.3, 0.3, 0.3}; // TODO: this is a temp fix, will probably cause issues
+            }
+
+            auto& transform = registry.get<TransformComponent>(model);
 
             std::vector<glm::ivec4> safeBoneIDs = mesh.boneIDs;
             std::vector<glm::vec4> safeWeights = mesh.weights;
@@ -297,26 +306,39 @@ namespace Kiki {
                 safeWeights.assign(mesh.vertices.size(), glm::vec4(0.0f));
             }
 
-            registry.emplace<MeshComponent>(model, createMesh(
-                mesh.vertices,
-                mesh.indices,
-                mesh.normals,
-                mesh.uvs,
-                mesh.tangents,
-                safeBoneIDs, 
-                safeWeights  
-            ));
+
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                registry.emplace<MeshComponent>(model, createMesh(
+                    mesh.vertices,
+                    mesh.indices,
+                    mesh.normals,
+                    mesh.uvs,
+                    mesh.tangents,
+                    safeBoneIDs,
+                    safeWeights
+                ));
+            }
 
             if (texture.hastexture) {
                 materials.emplace_back(RenderManager::get().allocateMaterial(texture));
 				int id = materials.size() - 1;
-                registry.emplace<MaterialComponent>(model, id);
-				if (texture.mode == alphaMode::MASK) {
-                    registry.emplace<TransparencyComponent>(model); // yeah idk what else to do other then just have this added
+
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<MaterialComponent>(model, id);
+                    if (texture.mode == alphaMode::MASK) {
+                        registry.emplace<TransparencyComponent>(model); // yeah idk what else to do other then just have this added
+                    }
                 }
             }
-            registry.emplace<ColourComponent>(model, glm::vec3(texture.baseColour));
-            registry.emplace<RoughnessMetallicFactorComponent>(model, glm::vec2(texture.roughnessFactor, texture.metallicFactor));
+
+
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                registry.emplace<ColourComponent>(model, glm::vec3(texture.baseColour));
+                registry.emplace<RoughnessMetallicFactorComponent>(model, glm::vec2(texture.roughnessFactor, texture.metallicFactor));
+            }
             //Kiki::GltfLoaderAssimp::debugPrintMesh(mesh);
 			//Kiki::GltfLoaderAssimp::debugPrintTexture(texture);
 
@@ -324,7 +346,13 @@ namespace Kiki {
 
                 spdlog::info("Instance {} is a PLAYER with animations, attaching AnimationComponent...", i);
 
-                auto& animComp = registry.emplace<AnimationComponent>(model);
+
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<AnimationComponent>(model);
+                }
+
+                auto& animComp = registry.get<AnimationComponent>(model);
 
                 if (scene.skeleton) {
                     animComp.skeleton = std::move(scene.skeleton);
@@ -357,7 +385,11 @@ namespace Kiki {
 
 			// Physics setup
 
-            registry.emplace<TagComponent>(model, entt::hashed_string(mesh.name.c_str()), mesh.name);
+
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                registry.emplace<TagComponent>(model, entt::hashed_string(mesh.name.c_str()), mesh.name);
+            }
             JPH::Ref<JPH::Shape> colliderShape;
             JPH::EMotionType joltMotionType;
             uint16_t joltLayer;
@@ -383,12 +415,18 @@ namespace Kiki {
 
             switch (instance.colliderType) {
             case McolliderType::BOX:
-                registry.emplace<BoxColliderComponent>(model);
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<BoxColliderComponent>(model);
+                }
                 spdlog::info("[Physics] Attached BOX collider to mesh: '{}'", mesh.name);
                 break;
 
             case McolliderType::SPHERE:
-                registry.emplace<SphereColliderComponent>(model);
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<SphereColliderComponent>(model);
+                }
                 spdlog::info("[Physics] Attached SPHERE collider to mesh: '{}'", mesh.name);
                 break;
 
@@ -413,8 +451,10 @@ namespace Kiki {
                 if (joltHalfHeight < 0.05f) {
                     joltHalfHeight = 0.05f;
                 }
-
-                registry.emplace<CapsuleColliderComponent>(model, radius/2.5f, joltHalfHeight);
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<CapsuleColliderComponent>(model, radius / 2.5f, joltHalfHeight);
+                }
 
                 spdlog::info("[Physics] Calculated CAPSULE: Radius = {:.2f}, HalfHeight = {:.2f}, TotalHeight = {:.2f}",
                     radius, joltHalfHeight, sizeY);
@@ -423,7 +463,10 @@ namespace Kiki {
 
             case McolliderType::CONVEX_HULL:
                 if (auto hull = CreateConvexHull(mesh.vertices)) {
-                    registry.emplace<MeshColliderComponent>(model, hull);
+                    {
+                        std::lock_guard<std::mutex> lock(sceneMutex);
+                        registry.emplace<MeshColliderComponent>(model, hull);
+                    }
                     spdlog::info("[Physics] Attached CONVEX_HULL collider to mesh: '{}'", mesh.name);
                 }
                 else {
@@ -435,7 +478,10 @@ namespace Kiki {
             case McolliderType::NONE:
             default:
                 if (auto triMesh = CreateTriangleMesh(mesh.vertices, mesh.indices)) {
-                    registry.emplace<MeshColliderComponent>(model, triMesh);
+                    {
+                        std::lock_guard<std::mutex> lock(sceneMutex);
+                        registry.emplace<MeshColliderComponent>(model, triMesh);
+                    }
                     spdlog::info("[Physics] Attached TRIANGLE_MESH (Default) collider to mesh: '{}'", mesh.name);
                 }
                 else {
@@ -445,7 +491,11 @@ namespace Kiki {
             }
 
 			if (instance.simpleAnim != MsimpleAnimType::NONE) {
-				auto& simpleAnimComp = registry.emplace<SimpleAnimationComponent>(model);
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<SimpleAnimationComponent>(model);
+                }
+				auto& simpleAnimComp = registry.get<SimpleAnimationComponent>(model);
 				simpleAnimComp.type = instance.simpleAnim;
 				simpleAnimComp.startPosition = transform.position; // Store the initial position for oscillation
 				simpleAnimComp.startRotation = transform.rotation; // Store the initial rotation for rotation animations
@@ -460,26 +510,43 @@ namespace Kiki {
             bool isPlayer = (instance.miscTag == MmiscTags::PLAYER);
             float playerFriction = isPlayer ? 0.0f : 0.5f;
             //Set the friction of the capsule body to 0, so there won't be Titanfall's wall-running.
-            registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer, 0.0f, playerFriction, false, isPlayer);
-            registry.emplace<PhysicalAttributesComponent>(model);
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer, 0.0f, playerFriction, false, isPlayer);
+                registry.emplace<PhysicalAttributesComponent>(model);
+            }
 
 			// Misc tags
             if (instance.miscTag != MmiscTags::NONE) {
-                registry.emplace<MiscComponent>(model, instance.miscTag);
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<MiscComponent>(model, instance.miscTag);
+                }
 			}
         }
         for (int i = 0; i < scene.emptyInstances.size(); i++) {
-            auto model = World::Get().CreateEntity();
+            entt::entity model;
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                model = World::Get().CreateEntity();
+            }
             auto& registry = World::Get().Registry();
             const auto& instance = scene.emptyInstances[i];
-            auto& transform = registry.emplace<TransformComponent>(model);
+            {
+                std::lock_guard<std::mutex> lock(sceneMutex);
+                registry.emplace<TransformComponent>(model);
+            }
+            auto& transform = registry.get<TransformComponent>(model);
             glm::vec3 skew;
             glm::vec4 perspective;
             glm::decompose(instance.transform, transform.scale, transform.rotation, transform.position, skew, perspective);
             transform.rotation = glm::conjugate(transform.rotation);
             // Misc tags
             if (instance.miscTag != MmiscTags::NONE) {
-                registry.emplace<MiscComponent>(model, instance.miscTag);
+                {
+                    std::lock_guard<std::mutex> lock(sceneMutex);
+                    registry.emplace<MiscComponent>(model, instance.miscTag);
+                }
             }
         }
     }

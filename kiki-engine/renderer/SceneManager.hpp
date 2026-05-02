@@ -43,6 +43,8 @@ namespace Kiki {
         bool validMaterial(int id);
         bool validMesh(int id);
 
+        std::mutex sceneMutex;
+
         private:
         SceneManager() = default;
         ~SceneManager() = default;

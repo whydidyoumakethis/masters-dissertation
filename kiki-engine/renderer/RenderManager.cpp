@@ -259,8 +259,8 @@ namespace Kiki {
             stbi_uc* emptyTexture = stbi_load((std::filesystem::path(PROJECT_ROOT_PATH) / "assets/empty.png").string().c_str(), &width, &height, &c, 4 /* want 4 c h a n n e l s = RGBA */);
             stbi_uc* emptyNormalsTexture = stbi_load((std::filesystem::path(PROJECT_ROOT_PATH) / "assets/empty_normals.png").string().c_str(), &normals_width, &normals_height, &normals_c, 4 /* want 4 c h a n n e l s = RGBA */);
 
-            noTexture = rutils::loadImageTexture(emptyTexture, width, height, window, tempTextureCmdPool.handle, allocator);
-            noNormalMap = rutils::loadImageTexture(emptyNormalsTexture, normals_width, normals_height, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+            noTexture = rutils::loadImageTexture(emptyTexture, width, height, window, tempTextureCmdPool.handle, allocator, queueMutex);
+            noNormalMap = rutils::loadImageTexture(emptyNormalsTexture, normals_width, normals_height, window, tempTextureCmdPool.handle, allocator, queueMutex, VK_FORMAT_R8G8B8A8_UNORM);
             
             noTextureDst = rutils::allocDescSet(window, descriptorPool.handle, materialLayout.handle);
 
@@ -423,10 +423,13 @@ namespace Kiki {
                 submitInfo.commandBufferInfoCount = 1;
                 submitInfo.pCommandBufferInfos = submit;
 
-                if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-                    throw FatalError("Unable to submit command buffer to queue\n"
-                        "vkQueueSubmit2() returned {}", rutils::toString(res)
-                    );
+                {
+                    std::lock_guard<std::mutex> lock(queueMutex);
+                    if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                        throw FatalError("Unable to submit command buffer to queue\n"
+                            "vkQueueSubmit2() returned {}", rutils::toString(res)
+                        );
+                    }
                 }
 
                 // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
@@ -715,7 +718,8 @@ namespace Kiki {
                 commandBuffers[frameIndex],
                 frameDone[frameIndex].handle,
                 imageAvailable[frameIndex].handle,
-                renderFinished[frameIndex].handle
+                renderFinished[imageIndex].handle,
+                queueMutex
             );
         }
 
@@ -724,7 +728,7 @@ namespace Kiki {
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &renderFinished[frameIndex].handle;
+        presentInfo.pWaitSemaphores = &renderFinished[imageIndex].handle;
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &window.swapchain;
         presentInfo.pImageIndices = &imageIndex;
@@ -733,15 +737,19 @@ namespace Kiki {
         {
             ZoneScopedN("Presenting results");
 
-            auto const presentRes = vkQueuePresentKHR(window.presentQueue, &presentInfo);
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                auto const presentRes = vkQueuePresentKHR(window.presentQueue, &presentInfo);
 
-            if (VK_SUBOPTIMAL_KHR == presentRes || VK_ERROR_OUT_OF_DATE_KHR == presentRes) {
-                recreateSwapchain = true;
-            }
-            else if (VK_SUCCESS != presentRes) {
-                throw Kiki::FatalError( "Unable present swapchain image {}\n"
-                    "vkQueuePresentKHR() returned {}", imageIndex, rutils::toString(presentRes)
-                );
+
+                if (VK_SUBOPTIMAL_KHR == presentRes || VK_ERROR_OUT_OF_DATE_KHR == presentRes) {
+                    recreateSwapchain = true;
+                }
+                else if (VK_SUCCESS != presentRes) {
+                    throw Kiki::FatalError("Unable present swapchain image {}\n"
+                        "vkQueuePresentKHR() returned {}", imageIndex, rutils::toString(presentRes)
+                    );
+                }
             }
         }
 
@@ -1038,11 +1046,13 @@ namespace Kiki {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-
-        if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw FatalError( "Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", rutils::toString(res)
-            );
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", rutils::toString(res)
+                );
+            }
         }
 
         // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
@@ -1224,10 +1234,13 @@ namespace Kiki {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-        if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw FatalError( "Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", rutils::toString(res)
-            );
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", rutils::toString(res)
+                );
+            }
         }
 
         // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
@@ -1287,10 +1300,10 @@ namespace Kiki {
 
     Material RenderManager::allocateMaterial(const Mtexture& textureData) {
         //  width / height
-        rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image texture = rutils::loadImageTexture(textureData.rawDataPtr, textureData.width, textureData.height, window, tempTextureCmdPool.handle, allocator, queueMutex);
         // roughWidth / roughHeight
-        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
-        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.normalMapWidth, textureData.normalMapHeight, window, tempTextureCmdPool.handle, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        rutils::Image roughnessMetalness = rutils::loadImageTexture(textureData.roughness, textureData.roughWidth, textureData.roughHeight, window, tempTextureCmdPool.handle, allocator, queueMutex, VK_FORMAT_R8G8B8A8_UNORM);
+        rutils::Image normalMap = rutils::loadImageTexture(textureData.normalMap, textureData.normalMapWidth, textureData.normalMapHeight, window, tempTextureCmdPool.handle, allocator, queueMutex, VK_FORMAT_R8G8B8A8_UNORM);
 
         VkDescriptorImageInfo textureInfo[3]{};
 
@@ -1341,7 +1354,7 @@ namespace Kiki {
 
     iutils::InterfaceTexture RenderManager::loadInterfaceTexture(stbi_uc* imageData, int width, int height) {
         //  width / height
-        rutils::Image texture = rutils::loadImageTexture(imageData, width, height, window, tempTextureCmdPool.handle, allocator);
+        rutils::Image texture = rutils::loadImageTexture(imageData, width, height, window, tempTextureCmdPool.handle, allocator, queueMutex);
 
         VkDescriptorImageInfo textureInfo[1]{};
 
@@ -1369,7 +1382,7 @@ namespace Kiki {
     void RenderManager::loadFontAtlas(iutils::Font* font, std::vector<uint8_t> atlas) {
         {
             ZoneScopedN("Upload font atlas");
-            font->atlas = rutils::loadFontAtlas(atlas, font->atlasSize, window, tempTextureCmdPool.handle, allocator);
+            font->atlas = rutils::loadFontAtlas(atlas, font->atlasSize, window, tempTextureCmdPool.handle, allocator, queueMutex);
             font->descriptorSet = rutils::allocDescSet(window, descriptorPool.handle, textLayout.handle);
 
             VkDescriptorImageInfo textureInfo[1]{};
@@ -1471,10 +1484,13 @@ namespace Kiki {
             submitInfo.commandBufferInfoCount = 1;
             submitInfo.pCommandBufferInfos = submit;
 
-            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-                throw FatalError("Unable to submit command buffer to queue\n"
-                    "vkQueueSubmit2() returned {}", rutils::toString(res)
-                );
+            {
+                std::lock_guard<std::mutex> lock(queueMutex);
+                if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                    throw FatalError("Unable to submit command buffer to queue\n"
+                        "vkQueueSubmit2() returned {}", rutils::toString(res)
+                    );
+                }
             }
 
             // Wait for commands to finish before we destroy the temporary resources required for the transfers (staging
@@ -1690,7 +1706,7 @@ namespace Kiki {
         faces[4] = stbi_load(paths.front.string().c_str(), &w, &h, &c, 4);
         faces[5] = stbi_load(paths.back.string().c_str(), &w, &h, &c, 4);
 
-        skybox.cubemap = rutils::loadCubemapTexture(faces, w, h, window, tempTextureCmdPool.handle, allocator);
+        skybox.cubemap = rutils::loadCubemapTexture(faces, w, h, window, tempTextureCmdPool.handle, allocator, queueMutex);
         skybox.sampler = rutils::createSampler(window, true);
 
         for (auto* face : faces) {
