@@ -23,16 +23,20 @@ struct InterfaceAnimationComponent {
     glm::vec3 targetTextColour;
     float targetTextTransparency;
     float targetTextSize;
+
+    glm::vec4 targetTextureColour;
     
     bool loop = false;
     bool reverse = false;
     Kiki::InterfaceInterpolationType interpolation = Kiki::InterfaceInterpolationType::LINEAR;
     float time;
+    float delay;
 
     // Not to be set manually
     bool init = false;
     bool reversing = false;
     float elapsed = 0.0f;
+    float delayElapsed = 0.0f;
 
     ScaleVec2D positionDiff;
     ScaleVec2D sizeDiff;
@@ -44,6 +48,8 @@ struct InterfaceAnimationComponent {
     glm::vec3 textColourDiff;
     float textTransparencyDiff;
     float textSizeDiff;
+
+    glm::vec4 textureColourDiff;
 };
 
 #endif
