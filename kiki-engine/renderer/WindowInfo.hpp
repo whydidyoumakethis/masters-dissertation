@@ -20,7 +20,7 @@ namespace Kiki {
         int width = 0;
         int height = 0;
         bool resizeable = false;
-        bool fullscreen = false;
+        bool fullscreen = true;
         int monitor = 0;
         const char *title = "kiki";
         std::filesystem::path icon;

@@ -127,6 +127,11 @@ namespace rutils {
 	VulkanWindow makeVulkanWindow(Kiki::WindowInfo info) {
 		VulkanWindow ret;
 
+		#ifdef __APPLE__
+			setenv("MVK_CONFIG_SYNCHRONOUS_QUEUE_SUBMITS", "0", 1);
+			setenv("MVK_CONFIG_PRESENT_WITH_COMMAND_BUFFER", "1", 1);
+		#endif
+
 		// Initialize Volk
 		if( auto const res = volkInitialize(); VK_SUCCESS != res ) {
 			throw Kiki::FatalError( "Unable to load Vulkan API\n" 
@@ -563,9 +568,9 @@ std::tuple<VkSwapchainKHR,VkFormat,VkExtent2D> createSwapchain(VkPhysicalDevice 
     // Pick a presentation mode
     VkPresentModeKHR presentMode = VK_PRESENT_MODE_FIFO_KHR;
 
-    // Prefer FIFO RELAXED if it’s available.
-    if (modes.count(VK_PRESENT_MODE_FIFO_RELAXED_KHR))
-        presentMode = VK_PRESENT_MODE_FIFO_RELAXED_KHR;
+    // Prefer MAILBOX if it’s available.
+    if (modes.count(VK_PRESENT_MODE_MAILBOX_KHR))
+        presentMode = VK_PRESENT_MODE_MAILBOX_KHR;
 
     // Pick an image count
     VkSurfaceCapabilitiesKHR caps;

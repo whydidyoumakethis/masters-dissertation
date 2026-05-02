@@ -54,5 +54,6 @@ namespace Kiki {
         glm::vec3 impulse = { 0.0f, 0.0f, 0.0f };
 		bool isGrounded = false;
         bool isGroundedNeedsUpdate = false;
+        glm::vec3 groundVelocity = glm::vec3(0.0f);
 	};
 }

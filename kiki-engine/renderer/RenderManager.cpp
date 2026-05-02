@@ -728,7 +728,7 @@ namespace Kiki {
                 commandBuffers[frameIndex],
                 frameDone[frameIndex].handle,
                 imageAvailable[frameIndex].handle,
-                renderFinished[frameIndex].handle,
+                renderFinished[imageIndex].handle,
                 queueMutex
             );
         }
@@ -738,7 +738,7 @@ namespace Kiki {
         VkPresentInfoKHR presentInfo{};
         presentInfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
         presentInfo.waitSemaphoreCount = 1;
-        presentInfo.pWaitSemaphores = &renderFinished[frameIndex].handle;
+        presentInfo.pWaitSemaphores = &renderFinished[imageIndex].handle;
         presentInfo.swapchainCount = 1;
         presentInfo.pSwapchains = &window.swapchain;
         presentInfo.pImageIndices = &imageIndex;

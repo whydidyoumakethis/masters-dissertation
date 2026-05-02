@@ -17,6 +17,7 @@
 #include "debugging/DebugSystem.hpp"
 #include "interface/InterfaceSystem.hpp"
 #include "Audio/AudioSystem.h"
+#include "Audio/BGMController.h"
 
 #include "Timer/Timer.h"
 
@@ -59,8 +60,10 @@ namespace Kiki {
 				World::Get().FlushDestroy();
 			}
 
-			Kiki::AudioManager::get().shutdown();
+			BGMController::get().Shutdown();
+			AudioManager::get().shutdown();
 			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
+			
 
 		}
 	void Quit() {
