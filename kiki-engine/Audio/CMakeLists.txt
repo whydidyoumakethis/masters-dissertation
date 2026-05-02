@@ -10,5 +10,6 @@ target_sources(kiki
 	  AudioManager.h
 	  AudioCache.h
 	  BGMController.h
+	  AudioComponents.h
 	  
 )
