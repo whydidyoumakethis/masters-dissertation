@@ -5,8 +5,10 @@
 #include "Components/BackgroundComponent.hpp"
 #include "Components/TextComponent.hpp"
 #include "Components/ButtonComponent.hpp"
+#include "Components/InterfaceTextureComponent.hpp"
 #include "events/ButtonClickEvent.hpp"
 #include "events/ButtonHoverEvent.hpp"
+#include "events/AnimationEndEvent.hpp"
 #include "Components/InterfaceAnimationComponent.hpp"
 #include "Components/AspectRatioComponent.hpp"
 

@@ -14,6 +14,7 @@ from bpy.props import (
     CollectionProperty,
     IntProperty,
     PointerProperty,
+    FloatProperty,
 )
 
 
@@ -60,6 +61,20 @@ class GLTFTAG_PresetItem(PropertyGroup):
             ("PLAYER", "Player", ""),
             ("GOAL", "Goal", ""),
             ("SPAWN", "Spawn", ""),
+        ],
+        default="NONE"
+    )
+
+    anim_type: EnumProperty(
+        name="Anim Tag",
+        items=[
+            ("NONE", "None", ""),
+            ("UP_DOWN", "Up Down", ""),
+            ("DOWN_UP", "Down Up", ""),
+            ("LEFT_RIGHT", "Left Right", ""),
+            ("RIGHT_LEFT", "Right Left", ""),
+            ("ROTATE_CLOCKWISE", "Rotate Clockwise", ""),
+            ("ROTATE_COUNTERCLOCKWISE", "Rotate Counterclockwise", ""),
         ],
         default="NONE"
     )
@@ -112,6 +127,35 @@ class GLTFTAG_SceneProps(PropertyGroup):
         default="NONE",
     )
 
+    anim_type: EnumProperty(
+        name="Anim Tag",
+        items=[
+            ("NONE", "None", ""),
+            ("UP_DOWN", "Up Down", ""),
+            ("DOWN_UP", "Down Up", ""),
+            ("LEFT_RIGHT", "Left Right", ""),
+            ("RIGHT_LEFT", "Right Left", ""),
+            ("ROTATE_CLOCKWISE", "Rotate Clockwise", ""),
+            ("ROTATE_COUNTERCLOCKWISE", "Rotate Counterclockwise", ""),
+        ],
+        default="NONE"
+    )
+    anim_distance: FloatProperty(
+        name="Anim Distance",
+        default=5.0,
+        min=0.0,
+    )
+
+    anim_speed: FloatProperty(
+        name="Anim Speed",
+        default=1.0,
+        min=0.0,
+    )
+
+    anim_rotation_speed: FloatProperty(
+        name="Rotation Speed",
+        default=90.0,
+    )
 
 
 # ---------------------------------------------------
@@ -123,6 +167,10 @@ def apply_ui_to_object(obj, ui):
     obj["body"] = ui.body_type.lower()
     obj["collider"] = ui.collider_type.lower()
     obj["misc"] = ui.misc_type.lower()
+    obj["anim"] = ui.anim_type.lower()
+    obj["anim_distance"] = ui.anim_distance
+    obj["anim_speed"] = ui.anim_speed
+    obj["anim_rotation_speed"] = ui.anim_rotation_speed
 
 
 class GLTFTAG_OT_apply_active(Operator):
@@ -178,6 +226,13 @@ class GLTFTAG_PT_main_panel(Panel):
         layout.prop(ui, "body_type")
         layout.prop(ui, "collider_type")
         layout.prop(ui, "misc_type")
+
+        layout.separator()
+
+        layout.prop(ui, "anim_type")
+        layout.prop(ui, "anim_distance")
+        layout.prop(ui, "anim_speed")
+        layout.prop(ui, "anim_rotation_speed")
 
         layout.separator()
 

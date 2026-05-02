@@ -11,4 +11,5 @@ target_sources(kiki
 	  AnimationLoader.h
 	  Skeleton.h
 	  AnimationSystem.h
+	  SimpleAnimationSystem.h
 )

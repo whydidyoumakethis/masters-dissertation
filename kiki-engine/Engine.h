@@ -7,6 +7,7 @@
 #include "renderer/SceneManager.hpp"
 #include "Components/TransparencyComponent.hpp"
 #include "Animation/AnimationSystem.h"
+#include "Animation/SimpleAnimationSystem.h"
 
 #include "../debugging/DebugCamera.hpp"
 #include "debugging/DebugInterface.hpp"
@@ -31,6 +32,7 @@ namespace Kiki {
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
 			_scheduler.RegisterSystem<Kiki::DebugSystem>();
 			_scheduler.RegisterSystem<Kiki::InterfaceSystem>();
+			_scheduler.RegisterSystem<SimpleAnimationSystem>();
 
 			_scheduler.RegisterSystem<Kiki::AudioSystem>();
 		}

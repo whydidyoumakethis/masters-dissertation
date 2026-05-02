@@ -54,7 +54,18 @@ namespace Kiki {
                             animationComponent.textSizeDiff = animationComponent.targetTextSize - textComponent.size;
                         }
 
+                        if (registry.all_of<InterfaceTextureComponent>(e)) {
+                            auto& textureComponent = registry.get<InterfaceTextureComponent>(e);
+
+                            animationComponent.textureColourDiff = animationComponent.targetTextureColour - textureComponent.colour;
+                        }
+
                         animationComponent.init = true;
+                    }
+
+                    if (animationComponent.elapsed >= animationComponent.time && animationComponent.delay > 0.0f && animationComponent.delayElapsed <= animationComponent.delay) {
+                        animationComponent.delayElapsed += dt;
+                        continue;
                     }
 
                     float prevT = std::min(1.0f, animationComponent.elapsed / animationComponent.time);
@@ -104,33 +115,43 @@ namespace Kiki {
                     interfaceComponent.dirty = true;
 
                     if (registry.all_of<BackgroundComponent>(e)) {
-                            auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+                        auto& backgroundComponent = registry.get<BackgroundComponent>(e);
 
-                            backgroundComponent.colour = backgroundComponent.colour - (prevT * animationComponent.backgroundColourDiff) + (t * animationComponent.backgroundColourDiff);
-                            backgroundComponent.transparency = backgroundComponent.transparency - (prevT * animationComponent.backgroundTransparencyDiff) + (t * animationComponent.backgroundTransparencyDiff);
-                        }
+                        backgroundComponent.colour = backgroundComponent.colour - (prevT * animationComponent.backgroundColourDiff) + (t * animationComponent.backgroundColourDiff);
+                        backgroundComponent.transparency = backgroundComponent.transparency - (prevT * animationComponent.backgroundTransparencyDiff) + (t * animationComponent.backgroundTransparencyDiff);
+                    }
 
-                        if (registry.all_of<TextComponent>(e)) {
-                            auto& textComponent = registry.get<TextComponent>(e);
+                    if (registry.all_of<TextComponent>(e)) {
+                        auto& textComponent = registry.get<TextComponent>(e);
 
-                            textComponent.colour = textComponent.colour - (prevT * animationComponent.textColourDiff) + (t * animationComponent.textColourDiff);
-                            textComponent.transparency = textComponent.transparency - (prevT * animationComponent.textTransparencyDiff) + (t * animationComponent.textTransparencyDiff);
-                            textComponent.size = textComponent.size - (prevT * animationComponent.textSizeDiff) + (t * animationComponent.textSizeDiff);
+                        textComponent.colour = textComponent.colour - (prevT * animationComponent.textColourDiff) + (t * animationComponent.textColourDiff);
+                        textComponent.transparency = textComponent.transparency - (prevT * animationComponent.textTransparencyDiff) + (t * animationComponent.textTransparencyDiff);
+                        textComponent.size = textComponent.size - (prevT * animationComponent.textSizeDiff) + (t * animationComponent.textSizeDiff);
 
-                            textComponent.dirty = true;
-                        }
+                        textComponent.dirty = true;
+                    }
+
+                    if (registry.all_of<InterfaceTextureComponent>(e)) {
+                        auto& textureComponent = registry.get<InterfaceTextureComponent>(e);
+
+                        textureComponent.colour = textureComponent.colour - (prevT * animationComponent.textureColourDiff) + (t * animationComponent.textureColourDiff);
+                    }
 
                     if (animationComponent.elapsed >= animationComponent.time) {
                         if (animationComponent.loop && !animationComponent.reverse) {
                             animationComponent.elapsed = 0.0f;
+                            animationComponent.delayElapsed = 0.0f;
                         } else if (animationComponent.loop && animationComponent.reverse) {
                             animationComponent.elapsed = 0.0f;
+                            animationComponent.delayElapsed = 0.0f;
                             animationComponent.reversing = !animationComponent.reversing;
                         } else if (!animationComponent.loop && animationComponent.reverse && !animationComponent.reversing) {
                             animationComponent.elapsed = 0.0f;
+                            animationComponent.delayElapsed = 0.0f;
                             animationComponent.reversing = true;
                         } else {
                             registry.remove<InterfaceAnimationComponent>(e);
+                            messageCenter.Publish(AnimationEndEvent(e));
                         }
                     }
                 }
@@ -174,9 +195,13 @@ namespace Kiki {
                         float aspectRatio = interfaceComponent.size.absoluteX / interfaceComponent.size.absoluteY;
 
                         if (aspectRatio > aspectRatioComp.aspectRatio) {
-                            interfaceComponent.size.absoluteX = aspectRatioComp.aspectRatio * interfaceComponent.size.absoluteY;
+                            float newSize = aspectRatioComp.aspectRatio * interfaceComponent.size.absoluteY;
+                            interfaceComponent.position.absoluteX += (interfaceComponent.size.absoluteX - newSize) / 2;
+                            interfaceComponent.size.absoluteX = newSize;
                         } else if (aspectRatio < aspectRatioComp.aspectRatio) {
-                            interfaceComponent.size.absoluteY = interfaceComponent.size.absoluteX / aspectRatioComp.aspectRatio;
+                            float newSize = interfaceComponent.size.absoluteX / aspectRatioComp.aspectRatio;
+                            interfaceComponent.position.absoluteY += (interfaceComponent.size.absoluteY - newSize) / 2;
+                            interfaceComponent.size.absoluteY = newSize;
                         }
                     }
 
