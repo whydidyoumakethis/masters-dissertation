@@ -18,4 +18,5 @@ target_sources(kiki
       InterfaceAnimationComponent.hpp
       InterfaceTextureComponent.hpp
       AspectRatioComponent.hpp
+      SimpleAnimationComponent.hpp
 )

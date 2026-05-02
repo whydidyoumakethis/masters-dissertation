@@ -177,6 +177,16 @@ enum class MmiscTags {
 	SPAWN
 };
 
+enum class MsimpleAnimType {
+	NONE,
+	UP_DOWN,
+	DOWN_UP,
+	LEFT_RIGHT,
+	RIGHT_LEFT,
+	ROTATE_CLOCKWISE,
+	ROTATE_COUNTERCLOCKWISE
+};
+
 
 struct MmeshInstance {
 	int meshIndex;
@@ -184,6 +194,10 @@ struct MmeshInstance {
 	MbodyType bodyType = MbodyType::STATIC;
 	McolliderType colliderType = McolliderType::NONE;
 	MmiscTags miscTag = MmiscTags::NONE;
+	MsimpleAnimType simpleAnim = MsimpleAnimType::NONE;
+	float anim_distance = 5.f;
+	float anim_speed = 1.f;
+	float anim_rotation_speed = 90.f;
 };
 struct MemtpyInstance {
 	glm::mat4 transform;
@@ -391,6 +405,24 @@ namespace Kiki {
 
 		}
 
+		static MsimpleAnimType parseSimpleAnimType(aiNode* node) {
+			if (!node || !node->mMetaData) {
+				return MsimpleAnimType::NONE;
+			}
+			aiString animTypeStr;
+			if (!node->mMetaData->Get("anim", animTypeStr)) {
+				return MsimpleAnimType::NONE;
+			}
+			std::string s = animTypeStr.C_Str();
+			if (s == "up_down") return MsimpleAnimType::UP_DOWN;
+			if (s == "down_up") return MsimpleAnimType::DOWN_UP;
+			if (s == "left_right") return MsimpleAnimType::LEFT_RIGHT;
+			if (s == "right_left") return MsimpleAnimType::RIGHT_LEFT;
+			if (s == "rotate_clockwise") return MsimpleAnimType::ROTATE_CLOCKWISE;
+			if (s == "rotate_counterclockwise") return MsimpleAnimType::ROTATE_COUNTERCLOCKWISE;
+			return MsimpleAnimType::NONE;
+		}
+
 		static void collectNodeInstances(
 			aiNode* node,
 			const glm::mat4& parentTransform,
@@ -445,6 +477,20 @@ namespace Kiki {
 					}
 
 					instance.miscTag = parseMiscTag(node);
+
+					instance.simpleAnim = parseSimpleAnimType(node);
+					aiString animDistanceStr;
+					if (node->mMetaData->Get("anim_distance", animDistanceStr)) {
+						instance.anim_distance = std::stof(animDistanceStr.C_Str());
+					}
+					aiString animSpeedStr;
+					if (node->mMetaData->Get("anim_speed", animSpeedStr)) {
+						instance.anim_speed = std::stof(animSpeedStr.C_Str());
+					}
+					aiString animRotationSpeedStr;
+					if (node->mMetaData->Get("anim_rotation_speed", animRotationSpeedStr)) {
+						instance.anim_rotation_speed = std::stof(animRotationSpeedStr.C_Str());
+					}
 				}
 
 				out.instances.push_back(instance);

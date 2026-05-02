@@ -11,6 +11,7 @@
 
 #include "Animation/AnimationLoader.h"
 #include "Animation/AnimationComponent.h"
+#include "Components/SimpleAnimationComponent.hpp"
 
 #include <assimp/Importer.hpp> 
 
@@ -441,6 +442,18 @@ namespace Kiki {
                     spdlog::warn("[Physics] Failed to create TRIANGLE_MESH for mesh: '{}'", mesh.name);
                 }
                 break;
+            }
+
+			if (instance.simpleAnim != MsimpleAnimType::NONE) {
+				auto& simpleAnimComp = registry.emplace<SimpleAnimationComponent>(model);
+				simpleAnimComp.type = instance.simpleAnim;
+				simpleAnimComp.startPosition = transform.position; // Store the initial position for oscillation
+				simpleAnimComp.startRotation = transform.rotation; // Store the initial rotation for rotation animations
+                simpleAnimComp.distance = instance.anim_distance;
+				simpleAnimComp.speed = instance.anim_speed;
+                simpleAnimComp.rotationSpeed = instance.anim_rotation_speed;
+                spdlog::info("[Animation] Attached SimpleAnimationComponent with animation '{}' to mesh: '{}'", 
+                    static_cast<int>(instance.simpleAnim), mesh.name);
             }
 
             //registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
