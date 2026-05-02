@@ -63,7 +63,7 @@ namespace rutils {
 		return *this;
 	}
 
-    Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, VkFormat format) {
+    Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, std::mutex& queueMutex, VkFormat format) {
         auto const baseWidth = std::uint32_t(baseWidthi);
         auto const baseHeight = std::uint32_t(baseHeighti);
 
@@ -252,10 +252,13 @@ namespace rutils {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-        if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw Kiki::FatalError("Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", toString(res)
-            );
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", toString(res)
+                );
+            }
         }
 
         if (auto const res = vkWaitForFences(aContext.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
@@ -272,7 +275,7 @@ namespace rutils {
         return ret;
     }
 
-    Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator) {
+    Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, std::mutex& queueMutex) {
         // Create staging buffer and copy image data to it
         auto const sizeInBytes = atlasSize * atlasSize * sizeof(uint8_t) * 4;
 
@@ -379,10 +382,13 @@ namespace rutils {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-        if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw Kiki::FatalError("Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", toString(res)
-            );
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", toString(res)
+                );
+            }
         }
 
         if (auto const res = vkWaitForFences(aContext.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
@@ -457,7 +463,7 @@ namespace rutils {
         return Image(aAllocator.allocator, image, allocation, view);
     }
 
-    Image loadCubemapTexture(std::array<stbi_uc*, 6> faces, uint32_t width, uint32_t height, VulkanWindow const& context, VkCommandPool commandPool, Allocator const& allocator) {        
+    Image loadCubemapTexture(std::array<stbi_uc*, 6> faces, uint32_t width, uint32_t height, VulkanWindow const& context, VkCommandPool commandPool, Allocator const& allocator, std::mutex& queueMutex) {        
         // Create staging buffer and copy image data to it
         uint32_t const faceSizeInBytes = width * height * 4;
         uint32_t const totalSizeInBytes = width * height * 24; // total size is 4 channels * 6 images * width per image * height per image
@@ -578,8 +584,11 @@ namespace rutils {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-        if (auto const res = vkQueueSubmit2(context.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Unable to submit command buffer to queue\n" "vkQueueSubmit2() returned {}", toString(res));
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(context.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n" "vkQueueSubmit2() returned {}", toString(res));
+            }
         }
 
         if (auto const res = vkWaitForFences(context.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {

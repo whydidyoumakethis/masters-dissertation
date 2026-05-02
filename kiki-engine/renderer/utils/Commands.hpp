@@ -66,7 +66,8 @@ namespace rutils {
 		VkCommandBuffer,
 		VkFence,
 		VkSemaphore,
-		VkSemaphore
+		VkSemaphore, 
+        std::mutex& queueMutex
 	);
 }
 

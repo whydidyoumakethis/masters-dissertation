@@ -23,12 +23,6 @@ struct TextComponent {
 
     bool dirty = true;
     std::vector<CharacterTransform> characters;
-    TextComponent() = default;
-    TextComponent(TextComponent const&) = delete;
-    TextComponent& operator= (TextComponent const&) = delete;
-
-    TextComponent(TextComponent&&) noexcept = default;
-    TextComponent& operator=(TextComponent&&) noexcept = default;
 
     TextComponent(std::string name, std::u32string text, float size, glm::vec3 colour, float transparency, 
         Kiki::HorizontalAlignment horizontalAlignment = Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment verticalAlignment = Kiki::VerticalAlignment::CENTRE)
