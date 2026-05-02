@@ -75,6 +75,8 @@ namespace Kiki {
         float fxaaStrength = 16.f;
         bool fxaaEnabled = true;
 
+        bool customPostprocessEnabled = false;
+
         RenderMode renderMode = STANDARD;
     };
 
@@ -150,6 +152,7 @@ namespace Kiki {
         std::filesystem::path debug_f = "debug.frag.spv";
 		std::filesystem::path debug_line_v = "debug_line.vert.spv";
         std::filesystem::path debug_line_f = "debug_line.frag.spv";
+        std::filesystem::path custom_postprocess_f = "custom_postprocess.frag.spv";
     };
 
     class RenderManager {
@@ -204,6 +207,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout bloomLayout;
         rutils::DescriptorSetLayout compositeLayout;
         rutils::DescriptorSetLayout debugLayout;
+        rutils::DescriptorSetLayout customPostprocessLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -216,12 +220,14 @@ namespace Kiki {
         VkDescriptorSet shadowMatrixDescriptors;
         VkDescriptorSet compositeDescriptors;
         VkDescriptorSet debugDescriptors;
+        VkDescriptorSet customPostprocessDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
         rutils::Image doneCompositeImage;
         rutils::Image doneTonemapImage;
         rutils::Image doneDebugImage;
+        rutils::Image doneCustomPostprocessImage;
         rutils::Image depthBuffer;
 
         std::array<rutils::Image, N_BLOOM_IMAGES> bloomImages;

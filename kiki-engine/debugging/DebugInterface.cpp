@@ -239,6 +239,14 @@ namespace Kiki {
                 ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
 
 
+                ImGui::SeparatorText("Custom Postprocess");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##custompostprocessenabled", &renderManager.renderSettings.customPostprocessEnabled);
+
+
                 ImGui::Indent();
                 if (ImGui::CollapsingHeader("Shaders")) {
                     ImGui::Text("Shader Path:");
