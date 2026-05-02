@@ -111,14 +111,13 @@ private:
         JPH::Vec3 currentJoltVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 
         if (glm::length(inputDir) > 0.001f) {
-			// normalize to prevent faster diagonal movement
+            // normalize to prevent faster diagonal movement
             inputDir = glm::normalize(inputDir);
 
-			// inputdir transform from character space to camera space
-			// cameraYaw decides which direction is "forward" for the character
+            // inputdir transform from character space to camera space
+            // cameraYaw decides which direction is "forward" for the character
             float rad = glm::radians(cameraYaw);
-            //glm::vec3 forward = { sin(rad), 0, cos(rad) };
-            glm::vec3 forward = {-sin(rad), 0, -cos(rad) };
+            glm::vec3 forward = { -sin(rad), 0, -cos(rad) };
             glm::vec3 right = { cos(rad), 0, -sin(rad) };
 
             glm::vec3 moveDir = forward * inputDir.y + right * inputDir.x;
@@ -126,24 +125,27 @@ private:
             character.velocity.x = moveDir.x * speed;
             character.velocity.z = moveDir.z * speed;
 
-			// record target facing direction (character faces movement direction)
-            //character.targetYaw = glm::degrees(atan2(moveDir.x, moveDir.z));
+            // record target facing direction (character faces movement direction)
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
-            glm::vec3 newVel = glm::vec3(character.velocity.x, currentJoltVel.GetY(), character.velocity.z);
-			if (character.hasAbility(Ability::Dash) && inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) && dashTimer <= 0.0f) {
-                newVel += moveDir * speed * 100.0f; // Dash adds a burst of speed in the movement direction
+            // final speed = playerspeed + platformspeed！
+            glm::vec3 finalVel = character.velocity + ip.groundVelocity;
+
+            glm::vec3 newVel = glm::vec3(finalVel.x, currentJoltVel.GetY(), finalVel.z);
+
+            if (character.hasAbility(Ability::Dash) && inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) && dashTimer <= 0.0f) {
+                newVel += moveDir * speed * 100.0f; // Dash adds a burst of speed
                 dashTimer = 1.0f; // Dash cooldown
             }
             physics.setEntityVelocity(playerEntity, newVel);
         }
+
         else {
-			// TODO: apply friction to slow down instead of stopping immediately
-			// or just connect with physics system
             if (ip.isGrounded) {
                 character.velocity.x = 0.0f;
                 character.velocity.z = 0.0f;
-                glm::vec3 newVel = glm::vec3(0.0f, currentJoltVel.GetY(), 0.0f);
+
+                glm::vec3 newVel = glm::vec3(ip.groundVelocity.x, currentJoltVel.GetY(), ip.groundVelocity.z);
                 physics.setEntityVelocity(playerEntity, newVel);
             }
             else {
