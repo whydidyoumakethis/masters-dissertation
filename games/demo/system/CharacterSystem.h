@@ -4,6 +4,7 @@
 #include "../component/ThirdPersonCameraComponent.hpp"
 #include "Animation/AnimationComponent.h"
 #include"../Events.h"
+#include "../../../kiki-engine/Audio/BGMController.h"
 class CharacterSystem : public System {
 public:
     Phase GetPhase() const override { return Phase::Update; }
@@ -268,6 +269,8 @@ private:
                 if (i == 0) {
                     cc->grantAbility(Ability::DoubleJump);
 					spdlog::info("You earned the double jump ability!");
+                    //BGM TEST!!!
+                    Kiki::BGMController::get().Play("sounds/Bohemian Rhapsody.mp3");
                 }
                 else if (i == 1) {
                     cc->grantAbility(Ability::SpeedBoost);
@@ -280,6 +283,9 @@ private:
                 else if (i == 3) {
 					// completed level logic here
 					spdlog::info("Congratulations! You completed the level! ");
+					//BGM TEST!!!
+                    Kiki::BGMController::get().Stop();
+                    
                 }
                 break;
             }
