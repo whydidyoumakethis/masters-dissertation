@@ -1586,6 +1586,9 @@ namespace rutils {
 
             CustomPostprocessSettings customPostprocessSettings;
             customPostprocessSettings.isEnabled = renderSettings.customPostprocessEnabled ? 1 : 0;
+            customPostprocessSettings.params.x = static_cast<float>(renderSettings.bayerMatrixMode);
+            customPostprocessSettings.params.y = renderSettings.bayerExposure;
+            customPostprocessSettings.params.z = static_cast<float>(renderSettings.bayerLevels);
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.customPostprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CustomPostprocessSettings), &customPostprocessSettings);
 

@@ -76,6 +76,9 @@ namespace Kiki {
         bool fxaaEnabled = true;
 
         bool customPostprocessEnabled = false;
+        int bayerMatrixMode = 2;
+        float bayerExposure = 1.0f;
+        int bayerLevels = 4;
 
         RenderMode renderMode = STANDARD;
     };
