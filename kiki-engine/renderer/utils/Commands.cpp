@@ -1733,7 +1733,7 @@ namespace rutils {
         }
     }
 
-    void submitCommands(VulkanWindow const& window, VkCommandBuffer aCmdBuff, VkFence aFence, VkSemaphore aWaitSemaphore, VkSemaphore aSignalSemaphore) {
+    void submitCommands(VulkanWindow const& window, VkCommandBuffer aCmdBuff, VkFence aFence, VkSemaphore aWaitSemaphore, VkSemaphore aSignalSemaphore, std::mutex& queueMutex) {
         VkSemaphoreSubmitInfo wait[1]{};
         wait[0].sType = VK_STRUCTURE_TYPE_SEMAPHORE_SUBMIT_INFO;
         wait[0].semaphore = aWaitSemaphore;
@@ -1757,10 +1757,13 @@ namespace rutils {
         submitInfo.signalSemaphoreInfoCount = 1;
         submitInfo.pSignalSemaphoreInfos = signal;
 
-        if (auto const res = vkQueueSubmit2( window.graphicsQueue, 1, &submitInfo, aFence); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", toString(res)
-            );
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, aFence); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", toString(res)
+                );
+            }
         }
     }
 }
