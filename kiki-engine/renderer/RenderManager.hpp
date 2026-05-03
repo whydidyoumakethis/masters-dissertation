@@ -69,16 +69,21 @@ namespace Kiki {
         float bloomStrength = 0.04f;
         bool bloomEnabled = true;
 
+        bool chromaticAberrationEnabled = false;
+        glm::vec2 chromaticRedShift = glm::vec2(0.f, 0.f);
+        glm::vec2 chromaticGreenShift = glm::vec2(0.f, 0.f);
+        glm::vec2 chromaticBlueShift = glm::vec2(0.f, 0.f);
+
         float tonemapMaxWhite = 4.f;
         bool tonemapEnabled = true;
-
-        float fxaaStrength = 16.f;
-        bool fxaaEnabled = true;
 
         bool customPostprocessEnabled = false;
         int bayerMatrixMode = 2;
         float bayerExposure = 1.0f;
         int bayerLevels = 4;
+
+        float fxaaStrength = 16.f;
+        bool fxaaEnabled = true;
 
         RenderMode renderMode = STANDARD;
     };
@@ -156,6 +161,7 @@ namespace Kiki {
 		std::filesystem::path debug_line_v = "debug_line.vert.spv";
         std::filesystem::path debug_line_f = "debug_line.frag.spv";
         std::filesystem::path custom_postprocess_f = "custom_postprocess.frag.spv";
+        std::filesystem::path chromatic_aberration_f = "chromatic_aberration.frag.spv";
     };
 
     class RenderManager {
@@ -205,6 +211,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout cubemapLayout;
         rutils::DescriptorSetLayout ssaoLayout;
         rutils::DescriptorSetLayout ssaoBlurredLayout;
+        rutils::DescriptorSetLayout chromaticAberrationLayout;
         rutils::DescriptorSetLayout tonemapLayout;
         rutils::DescriptorSetLayout shadowMatrixLayout;
         rutils::DescriptorSetLayout bloomLayout;
@@ -219,6 +226,7 @@ namespace Kiki {
         VkDescriptorSet ssaoDescriptors;
         VkDescriptorSet ssaoHBlurDescriptors;
         VkDescriptorSet ssaoBlurredDescriptors;
+        VkDescriptorSet chromaticAberrationDescriptors;
         VkDescriptorSet tonemapDescriptors;
         VkDescriptorSet shadowMatrixDescriptors;
         VkDescriptorSet compositeDescriptors;
@@ -228,6 +236,7 @@ namespace Kiki {
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
         rutils::Image doneCompositeImage;
+        rutils::Image doneChromaticAberrationImage;
         rutils::Image doneTonemapImage;
         rutils::Image doneDebugImage;
         rutils::Image doneCustomPostprocessImage;

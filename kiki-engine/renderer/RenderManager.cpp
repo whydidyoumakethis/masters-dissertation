@@ -101,6 +101,7 @@ namespace Kiki {
             postProcessingLayout = rutils::createPostProcessingDescriptorLayout(window);
             ssaoLayout = rutils::createSSAODescriptorLayout(window);
             ssaoBlurredLayout = rutils::createSSAOBlurredDescriptorLayout(window);
+            chromaticAberrationLayout = rutils::createChromaticAberrationDescriptorLayout(window);
             tonemapLayout = rutils::createTonemapDescriptorLayout(window);
             bloomLayout = rutils::createBloomDescriptorLayout(window);
             compositeLayout = rutils::createCompositeDescriptorLayout(window);
@@ -119,6 +120,7 @@ namespace Kiki {
             pipelineLayouts.compositePipelineLayout = rutils::createCompositePipelineLayout(window, compositeLayout.handle);
             pipelineLayouts.debugPipelineLayout = rutils::createDebugPipelineLayout(window, debugLayout.handle);
             pipelineLayouts.customPostprocessPipelineLayout = rutils::createCustomPostprocessPipelineLayout(window, customPostprocessLayout.handle);
+            pipelineLayouts.chromaticAberrationPipelineLayout = rutils::createChromaticAberrationPipelineLayout(window, chromaticAberrationLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, textureLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -131,6 +133,7 @@ namespace Kiki {
             doneLightingImage = rutils::createPostProcessingImage(window, allocator);
             doneSSRImage = rutils::createPostProcessingImage(window, allocator);
             doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
+            doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator);
             doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
             doneDebugImage = rutils::createPostTonemapImage(window, allocator);
             doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator);
@@ -194,17 +197,20 @@ namespace Kiki {
             compositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
             initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
 
-            tonemapDescriptors = rutils::allocDescSet(window, descriptorPool.handle, tonemapLayout.handle);
-            initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
+            chromaticAberrationDescriptors = rutils::allocDescSet(window, descriptorPool.handle, chromaticAberrationLayout.handle);
+            initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
 
-            debugDescriptors = rutils::allocDescSet(window, descriptorPool.handle, debugLayout.handle);
-            initialiseDebugDescriptorSet(window, doneTonemapImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
+            tonemapDescriptors = rutils::allocDescSet(window, descriptorPool.handle, tonemapLayout.handle);
+            initialiseTonemapDescriptorSet(window, doneChromaticAberrationImage, sampler, tonemapDescriptors);
 
             customPostprocessDescriptors = rutils::allocDescSet(window, descriptorPool.handle, customPostprocessLayout.handle);
-            initialiseCustomPostprocessDescriptorSet(window, doneDebugImage, sampler, customPostprocessDescriptors);
+            initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
+
+            debugDescriptors = rutils::allocDescSet(window, descriptorPool.handle, debugLayout.handle);
+            initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
 
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
-            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneCustomPostprocessImage, sampler, fxaaDescriptors);
+            initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -506,6 +512,7 @@ namespace Kiki {
                 doneLightingImage = rutils::createPostProcessingImage(window, allocator);
                 doneSSRImage = rutils::createPostProcessingImage(window, allocator);
                 doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
+                doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator);
                 doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
                 doneDebugImage = rutils::createPostTonemapImage(window, allocator);
                 doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator);
@@ -535,10 +542,11 @@ namespace Kiki {
                 }
 
                 initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
-                initialiseTonemapDescriptorSet(window, doneCompositeImage, sampler, tonemapDescriptors);
-                initialiseDebugDescriptorSet(window, doneTonemapImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
-                initialiseCustomPostprocessDescriptorSet(window, doneDebugImage, sampler, customPostprocessDescriptors);
-                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneCustomPostprocessImage, sampler, fxaaDescriptors);
+                initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
+                initialiseTonemapDescriptorSet(window, doneChromaticAberrationImage, sampler, tonemapDescriptors);
+                initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
+                initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
+                initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
             }
 
             auto& registry = World::Get().Registry();
@@ -693,11 +701,13 @@ namespace Kiki {
                 compositeDescriptors,
                 debugDescriptors,
                 customPostprocessDescriptors,
+                chromaticAberrationDescriptors,
                 noTextureDst,
                 skybox,
                 doneLightingImage,
                 doneSSRImage,
                 doneCompositeImage,
+                doneChromaticAberrationImage,
                 doneTonemapImage,
                 doneDebugImage,
                 doneCustomPostprocessImage,
@@ -1839,6 +1849,7 @@ namespace Kiki {
         pipelines.debug = {};
 		pipelines.debug_line = {};
         pipelines.customPostprocess = {};
+        pipelines.chromaticAberration = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1855,6 +1866,7 @@ namespace Kiki {
         pipelineLayouts.compositePipelineLayout = {};
         pipelineLayouts.debugPipelineLayout = {};
         pipelineLayouts.customPostprocessPipelineLayout = {};
+        pipelineLayouts.chromaticAberrationPipelineLayout = {};
 
         for (auto& shadowCubemap : shadowCubemaps) {
             if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
@@ -1871,6 +1883,7 @@ namespace Kiki {
         doneSSRImage = {};
         doneDebugImage = {};
         doneCustomPostprocessImage = {};
+        doneChromaticAberrationImage = {};
         
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImages[i] = {};
 
@@ -1901,6 +1914,7 @@ namespace Kiki {
         compositeLayout = {};
         debugLayout = {};
         customPostprocessLayout = {};
+        chromaticAberrationLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
@@ -1909,6 +1923,7 @@ namespace Kiki {
         compositeDescriptors = {};
         debugDescriptors = {};
         customPostprocessDescriptors = {};
+        chromaticAberrationDescriptors = {};
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImageDownsampleDescriptorSets[i] = {};
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImageUpsampleDescriptorSets[i] = {};
 

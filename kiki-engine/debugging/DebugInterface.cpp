@@ -213,6 +213,29 @@ namespace Kiki {
                 ImGui::InputFloat("##editbloomradiusy", &renderManager.renderSettings.bloomRadius_y, 0.001f, 0.005f, "%.3f");
 
 
+                ImGui::SeparatorText("Chromatic aberration");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##chromaticaberrationenabled", &renderManager.renderSettings.chromaticAberrationEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Red shift:");
+                ImGui::SameLine(110.0f);
+                ImGui::DragFloat2("##editchromaticredshift", &renderManager.renderSettings.chromaticRedShift.x, 0.00001f, 0.f, 0.f, "%.5f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Green shift:");
+                ImGui::SameLine(110.0f);
+                ImGui::DragFloat2("##editchromaticgreenshift", &renderManager.renderSettings.chromaticGreenShift.x, 0.00001f, 0.f, 0.f, "%.5f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Blue shift:");
+                ImGui::SameLine(110.0f);
+                ImGui::DragFloat2("##editchromaticblueshift", &renderManager.renderSettings.chromaticBlueShift.x, 0.00001f, 0.f, 0.f, "%.5f");
+
+
                 ImGui::SeparatorText("Tonemapping");
 
                 ImGui::AlignTextToFramePadding();
@@ -226,20 +249,7 @@ namespace Kiki {
                 ImGui::InputFloat("##edittonemapmaxwhite", &renderManager.renderSettings.tonemapMaxWhite, 0.5f, 1.f, "%.2f");
 
 
-                ImGui::SeparatorText("FXAA");
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Enabled:");
-                ImGui::SameLine(110.f);
-                ImGui::Checkbox("##fxaaenabled", &renderManager.renderSettings.fxaaEnabled);
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Strength:");
-                ImGui::SameLine(110.f);
-                ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
-
-
-                ImGui::SeparatorText("Custom Postprocess");
+                ImGui::SeparatorText("Bayer dithering");
 
                 ImGui::AlignTextToFramePadding();
                 ImGui::Text("Enabled:");
@@ -261,6 +271,19 @@ namespace Kiki {
                 ImGui::Text("Levels:");
                 ImGui::SameLine(110.f);
                 ImGui::SliderInt("##editbayerlevels", &renderManager.renderSettings.bayerLevels, 2, 16);
+
+
+                ImGui::SeparatorText("FXAA");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##fxaaenabled", &renderManager.renderSettings.fxaaEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
 
 
                 ImGui::Indent();

@@ -55,6 +55,13 @@ namespace rutils {
         float bloomStrength;
     };
 
+    struct ChromaticAberrationSettings {
+        int isEnabled;
+        alignas(8) glm::vec2 redShift;
+        glm::vec2 greenShift;
+        glm::vec2 blueShift;
+    };
+
     struct TonemapSettings {
         float maxWhite;
         std::uint32_t isEnabled;
@@ -94,6 +101,7 @@ namespace rutils {
         rutils::Pipeline debug;
         rutils::Pipeline debug_line;
         rutils::Pipeline customPostprocess;
+        rutils::Pipeline chromaticAberration;
     };
 
     struct PipelineLayouts {
@@ -112,6 +120,7 @@ namespace rutils {
         PipelineLayout compositePipelineLayout;
         PipelineLayout debugPipelineLayout;
         PipelineLayout customPostprocessPipelineLayout;
+        PipelineLayout chromaticAberrationPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -129,6 +138,7 @@ namespace rutils {
     PipelineLayout createCompositePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout compositeLayout);
     PipelineLayout createDebugPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout debugLayout);
     PipelineLayout createCustomPostprocessPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout customPostprocessLayout);
+    PipelineLayout createChromaticAberrationPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout chromaticAberrationLayout);
     void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, VkDescriptorSetLayout textureLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
@@ -149,6 +159,7 @@ namespace rutils {
     Pipeline createDebugPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createDebugLinePipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createCustomPostprocessPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
+    Pipeline createChromaticAberrationPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
 
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
