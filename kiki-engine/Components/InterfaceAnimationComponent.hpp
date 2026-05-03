@@ -2,6 +2,11 @@
 #define KIKI_COMPONENTS_INTERFACEANIMATIONCOMPONENT
 
 #include "InterfaceComponent.hpp"
+#include "BackgroundComponent.hpp"
+#include "TextComponent.hpp"
+#include "InterfaceTextureComponent.hpp"
+
+#include "ECS/World.h"
 
 namespace Kiki {
     enum InterfaceInterpolationType {
@@ -50,6 +55,40 @@ struct InterfaceAnimationComponent {
     float textSizeDiff;
 
     glm::vec4 textureColourDiff;
+
+    void copy(entt::entity e) {
+        World& world = World::Get();
+        auto& registry = world.Registry();
+
+        if (registry.all_of<InterfaceComponent>(e)) {
+            auto& interfaceComponent = registry.get<InterfaceComponent>(e);
+
+            targetPosition = interfaceComponent.position;
+            targetSize = interfaceComponent.size;
+            targetRotation = interfaceComponent.rotation;
+        }
+
+        if (registry.all_of<BackgroundComponent>(e)) {
+            auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+
+            targetBackgroundColour = backgroundComponent.colour;
+            targetBackgroundTransparency = backgroundComponent.transparency;
+        }
+
+        if (registry.all_of<TextComponent>(e)) {
+            auto& textComponent = registry.get<TextComponent>(e);
+
+            targetTextColour = textComponent.colour;
+            targetTextTransparency = textComponent.transparency;
+            targetTextSize = textComponent.size;
+        }
+
+        if (registry.all_of<InterfaceTextureComponent>(e)) {
+            auto& textureComponent = registry.get<InterfaceTextureComponent>(e);
+
+            targetTextureColour = textureComponent.colour;
+        }
+    }
 };
 
 #endif

@@ -303,7 +303,13 @@ namespace Kiki {
                     hb_buffer_guess_segment_properties(buffer);
                     hb_shape(font.hbHandle, buffer, nullptr, 0);
 
-                    float scale = (float)textComponent.size / (float)font.baseSize;
+                    float scale = 0.0f;
+
+                    if (textComponent.sizeScales) {
+                        scale = (textComponent.size * interfaceComponent.size.absoluteY) / (float)font.baseSize;
+                    } else {
+                        scale = (float)textComponent.size / (float)font.baseSize;
+                    }
 
                     unsigned int numGlyphs;
                     hb_glyph_info_t* glyphInfo = hb_buffer_get_glyph_infos(buffer, &numGlyphs);

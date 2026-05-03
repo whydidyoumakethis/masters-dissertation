@@ -81,7 +81,13 @@ namespace Kiki {
                         msdfgen::Vector2(-bounds.l + 4.0 / scale, -bounds.b + 4.0 / scale)
                     );
                     msdfgen::Range range(4.0 / scale);
-                    msdfgen::generateMSDF(tempGlyphs[i].bitmap, shape, msdfgen::SDFTransformation(projection, range));
+
+                    msdfgen::MSDFGeneratorConfig config;
+                    // This tells the generator: "If a pixel looks like it will create a hole, fix it."
+                    config.errorCorrection.mode = msdfgen::ErrorCorrectionConfig::EDGE_PRIORITY;
+                    config.errorCorrection.distanceCheckMode = msdfgen::ErrorCorrectionConfig::DistanceCheckMode::ALWAYS_CHECK_DISTANCE;
+                    config.errorCorrection.mode = msdfgen::ErrorCorrectionConfig::Mode::INDISCRIMINATE;
+                    msdfgen::generateMSDF(tempGlyphs[i].bitmap, shape, msdfgen::SDFTransformation(projection, range), config);
                 }
 
                 stbrp_context context;

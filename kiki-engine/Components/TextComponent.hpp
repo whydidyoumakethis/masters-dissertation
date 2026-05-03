@@ -16,6 +16,7 @@ struct TextComponent {
     std::string font;
     std::u32string text;
     float size;
+    bool sizeScales = false;
     glm::vec3 colour;
     float transparency;
     Kiki::HorizontalAlignment horizontalAlignment = Kiki::HorizontalAlignment::CENTRE;
@@ -25,8 +26,8 @@ struct TextComponent {
     std::vector<CharacterTransform> characters;
 
     TextComponent(std::string name, std::u32string text, float size, glm::vec3 colour, float transparency, 
-        Kiki::HorizontalAlignment horizontalAlignment = Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment verticalAlignment = Kiki::VerticalAlignment::CENTRE)
-        : font(name), text(text), size(size), colour(colour), transparency(transparency), horizontalAlignment(horizontalAlignment), verticalAlignment(verticalAlignment) {}
+        Kiki::HorizontalAlignment horizontalAlignment = Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment verticalAlignment = Kiki::VerticalAlignment::CENTRE, bool sizeScales = false)
+        : font(name), text(text), size(size), colour(colour), transparency(transparency), horizontalAlignment(horizontalAlignment), verticalAlignment(verticalAlignment), sizeScales(sizeScales) {}
 };
 
 #endif
