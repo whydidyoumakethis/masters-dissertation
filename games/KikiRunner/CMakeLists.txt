@@ -6,9 +6,21 @@ target_sources(KikiRunner
     main.cpp
     systems/UISystem.hpp
     systems/LevelSystem.hpp
+    systems/CharacterSystem.h
+    systems/GoalTriggerSystem.h
+    systems/ThirdPersonCameraSystem.h 
+    systems/TimeLimitSystem.h
     events/LevelLoadedEvent.hpp
     events/RequestLevelChangeEvent.hpp
+    events/TimerTriggerEvent.h
+    events/ResetLevelEvent.hpp
+    events/RespawnCharacterEvent.hpp
+    events/ObjectiveAchievedEvent.hpp
+    events/ResetThirdPersonCameraEvent.hpp
+    components/CharacterComponent.h 
+    components/ThirdPersonCameraComponent.hpp
 )
+
 target_link_libraries(KikiRunner
   PRIVATE
     kiki
