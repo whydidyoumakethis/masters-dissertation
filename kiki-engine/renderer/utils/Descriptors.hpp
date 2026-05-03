@@ -18,6 +18,7 @@ namespace rutils {
     DescriptorSetLayout createPostProcessingDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createSSAODescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createSSAOBlurredDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createChromaticAberrationDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createTonemapDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createShadowMatrixDescriptorLayout(VulkanWindow const& window);
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors = 2048, std::uint32_t aMaxSets = 1024);
@@ -32,6 +33,7 @@ namespace rutils {
     void initialiseSSAODescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoDescriptors);
     void initialiseSSAOHBlurDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoHBlurDescriptors);
     void initialiseSSAOBlurredDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoBlurredDescriptors);
+    void initialiseChromaticAberrationDescriptorSet(VulkanWindow const& window, Image& doneChromaticAberrationImage, Sampler& sampler, VkDescriptorSet& chromaticAberrationDescriptors);
     void initialiseTonemapDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Sampler& sampler, VkDescriptorSet& tonemapDescriptors);
     void initialiseShadowMatrixDescriptorSet(VulkanWindow const& window, VkBuffer shadowMatricesBuffer, VkDescriptorSet& shadowMatrixDescriptors);
     void initialiseBloomImageDescriptorSet(VulkanWindow const& window, Image& prevImage, Sampler& sampler, VkDescriptorSet& bloomImageDescriptors);

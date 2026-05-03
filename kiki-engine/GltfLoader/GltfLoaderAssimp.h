@@ -183,6 +183,8 @@ enum class MsimpleAnimType {
 	DOWN_UP,
 	LEFT_RIGHT,
 	RIGHT_LEFT,
+	FORWARD_BACKWARD,
+	BACKWARD_FORWARD,
 	ROTATE_CLOCKWISE,
 	ROTATE_COUNTERCLOCKWISE
 };
@@ -418,6 +420,8 @@ namespace Kiki {
 			if (s == "down_up") return MsimpleAnimType::DOWN_UP;
 			if (s == "left_right") return MsimpleAnimType::LEFT_RIGHT;
 			if (s == "right_left") return MsimpleAnimType::RIGHT_LEFT;
+			if (s == "forward_backward") return MsimpleAnimType::FORWARD_BACKWARD;
+			if (s == "backward_forward") return MsimpleAnimType::BACKWARD_FORWARD;
 			if (s == "rotate_clockwise") return MsimpleAnimType::ROTATE_CLOCKWISE;
 			if (s == "rotate_counterclockwise") return MsimpleAnimType::ROTATE_COUNTERCLOCKWISE;
 			return MsimpleAnimType::NONE;

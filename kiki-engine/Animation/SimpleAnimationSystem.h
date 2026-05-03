@@ -38,7 +38,14 @@ public:
                 localOffset = glm::vec3(-wave, 0.0f, 0.0f);
                 transform.position = anim.startPosition + (anim.startRotation * localOffset);
                 break;
-
+            case MsimpleAnimType::FORWARD_BACKWARD:
+                localOffset = glm::vec3(0.0f, 0.0f, wave);
+                transform.position = anim.startPosition + (anim.startRotation * localOffset);
+				break;
+            case MsimpleAnimType::BACKWARD_FORWARD:
+                localOffset = glm::vec3(0.0f, 0.0f, -wave);
+				transform.position = anim.startPosition + (anim.startRotation * localOffset);
+                break;
             case MsimpleAnimType::ROTATE_CLOCKWISE:
                 localRotation = glm::angleAxis(
                     glm::radians(anim.time * anim.rotationSpeed),
