@@ -55,5 +55,6 @@ namespace Kiki {
 		bool isGrounded = false;
         bool isGroundedNeedsUpdate = false;
         glm::vec3 groundVelocity = glm::vec3(0.0f);
+		glm::vec3 PointVelocity = glm::vec3(0.0f);
 	};
 }

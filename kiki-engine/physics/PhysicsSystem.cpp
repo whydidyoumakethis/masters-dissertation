@@ -304,15 +304,21 @@ namespace Kiki {
             JPH::uint64 userData = _manager.GetBodyInterface().GetUserData(joltResult.mBodyID);
             entt::entity hitEntity = (entt::entity)userData;
 
+			glm::vec3 hitPoint = rayOrigin + glm::vec3(0, -1, 0) * (joltResult.mFraction * testRayLength);
+
             if (hitEntity != entt::null && reg.valid(hitEntity)) {
                 if (auto* groundRb = reg.try_get<RigidBodyComponent>(hitEntity)) {
                     JPH::Vec3 gVel = _manager.GetBodyInterface().GetLinearVelocity(groundRb->bodyID);
                     ip->groundVelocity = ToGLM(gVel);
+
+					JPH::Vec3 pVel = _manager.GetBodyInterface().GetPointVelocity(groundRb->bodyID, ToJPHR(hitPoint));
+					ip->PointVelocity = ToGLM(pVel);
                 }
             }
         }
         else {
             ip->groundVelocity = glm::vec3(0.0f);
+            ip->PointVelocity = glm::vec3(0.0f);
         }
     }
 
