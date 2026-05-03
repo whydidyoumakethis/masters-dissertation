@@ -2,9 +2,10 @@
 #define KIKIRUNNER_REQUESTLEVELCHANGEEVENT
 
 #include <filesystem>
+#include <vector>
 
 struct RequestLevelChangeEvent {
-	std::filesystem::path levelPath;
+	std::vector<std::filesystem::path> levelPaths;
 };
 
 #endif

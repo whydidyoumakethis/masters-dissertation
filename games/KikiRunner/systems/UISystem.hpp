@@ -5,6 +5,7 @@
 
 #include "events/LevelLoadedEvent.hpp"
 #include "events/RequestLevelChangeEvent.hpp"
+#include "events/ResetLevelEvent.hpp"
 
 enum class ScreenType {
 	SPLASH,
@@ -89,7 +90,7 @@ class UISystem : public System {
 		std::thread([this]() {
 			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
 
-			MessageCenter::Publish(RequestLevelChangeEvent(std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb"));
+			MessageCenter::Publish(RequestLevelChangeEvent({ std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb" }));
 
 			createMainMenu();
 			initialised = true;
@@ -104,29 +105,56 @@ class UISystem : public System {
 	void OnUpdate(float dt) override {
 		if (nextReady && initialised) {
 			nextReady = false;
-			SplashScreen* screen = static_cast<SplashScreen*>(currentScreen);
-			InterfaceAnimationComponent animComp;
-			animComp.copy(screen->engineLogo);
-			animComp.targetTextureColour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
-			animComp.time = 2.0f;
-			animComp.delay = 1.0f;
-			animComp.reverse = true;
-			animComp.interpolation = InterfaceInterpolationType::EASE_IN;
-			{
-				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
-				registry.emplace<InterfaceAnimationComponent>(screen->engineLogo, animComp);
-				registry.erase<InterfaceAnimationComponent>(screen->spinner);
-			}
+			if (currentScreenType == ScreenType::SPLASH) {
+				SplashScreen* screen = static_cast<SplashScreen*>(currentScreen);
+				InterfaceAnimationComponent animComp;
+				animComp.copy(screen->engineLogo);
+				animComp.targetTextureColour = glm::vec4(1.0f, 1.0f, 1.0f, 1.0f);
+				animComp.time = 2.0f;
+				animComp.delay = 1.0f;
+				animComp.reverse = true;
+				animComp.interpolation = InterfaceInterpolationType::EASE_IN;
+				{
+					std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+					registry.emplace<InterfaceAnimationComponent>(screen->engineLogo, animComp);
+					registry.erase<InterfaceAnimationComponent>(screen->spinner);
+				}
 
-			InterfaceAnimationComponent spinnerComp;
-			spinnerComp.copy(screen->spinner);
-			spinnerComp.targetTextureColour = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
-			spinnerComp.targetRotation += 180.0f;
-			spinnerComp.time = 0.5f;
-			spinnerComp.interpolation = InterfaceInterpolationType::EASE_OUT;
-			{
-				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
-				registry.emplace<InterfaceAnimationComponent>(screen->spinner, spinnerComp);
+				InterfaceAnimationComponent spinnerComp;
+				spinnerComp.copy(screen->spinner);
+				spinnerComp.targetTextureColour = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+				spinnerComp.targetRotation += 180.0f;
+				spinnerComp.time = 0.5f;
+				spinnerComp.interpolation = InterfaceInterpolationType::EASE_OUT;
+				{
+					std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+					registry.emplace<InterfaceAnimationComponent>(screen->spinner, spinnerComp);
+				}
+			} else if (currentScreenType == ScreenType::LOADING) {
+				LoadingScreen* screen = static_cast<LoadingScreen*>(currentScreen);
+				InterfaceAnimationComponent animComp;
+				animComp.copy(screen->background);
+				animComp.targetBackgroundTransparency = 1.0f;
+				animComp.time = 1.0f;
+				animComp.interpolation = InterfaceInterpolationType::EASE_OUT;
+				{
+					std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+					registry.emplace<InterfaceAnimationComponent>(screen->background, animComp);
+					registry.erase<InterfaceAnimationComponent>(screen->spinner);
+				}
+
+				InterfaceAnimationComponent spinnerComp;
+				spinnerComp.copy(screen->spinner);
+				spinnerComp.targetTextureColour = glm::vec4(1.0f, 1.0f, 1.0f, 0.0f);
+				spinnerComp.targetRotation += 180.0f;
+				spinnerComp.time = 0.5f;
+				spinnerComp.interpolation = InterfaceInterpolationType::EASE_OUT;
+				{
+					std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+					registry.emplace<InterfaceAnimationComponent>(screen->spinner, spinnerComp);
+				}
+
+				MessageCenter::Publish(ResetLevelEvent());
 			}
 		}
 	}
@@ -148,19 +176,17 @@ class UISystem : public System {
 						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
 						registry.emplace<InterfaceAnimationComponent>(screen->gameLogo, animComp);
 					}
-				}
-				else if (e.entity == screen->gameLogo) {
+				} else if (e.entity == screen->gameLogo) {
 					InterfaceAnimationComponent animComp;
 					animComp.copy(screen->background);
 					animComp.targetBackgroundTransparency = 1.0f;
-					animComp.time = 2.0f;
+					animComp.time = 1.0f;
 					animComp.interpolation = InterfaceInterpolationType::EASE_OUT;
 					{
 						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
 						registry.emplace<InterfaceAnimationComponent>(screen->background, animComp);
 					}
-				}
-				else if (e.entity == screen->background) {
+				} else if (e.entity == screen->background) {
 					delete currentScreen;
 					currentScreen = std::move(nextScreen);
 					currentScreenType = ScreenType::MAIN_MENU;
@@ -186,6 +212,11 @@ class UISystem : public System {
 						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
 						registry.emplace<InterfaceAnimationComponent>(screen->spinner, animComp);
 					}
+
+					MessageCenter::Publish(RequestLevelChangeEvent({
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1.glb",
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level2.glb"
+					}));
 				}
 			}
 			break;
@@ -281,7 +312,7 @@ class UISystem : public System {
 			InterfaceAnimationComponent backgroundAnim;
 			backgroundAnim.copy(screen->background);
 			backgroundAnim.targetBackgroundTransparency = 0.0f;
-			backgroundAnim.time = 2.0f;
+			backgroundAnim.time = 1.0f;
 			backgroundAnim.interpolation = InterfaceInterpolationType::EASE_IN;
 			registry.emplace<InterfaceAnimationComponent>(screen->background, backgroundAnim);
 
@@ -292,8 +323,8 @@ class UISystem : public System {
 			InterfaceAnimationComponent spinnerComp;
 			spinnerComp.copy(screen->spinner);
 			spinnerComp.targetTextureColour = glm::vec4(1.0f, 1.0f, 1.0f, 0.6f);
-			spinnerComp.targetRotation += 720.0f;
-			spinnerComp.time = 2.0f;
+			spinnerComp.targetRotation += 360.0f;
+			spinnerComp.time = 1.0f;
 			registry.emplace<InterfaceAnimationComponent>(screen->spinner, spinnerComp);
 		}
 	}
