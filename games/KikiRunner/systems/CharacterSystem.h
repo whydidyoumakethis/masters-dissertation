@@ -6,6 +6,7 @@
 #include "events/TimerTriggerEvent.h"
 #include "events/ResetLevelEvent.hpp"
 #include "events/ResetThirdPersonCameraEvent.hpp"
+#include "events/ObjectiveAchievedEvent.hpp"
 #include "../../../kiki-engine/Audio/BGMController.h"
 class CharacterSystem : public System {
 public:
@@ -277,6 +278,9 @@ private:
         float elapsed = e.elapsedTime;
         for (size_t i = 0; i < timelimits.size(); ++i) {
 			if (cc->isDone[i]) continue; // skip already completed tiers
+
+            MessageCenter::Publish(ObjectiveAchievedEvent(i));
+
             if (timelimits[i] > elapsed) {
                 cc->isDone[i] = true;
                 spdlog::info("You completed the level in {:.2f} seconds! You earned a new ability!", elapsed);
@@ -284,7 +288,7 @@ private:
                     cc->grantAbility(Ability::DoubleJump);
 					spdlog::info("You earned the double jump ability!");
                     //BGM TEST!!!
-                    Kiki::BGMController::get().Play("sounds/Bohemian Rhapsody.mp3");
+                    Kiki::BGMController::get().Play("interface/success.mp3");
                 }
                 else if (i == 1) {
                     cc->grantAbility(Ability::SpeedBoost);

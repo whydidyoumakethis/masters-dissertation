@@ -7,6 +7,7 @@
 #include "events/RequestLevelChangeEvent.hpp"
 #include "events/ResetLevelEvent.hpp"
 #include "events/TimerTriggerEvent.h"
+#include "events/ObjectiveAchievedEvent.hpp"
 #include "components/CharacterComponent.h"
 
 enum class ScreenType {
@@ -87,6 +88,8 @@ struct Objective {
 	entt::entity powerup;
 	entt::entity strikethrough;
 	entt::entity tick;
+
+	bool complete = false;
 };
 
 struct LevelScreen : ScreenBase {
@@ -138,7 +141,7 @@ class UISystem : public System {
 	void OnStart() override {
 		createSplashScreen();
 
-		std::thread([this]() {
+		//std::thread([this]() {
 			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
 			textureManager.loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "interface/tick.png", "Tick");
 
@@ -146,13 +149,13 @@ class UISystem : public System {
 
 			createMainMenu();
 			initialised = true;
-		}).detach();
+		//}).detach();
 
 		MessageCenter::Subscribe<AnimationEndEvent, &UISystem::OnAnimationEnd>(this);
 		MessageCenter::Subscribe<LevelLoadedEvent, &UISystem::OnLevelLoaded>(this);
 		MessageCenter::Subscribe<ButtonHoverEvent, &UISystem::OnButtonHover>(this);
 		MessageCenter::Subscribe<ButtonClickEvent, &UISystem::OnButtonPress>(this);
-		MessageCenter::Subscribe<TimerTriggerEvent, &UISystem::OnTimeLimitReached>(this);
+		MessageCenter::Subscribe<ObjectiveAchievedEvent, &UISystem::OnObjectiveComplete>(this);
 	}
 
 	void OnUpdate(float dt) override {
@@ -316,27 +319,21 @@ class UISystem : public System {
 		}
 	}
 
-	void OnTimeLimitReached(TimerTriggerEvent e) {
+	void OnObjectiveComplete(ObjectiveAchievedEvent e) {
 		if (currentScreenType == ScreenType::LEVEL) {
+			int i = e.objective;
 			LevelScreen* screen = static_cast<LevelScreen*>(currentScreen);
-			auto& registry = World::Get().Registry();
 
-			entt::entity targetEntity = entt::null;
-
-			auto object = registry.view<CharacterComponent>();
-			for (auto [entity, chara] : object.each()) {
-				targetEntity = entity;
-				break;
-			}
-
-
-			auto& isDone = registry.get<CharacterComponent>(targetEntity).isDone;
-			auto& timeLimits = registry.get<CharacterComponent>(targetEntity).timeLimits;
-
-			for (int i = 0; i < screen->objectives.size(); i++) {
-				if (e.elapsedTime > timeLimits[i] || isDone[i]) continue;
-
-
+			if (!screen->objectives[i].complete) {
+				InterfaceAnimationComponent strikethroughComp;
+				strikethroughComp.copy(screen->objectives[i].strikethrough);
+				strikethroughComp.targetSize = ScaleVec2D(1.0f, -20.0f, 0.0f, 2.0f);
+				strikethroughComp.time = 1.0f;
+				strikethroughComp.interpolation = InterfaceInterpolationType::EASE_IN_OUT;
+				{
+					std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+					registry.emplace<InterfaceAnimationComponent>(screen->objectives[i].strikethrough, strikethroughComp);
+				}
 			}
 		}
 	}
@@ -595,6 +592,8 @@ class UISystem : public System {
 			{
 				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
 				obj.strikethrough = world.CreateEntity();
+				registry.emplace<InterfaceComponent>(obj.strikethrough, ScaleVec2D(0.0f, 10.0f, 0.0f, 114.0f + (i * 40.0f)), ScaleVec2D(0.0f, 0.0f, 0.0f, 2.0f), screen->objectivesContainer, (unsigned int)42);
+				registry.emplace<BackgroundComponent>(obj.strikethrough, glm::vec3(52.0f / 255.0f, 181.0f / 255.0f, 88.0f / 255.0f), 0.3f, 1.0f);
 			}
 
 			{
