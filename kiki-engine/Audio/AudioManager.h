@@ -23,7 +23,6 @@ namespace Kiki {
 
         void shutdown() {
             if (!_isInitialized) return;
-
             //spdlog::info("AudioManager: Shutting down hardware safely...");
             ma_engine_uninit(&_engine);
             _isInitialized = false;

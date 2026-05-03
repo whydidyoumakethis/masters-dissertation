@@ -60,6 +60,11 @@ namespace rutils {
         std::uint32_t isEnabled;
     };
 
+    struct CustomPostprocessSettings {
+        glm::vec4 params = glm::vec4(0.f);
+        std::uint32_t isEnabled = 1;
+    };
+
     struct ShapeData {
         glm::vec4 colour;
         glm::mat4 model = glm::mat4(1.0f);
@@ -88,6 +93,7 @@ namespace rutils {
         rutils::Pipeline composite;
         rutils::Pipeline debug;
         rutils::Pipeline debug_line;
+        rutils::Pipeline customPostprocess;
     };
 
     struct PipelineLayouts {
@@ -105,6 +111,7 @@ namespace rutils {
         PipelineLayout bloomPipelineLayout;
         PipelineLayout compositePipelineLayout;
         PipelineLayout debugPipelineLayout;
+        PipelineLayout customPostprocessPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -121,6 +128,7 @@ namespace rutils {
     PipelineLayout createBloomPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout bloomLayout);
     PipelineLayout createCompositePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout compositeLayout);
     PipelineLayout createDebugPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout debugLayout);
+    PipelineLayout createCustomPostprocessPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout customPostprocessLayout);
     void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, VkDescriptorSetLayout textureLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
@@ -140,6 +148,7 @@ namespace rutils {
     Pipeline createBloomUpsamplePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createDebugPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createDebugLinePipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
+    Pipeline createCustomPostprocessPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
 
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }

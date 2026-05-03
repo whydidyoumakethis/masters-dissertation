@@ -82,6 +82,7 @@ namespace rutils {
         VkDescriptorSet shadowMatrixDescriptors,
         VkDescriptorSet compositeDescriptors,
         VkDescriptorSet debugDescriptors,
+        VkDescriptorSet customPostprocessDescriptors,
         VkDescriptorSet noTexture,
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
@@ -89,6 +90,7 @@ namespace rutils {
         Image const& doneCompositeImage,
         Image const& doneTonemapImage,
         Image const& doneDebugImage,
+        Image const& doneCustomPostprocessImage,
         VkBuffer interfaceUBO,
         Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
         VkDescriptorSet interfaceDescriptors,
@@ -1534,6 +1536,68 @@ namespace rutils {
         }
 
         {
+            ZoneScopedN("Recording custom postprocess pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "Custom postprocess pass");
+            #endif
+
+            imageBarrier(aCmdBuff, doneDebugImage.image,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+
+            imageBarrier(aCmdBuff, doneCustomPostprocessImage.image,
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo customPostprocessColourAttach{};
+            customPostprocessColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            customPostprocessColourAttach.imageView = doneCustomPostprocessImage.view;
+            customPostprocessColourAttach.imageLayout = VK_IMAGE_LAYOUT_ATTACHMENT_OPTIMAL;
+            customPostprocessColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            customPostprocessColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo customPostprocessRenderInfo{};
+            customPostprocessRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            customPostprocessRenderInfo.layerCount = 1;
+            customPostprocessRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            customPostprocessRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            customPostprocessRenderInfo.colorAttachmentCount = 1;
+            customPostprocessRenderInfo.pColorAttachments = &customPostprocessColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &customPostprocessRenderInfo);
+
+            VkDescriptorSet customPostprocessSets[] = {
+                customPostprocessDescriptors
+            };
+
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.customPostprocess.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.customPostprocessPipelineLayout.handle, 0, 1, customPostprocessSets, 0, nullptr);
+
+            CustomPostprocessSettings customPostprocessSettings;
+            customPostprocessSettings.isEnabled = renderSettings.customPostprocessEnabled ? 1 : 0;
+            customPostprocessSettings.params.x = static_cast<float>(renderSettings.bayerMatrixMode);
+            customPostprocessSettings.params.y = renderSettings.bayerExposure;
+            customPostprocessSettings.params.z = static_cast<float>(renderSettings.bayerLevels);
+
+            vkCmdPushConstants(aCmdBuff, pipelineLayouts.customPostprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CustomPostprocessSettings), &customPostprocessSettings);
+
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+        }
+
+        {
             ZoneScopedN("Recording FXAA and ImGui pass");
 
             #ifdef TRACY_VK_ENABLE
@@ -1542,7 +1606,7 @@ namespace rutils {
 
             // begin fxaa pass
             // transition the image we just rendered to be sampled
-            imageBarrier(aCmdBuff, doneDebugImage.image,
+            imageBarrier(aCmdBuff, doneCustomPostprocessImage.image,
                 // before
                 VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
                 VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,

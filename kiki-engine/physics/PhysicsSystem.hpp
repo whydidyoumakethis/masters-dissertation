@@ -88,8 +88,7 @@ namespace Kiki {
 
         void AddForce(entt::entity entity, const glm::vec3& force);
 
-        // PhysicsSystem.hpp
-        //RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID = JPH::BodyID());
+        RaycastHit Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID = JPH::BodyID());
         void UpdateIsGrounded(entt::entity entity, float maxDistance = 0.1f);
     private:
 

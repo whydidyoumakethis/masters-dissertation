@@ -239,6 +239,30 @@ namespace Kiki {
                 ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
 
 
+                ImGui::SeparatorText("Custom Postprocess");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##custompostprocessenabled", &renderManager.renderSettings.customPostprocessEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Bayer size:");
+                ImGui::SameLine(110.f);
+                const char* bayerModes[] = {"2x2", "4x4", "8x8"};
+                ImGui::Combo("##editbayermode", &renderManager.renderSettings.bayerMatrixMode, bayerModes, IM_ARRAYSIZE(bayerModes));
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Exposure:");
+                ImGui::SameLine(110.f);
+                ImGui::SliderFloat("##editbayerexposure", &renderManager.renderSettings.bayerExposure, 0.0f, 4.0f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Levels:");
+                ImGui::SameLine(110.f);
+                ImGui::SliderInt("##editbayerlevels", &renderManager.renderSettings.bayerLevels, 2, 16);
+
+
                 ImGui::Indent();
                 if (ImGui::CollapsingHeader("Shaders")) {
                     ImGui::Text("Shader Path:");
