@@ -47,6 +47,12 @@ namespace Kiki {
         BLOOM
     };
 
+    enum RenderPreset {
+        FAST,
+        FANCY,
+        ULTRA
+    };
+
     struct RenderSettings {
         int ssaoSamples = 16;
         float ssaoRadius = 0.5f;
@@ -86,6 +92,7 @@ namespace Kiki {
         bool fxaaEnabled = true;
 
         RenderMode renderMode = STANDARD;
+        RenderPreset renderPreset = ULTRA;
     };
 
     struct Mesh {
@@ -274,6 +281,8 @@ namespace Kiki {
 
         rutils::Allocator allocator;
         static RenderManager& get();
+
+        void setRenderPreset(RenderPreset preset);
 
         Mesh allocateMesh(
             std::vector<float> positions,

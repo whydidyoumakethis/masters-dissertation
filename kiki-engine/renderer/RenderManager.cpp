@@ -1771,6 +1771,66 @@ namespace Kiki {
         skybox.mesh = allocateSkyboxMesh(skyboxVertices, skyboxIndices);
     }
 
+    void RenderManager::setRenderPreset(RenderPreset preset) {
+        // ignore simple/custom shaders like bayer, chromatic aberration, tonemap,... when applying settings
+        renderSettings.renderPreset = preset;
+
+        if (preset == FAST) {
+            // very basic settings
+            renderSettings.ssaoEnabled = false;
+            renderSettings.shadowsEnabled = false;
+            renderSettings.ssrEnabled = false;
+            renderSettings.bloomEnabled = false;
+            renderSettings.fxaaEnabled = false;
+        }
+        else if (preset == FANCY) {
+            renderSettings.ssaoEnabled = true;
+            renderSettings.ssaoRadius = 0.5f;
+            renderSettings.ssaoSamples = 8;
+            renderSettings.ssaoBlurRange = 2;
+
+            renderSettings.shadowsEnabled = true;
+            renderSettings.shadowPcfSamples = 1;
+
+            renderSettings.ssrEnabled = true;
+            renderSettings.ssrMaxSteps = 8;
+            renderSettings.ssrBinarySteps = 2;
+            renderSettings.ssrStepSize = 0.75f;
+            renderSettings.ssrThicknessTolerance = 0.4f;
+
+            renderSettings.bloomEnabled = true;
+            renderSettings.bloomRadius_x = 0.005f;
+            renderSettings.bloomRadius_y = 0.005f;
+            renderSettings.bloomStrength = 0.04f;
+
+            renderSettings.fxaaEnabled = true;
+            renderSettings.fxaaStrength = 16.f;
+        }
+        else {  // ULTRA, default
+            renderSettings.ssaoEnabled = true;
+            renderSettings.ssaoRadius = 0.5f;
+            renderSettings.ssaoSamples = 16;
+            renderSettings.ssaoBlurRange = 2;
+
+            renderSettings.shadowsEnabled = true;
+            renderSettings.shadowPcfSamples = 20;
+
+            renderSettings.ssrEnabled = true;
+            renderSettings.ssrMaxSteps = 16;
+            renderSettings.ssrBinarySteps = 4;
+            renderSettings.ssrStepSize = 0.5f;
+            renderSettings.ssrThicknessTolerance = 0.2f;
+
+            renderSettings.bloomEnabled = true;
+            renderSettings.bloomRadius_x = 0.005f;
+            renderSettings.bloomRadius_y = 0.005f;
+            renderSettings.bloomStrength = 0.04f;
+
+            renderSettings.fxaaEnabled = true;
+            renderSettings.fxaaStrength = 16.f;
+        }
+    }
+
     void RenderManager::shutdown() {
         vkDeviceWaitIdle(window.device);
 

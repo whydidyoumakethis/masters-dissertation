@@ -126,6 +126,14 @@ namespace Kiki {
                     renderManager.renderSettings.renderMode = static_cast<Kiki::RenderMode>(currentMode);
                 }
 
+                ImGui::Text("Preset:");
+                ImGui::SameLine(110.f);
+                const char* presets[] = {"Fast", "Fancy", "Ultra"};
+                int currentPreset = static_cast<int>(renderManager.renderSettings.renderPreset);
+                if (ImGui::Combo("##editrenderpreset", &currentPreset, presets, IM_ARRAYSIZE(presets))) {
+                    renderManager.setRenderPreset(static_cast<Kiki::RenderPreset>(currentPreset));
+                }
+
                 ImGui::SeparatorText("SSAO");
 
                 ImGui::AlignTextToFramePadding();
