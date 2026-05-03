@@ -292,7 +292,7 @@ namespace Kiki {
                 glm::vec3 skew;
                 glm::vec4 perspective;
                 glm::decompose(scene.instances[i].transform, transform.scale, transform.rotation, transform.position, skew, perspective);
-                transform.rotation = glm::conjugate(transform.rotation);
+                //transform.rotation = glm::conjugate(transform.rotation);
                 //transform.scale = {0.3, 0.3, 0.3}; // TODO: this is a temp fix, will probably cause issues
             }
 
@@ -540,7 +540,7 @@ namespace Kiki {
             glm::vec3 skew;
             glm::vec4 perspective;
             glm::decompose(instance.transform, transform.scale, transform.rotation, transform.position, skew, perspective);
-            transform.rotation = glm::conjugate(transform.rotation);
+            //transform.rotation = glm::conjugate(transform.rotation);
             // Misc tags
             if (instance.miscTag != MmiscTags::NONE) {
                 {
