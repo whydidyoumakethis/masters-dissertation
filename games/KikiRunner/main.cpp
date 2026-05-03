@@ -12,11 +12,11 @@ int main(int argc, char** argv) {
 	engine.Init();
 
 	engine.RegisterSystem<LevelSystem>();
-	engine.RegisterSystem<UISystem>();
 	engine.RegisterSystem<CharacterSystem>();
 	engine.RegisterSystem<ThirdPersonCameraSystem>();
 	engine.RegisterSystem<GoalTriggerSystem>();
 	engine.RegisterSystem<TimeLimitSystem>();
+	engine.RegisterSystem<UISystem>();
 
 	engine.Run();
 }

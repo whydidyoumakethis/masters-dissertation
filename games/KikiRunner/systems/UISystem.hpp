@@ -6,6 +6,8 @@
 #include "events/LevelLoadedEvent.hpp"
 #include "events/RequestLevelChangeEvent.hpp"
 #include "events/ResetLevelEvent.hpp"
+#include "events/TimerTriggerEvent.h"
+#include "components/CharacterComponent.h"
 
 enum class ScreenType {
 	SPLASH,
@@ -80,6 +82,55 @@ struct MainMenuScreen : ScreenBase {
 	};
 };
 
+struct Objective {
+	entt::entity time;
+	entt::entity powerup;
+	entt::entity strikethrough;
+	entt::entity tick;
+};
+
+struct LevelScreen : ScreenBase {
+	entt::entity timerBackground;
+	entt::entity timer;
+
+	entt::entity objectivesContainer;
+	entt::entity objectivesBackground;
+	entt::entity objectivesTitle;
+	entt::entity objectivesTitleDivider;
+	entt::entity objectivesTimeLimit;
+	entt::entity objectivesPowerup;
+	entt::entity objectivesSubtitleDivider;
+
+	std::vector<Objective> objectives;
+
+	LevelScreen() = default;
+	~LevelScreen() {
+		World& world = World::Get();
+
+		{
+			std::lock_guard<std::mutex> lock(Kiki::SceneManager::get().registryMutex);
+			world.DestroyEntity(timer);
+			world.DestroyEntity(timerBackground);
+
+			for (auto obj : objectives) {
+				world.DestroyEntity(obj.time);
+				world.DestroyEntity(obj.powerup);
+				world.DestroyEntity(obj.strikethrough);
+				world.DestroyEntity(obj.tick);
+			}
+			objectives.clear();
+
+			world.DestroyEntity(objectivesSubtitleDivider);
+			world.DestroyEntity(objectivesPowerup);
+			world.DestroyEntity(objectivesTimeLimit);
+			world.DestroyEntity(objectivesTitleDivider);
+			world.DestroyEntity(objectivesTitle);
+			world.DestroyEntity(objectivesBackground);
+			world.DestroyEntity(objectivesContainer);
+		}
+	};
+};
+
 class UISystem : public System {
 	public:
 	Phase GetPhase() const override { return Phase::Input; }
@@ -89,6 +140,7 @@ class UISystem : public System {
 
 		std::thread([this]() {
 			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
+			textureManager.loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "interface/tick.png", "Tick");
 
 			MessageCenter::Publish(RequestLevelChangeEvent({ std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb" }));
 
@@ -100,6 +152,7 @@ class UISystem : public System {
 		MessageCenter::Subscribe<LevelLoadedEvent, &UISystem::OnLevelLoaded>(this);
 		MessageCenter::Subscribe<ButtonHoverEvent, &UISystem::OnButtonHover>(this);
 		MessageCenter::Subscribe<ButtonClickEvent, &UISystem::OnButtonPress>(this);
+		MessageCenter::Subscribe<TimerTriggerEvent, &UISystem::OnTimeLimitReached>(this);
 	}
 
 	void OnUpdate(float dt) override {
@@ -154,7 +207,7 @@ class UISystem : public System {
 					registry.emplace<InterfaceAnimationComponent>(screen->spinner, spinnerComp);
 				}
 
-				MessageCenter::Publish(ResetLevelEvent());
+				MessageCenter::Publish(ResetLevelEvent(static_cast<LevelScreen*>(nextScreen)->timer));
 			}
 		}
 	}
@@ -214,9 +267,26 @@ class UISystem : public System {
 					}
 
 					MessageCenter::Publish(RequestLevelChangeEvent({
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1.glb",
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level_noPlayer.glb",
 						std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level2.glb"
 					}));
+
+					createLevelScreen();
+				}
+			}
+			break;
+		case (ScreenType::LOADING):
+			{
+				LoadingScreen* screen = static_cast<LoadingScreen*>(currentScreen);
+				if (e.entity == screen->background && registry.get<BackgroundComponent>(e.entity).transparency == 1.0f) {
+					delete currentScreen;
+					currentScreen = std::move(nextScreen);
+					currentScreenType = nextScreenType;
+					nextScreen = new ScreenBase();
+
+					if (currentScreenType == ScreenType::LEVEL) {
+						addObjectives();
+					}
 				}
 			}
 			break;
@@ -242,6 +312,31 @@ class UISystem : public System {
 				} else if (e.button == screen->quitGameButton) {
 					glfwSetWindowShouldClose(renderManager.getWindow(), true);
 				}
+			}
+		}
+	}
+
+	void OnTimeLimitReached(TimerTriggerEvent e) {
+		if (currentScreenType == ScreenType::LEVEL) {
+			LevelScreen* screen = static_cast<LevelScreen*>(currentScreen);
+			auto& registry = World::Get().Registry();
+
+			entt::entity targetEntity = entt::null;
+
+			auto object = registry.view<CharacterComponent>();
+			for (auto [entity, chara] : object.each()) {
+				targetEntity = entity;
+				break;
+			}
+
+
+			auto& isDone = registry.get<CharacterComponent>(targetEntity).isDone;
+			auto& timeLimits = registry.get<CharacterComponent>(targetEntity).timeLimits;
+
+			for (int i = 0; i < screen->objectives.size(); i++) {
+				if (e.elapsedTime > timeLimits[i] || isDone[i]) continue;
+
+
 			}
 		}
 	}
@@ -379,6 +474,136 @@ class UISystem : public System {
 			registry.emplace<BackgroundComponent>(screen->quitGameButtonInner, glm::vec3(170.0f / 255.0f, 27.0f / 255.0f, 27.0f / 255.0f), 0.4f, 16.0f);
 			registry.emplace<TextComponent>(screen->quitGameButtonInner, "chewy-regular", U"Quit", 0.5f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
 		}
+	}
+
+	void createLevelScreen() {
+		nextScreen = new LevelScreen();
+		nextScreenType = ScreenType::LEVEL;
+		LevelScreen* screen = static_cast<LevelScreen*>(nextScreen);
+
+		{
+			std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+
+			screen->timerBackground = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->timerBackground, ScaleVec2D(0.0f, 0.0f, 0.0f, 10.0f), ScaleVec2D(1.0f, 0.0f, 0.1f, 0.0f), entt::null, (unsigned int) 40);
+			registry.emplace<BackgroundComponent>(screen->timerBackground, glm::vec3(0.1f, 0.1f, 0.1f), 0.3f, 40.0f);
+			registry.emplace<AspectRatioComponent>(screen->timerBackground, 3.0f / 1.0f);
+
+			screen->timer = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->timer, ScaleVec2D(0.0f, 0.0f, 0.0f, 0.0f), ScaleVec2D(1.0f, 0.0f, 1.0f, 0.0f), screen->timerBackground, (unsigned int) 41);
+			registry.emplace<TextComponent>(screen->timer, "chewy-regular", U"00:00.00", 0.5f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+
+			screen->objectivesContainer = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesContainer, ScaleVec2D(1.0f, -300.0f, 0.5f, -52.0f), ScaleVec2D(0.0f, 300.0f, 0.0f, 104.0f), entt::null, (unsigned int)40);
+
+			screen->objectivesBackground = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesBackground, ScaleVec2D(0.0f, 0.0f, 0.0f, 0.0f), ScaleVec2D(1.0f, 20.0f, 1.0f, 00.0f), screen->objectivesContainer, (unsigned int)40);
+			registry.emplace<BackgroundComponent>(screen->objectivesBackground, glm::vec3(0.1f, 0.1f, 0.1f), 0.3f, 20.0f);
+
+			screen->objectivesTitle = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesTitle, ScaleVec2D(0.0f, 0.0f, 0.0f, 0.0f), ScaleVec2D(1.0f, 0.0f, 0.0f, 50.0f), screen->objectivesContainer, (unsigned int)41);
+			registry.emplace<TextComponent>(screen->objectivesTitle, "chewy-regular", U"Objectives", 0.7f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+
+			screen->objectivesTitleDivider = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesTitleDivider, ScaleVec2D(0.0f, 10.0f, 0.0f, 50.0f), ScaleVec2D(1.0f, -20.0f, 0.0f, 2.0f), screen->objectivesContainer, (unsigned int)41);
+			registry.emplace<BackgroundComponent>(screen->objectivesTitleDivider, glm::vec3(0.9f, 0.9f, 0.9f), 0.3f, 1.0f);
+
+			screen->objectivesTimeLimit = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesTimeLimit, ScaleVec2D(0.0f, 0.0f, 0.0f, 52.0f), ScaleVec2D(0.0f, 100.0f, 0.0f, 40.0f), screen->objectivesContainer, (unsigned int)41);
+			registry.emplace<TextComponent>(screen->objectivesTimeLimit, "chewy-regular", U"Time Limit", 0.5f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+
+			screen->objectivesPowerup = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesPowerup, ScaleVec2D(0.0f, 100.0f, 0.0f, 52.0f), ScaleVec2D(0.0f, 200.0f, 0.0f, 40.0f), screen->objectivesContainer, (unsigned int)41);
+			registry.emplace<TextComponent>(screen->objectivesPowerup, "chewy-regular", U"Powerup", 0.5f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+
+			screen->objectivesSubtitleDivider = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->objectivesSubtitleDivider, ScaleVec2D(0.0f, 10.0f, 0.0f, 92.0f), ScaleVec2D(1.0f, -20.0f, 0.0f, 2.0f), screen->objectivesContainer, (unsigned int)41);
+			registry.emplace<BackgroundComponent>(screen->objectivesSubtitleDivider, glm::vec3(0.9f, 0.9f, 0.9f), 0.3f, 1.0f);
+		}
+	}
+
+	std::u32string formatTime(float seconds) {
+		int mins = static_cast<int>(seconds) / 60;
+		int secs = static_cast<int>(seconds) % 60;
+		char buf[12];
+		snprintf(buf, sizeof(buf), "%d:%02d  ", mins, secs);
+
+		std::u32string result;
+		for (char c : std::string(buf)) result.push_back(static_cast<char32_t>(c));
+
+		return result;
+	}
+
+	void addObjectives() {
+		LevelScreen* screen = static_cast<LevelScreen*>(currentScreen);
+		auto objects = world.Query<CharacterComponent>();
+
+		std::vector<float> timeLimits;
+		std::vector<std::u32string> labels;
+
+		for (auto [entity, chara] : objects.each()) {
+			timeLimits = chara.timeLimits;
+			labels = chara.labels;
+			break; // just take the first one we find, assuming there's only one player character
+		}
+
+		InterfaceAnimationComponent animComp;
+		animComp.copy(screen->objectivesContainer);
+		animComp.targetPosition = ScaleVec2D(1.0f, -300.0f, 0.5f, -0.5f * (94.0f + ((float)timeLimits.size() * 40.0f)));
+		animComp.targetSize = ScaleVec2D(0.0f, 300.0f, 0.0f, 94.0f + ((float)timeLimits.size() * 40.0f));
+		animComp.time = 1.5f;
+		animComp.interpolation = InterfaceInterpolationType::EASE_IN_OUT; 
+		{
+			std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+			registry.emplace<InterfaceAnimationComponent>(screen->objectivesContainer, animComp);
+		}
+
+		for (int i = 0; i < timeLimits.size(); i++) {
+			Objective obj;
+			{
+				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+				obj.time = world.CreateEntity();
+				registry.emplace<InterfaceComponent>(obj.time, ScaleVec2D(0.0f, 0.0f, 0.0f, 94.0f + (i * 40.0f)), ScaleVec2D(0.0f, 100.0f, 0.0f, 40.0f), screen->objectivesContainer, (unsigned int)41);
+				registry.emplace<TextComponent>(obj.time, "chewy-regular", formatTime(timeLimits[i]), 0.5f, glm::vec3(1.0f, 1.0f, 1.0f), 1.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+			}
+			InterfaceAnimationComponent timeComp;
+			timeComp.copy(obj.time);
+			timeComp.targetTextTransparency = 0.0f;
+			timeComp.time = 3.0f;
+			timeComp.interpolation = InterfaceInterpolationType::EASE_IN;
+			{
+				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+				registry.emplace<InterfaceAnimationComponent>(obj.time, timeComp);
+			}
+
+			{
+				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+				obj.powerup = world.CreateEntity();
+				registry.emplace<InterfaceComponent>(obj.powerup, ScaleVec2D(0.0f, 100.0f, 0.0f, 94.0f + (i * 40.0f)), ScaleVec2D(0.0f, 200.0f, 0.0f, 40.0f), screen->objectivesContainer, (unsigned int)41);
+				registry.emplace<TextComponent>(obj.powerup, "chewy-regular", labels[i], 0.5f, glm::vec3(1.0f, 1.0f, 1.0f), 1.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+			}
+			InterfaceAnimationComponent powerupComp;
+			powerupComp.copy(obj.powerup);
+			powerupComp.targetTextTransparency = 0.0f;
+			powerupComp.time = 3.0f;
+			powerupComp.interpolation = InterfaceInterpolationType::EASE_IN;
+			{
+				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+				registry.emplace<InterfaceAnimationComponent>(obj.powerup, powerupComp);
+			}
+
+			{
+				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+				obj.strikethrough = world.CreateEntity();
+			}
+
+			{
+				std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+				obj.tick = world.CreateEntity();
+			}
+			screen->objectives.push_back(obj);
+		}
+		
 	}
 };
 

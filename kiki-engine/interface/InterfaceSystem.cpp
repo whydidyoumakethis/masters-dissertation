@@ -171,6 +171,14 @@ namespace Kiki {
                     float width = (float)extent.width;
                     float height = (float)extent.height;
 
+                    for (auto [potentialChild, potentialChildComp] : uiComponents.each()) {
+                        if (e == potentialChild)
+                            continue;
+
+                        if (e == potentialChildComp.parent)
+                            potentialChildComp.dirty = true;
+                    }
+
                     if (interfaceComponent.parent != entt::null && registry.all_of<InterfaceComponent>(interfaceComponent.parent)) {
                         auto& parentComp = registry.get<InterfaceComponent>(interfaceComponent.parent);
 

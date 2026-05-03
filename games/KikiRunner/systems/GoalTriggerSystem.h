@@ -1,6 +1,8 @@
 #pragma once
 #include <kiki.h>
 #include "events/TimerTriggerEvent.h"
+#include "events/ResetLevelEvent.hpp"
+
 class GoalTriggerSystem : public System {
 public:
 	Phase GetPhase() const override { return Phase::PostUpdate; }
@@ -21,9 +23,14 @@ public:
 		
 		//MessageCenter::Subscribe<CollisionEvent, OnTriggerEnter>();
 		MessageCenter::Subscribe<CollisionEvent, &GoalTriggerSystem::OnTriggerEnter>(this);
+		MessageCenter::Subscribe<ResetLevelEvent, &GoalTriggerSystem::OnLevelReset>(this);
+		Reset();
+	}
+
+	void Reset() {
 		auto objects = World::Get().Query<MiscComponent>();
-		for(auto[e,misc] : objects.each()){
-			if(misc.miscTag == MmiscTags::GOAL){
+		for (auto [e, misc] : objects.each()) {
+			if (misc.miscTag == MmiscTags::GOAL) {
 				goalEntity = e;
 				//spdlog::info("Goal entity found: {}", (uint32_t)e);
 			}
@@ -33,6 +40,11 @@ public:
 			}
 		}
 	}
+
+	void OnLevelReset(const ResetLevelEvent& e) {
+		Reset();
+	}
+
 	void OnTriggerEnter(const CollisionEvent& e) {
 		auto& reg = World::Get().Registry();
 		//spdlog::info("Collision detected between entity {} and entity {}", (uint32_t)e.entity1, (uint32_t)e.entity2);

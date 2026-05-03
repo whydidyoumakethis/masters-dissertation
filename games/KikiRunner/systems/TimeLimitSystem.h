@@ -1,6 +1,8 @@
 #pragma once
 #include <kiki.h>
 #include "events/TimerTriggerEvent.h"
+#include "events/ResetLevelEvent.hpp"
+
 class TimeLimitSystem : public System {
 public:
     Phase GetPhase() const override { return Phase::PreUpdate; }
@@ -23,18 +25,33 @@ public:
 
 	void OnStart() override {
 		Timer::get().Reset();
+
+        
+		//createTimerUI();
+		MessageCenter::Subscribe<TimerTriggerEvent, &TimeLimitSystem::OnTimeLimitReached>(this);
+        MessageCenter::Subscribe<RequestLevelChangeEvent, &TimeLimitSystem::OnLevelChange>(this);
+        MessageCenter::Subscribe<ResetLevelEvent, &TimeLimitSystem::OnResetLevel>(this);
+	}
+
+    void OnResetLevel(const ResetLevelEvent& e) {
+        Timer::get().Reset();
+        timerTextEntity = e.timer;
         auto objects = World::Get().Query<CharacterComponent>();
-        FontManager::get().loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
 
         for (auto [entity, chara] : objects.each()) {
-			timeLimits = chara.timeLimits;
+            timeLimits = chara.timeLimits;
             labels = chara.labels;
-			break; // just take the first one we find, assuming there's only one player character
+            break; // just take the first one we find, assuming there's only one player character
         }
-		createTimerUI();
-        createTimeLimitPanel();
-		MessageCenter::Subscribe<TimerTriggerEvent, &TimeLimitSystem::OnTimeLimitReached>(this);
-	}
+
+        //createTimeLimitPanel();
+    }
+
+    void OnLevelChange(const RequestLevelChangeEvent& e) {
+        Timer::get().Reset();
+        timerTextEntity = entt::null;
+    }
+
     void createTimerUI() {
         auto& registry = World::Get().Registry();
         auto timerUIEntity = registry.create();
