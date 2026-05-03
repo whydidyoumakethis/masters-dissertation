@@ -28,7 +28,7 @@ inline Ability& operator&=(Ability& a, Ability b) {
 struct CharacterComponent {
     float walkSpeed = 2.0f;
     float runSpeed = 5.0f;
-    float jumpForce = 5.0f;
+    float jumpForce = 10.0f;
 	float rotateSpeed = 10.0f; // character rotation speed (for interpolating facing direction)
 
     float currentMaxSpeed = walkSpeed;

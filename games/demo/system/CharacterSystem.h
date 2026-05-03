@@ -129,7 +129,7 @@ private:
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
             // final speed = playerspeed + platformspeed！
-            glm::vec3 finalVel = character.velocity + ip.groundVelocity;
+            glm::vec3 finalVel = character.velocity + ip.PointVelocity;
 
             glm::vec3 newVel = glm::vec3(finalVel.x, currentJoltVel.GetY(), finalVel.z);
 
@@ -145,7 +145,7 @@ private:
                 character.velocity.x = 0.0f;
                 character.velocity.z = 0.0f;
 
-                glm::vec3 newVel = glm::vec3(ip.groundVelocity.x, currentJoltVel.GetY(), ip.groundVelocity.z);
+                glm::vec3 newVel = glm::vec3(ip.PointVelocity.x, currentJoltVel.GetY(), ip.PointVelocity.z);
                 physics.setEntityVelocity(playerEntity, newVel);
             }
             else {
