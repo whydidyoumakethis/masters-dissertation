@@ -27,8 +27,11 @@ int main(int argc, char** argv) {
 
 
 
-	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1.glb");
+	Mscene scene = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb");
 	Kiki::SceneManager::get().loadScene(std::move(scene));
+
+	Mscene scene2 = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb");
+	Kiki::SceneManager::get().loadScene(std::move(scene2));
 
 	Mscene player = Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level2.glb");
 	Kiki::SceneManager::get().loadScene(std::move(player));
