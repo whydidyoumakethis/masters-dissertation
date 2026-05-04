@@ -1,6 +1,7 @@
 # Ignore compiled code
 build/output/
 .vscode/
+.idea/
 
 out/
 

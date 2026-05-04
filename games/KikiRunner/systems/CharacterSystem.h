@@ -7,6 +7,7 @@
 #include "events/ResetLevelEvent.hpp"
 #include "events/ResetThirdPersonCameraEvent.hpp"
 #include "events/ObjectiveAchievedEvent.hpp"
+#include "events/RequestLevelChangeEvent.hpp"
 #include "../../../kiki-engine/Audio/BGMController.h"
 class CharacterSystem : public System {
 public:
@@ -33,6 +34,7 @@ public:
         Reset();
         MessageCenter::Subscribe<TimerTriggerEvent, &CharacterSystem::OnTimerTrigger>(this);
         MessageCenter::Subscribe<ResetLevelEvent, &CharacterSystem::OnResetEvent>(this);
+        MessageCenter::Subscribe<RequestLevelChangeEvent, &CharacterSystem::OnLevelChange>(this);
     }
     void OnStop() override {
        
@@ -41,6 +43,10 @@ public:
     void OnResetEvent(const ResetLevelEvent& e) {
         Reset();
         MessageCenter::Publish(ResetThirdPersonCameraEvent());
+    }
+
+    void OnLevelChange(const RequestLevelChangeEvent& e) {
+        playerEntity = entt::null;
     }
 private:
     InputManager& inputManager = Kiki::InputManager::get();
