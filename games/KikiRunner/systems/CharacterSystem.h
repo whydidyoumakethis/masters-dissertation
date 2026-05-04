@@ -154,55 +154,78 @@ private:
         if (inputManager.isKeyDown(GLFW_KEY_A)) inputDir.x -= 1.0f;
         if (inputManager.isKeyDown(GLFW_KEY_D)) inputDir.x += 1.0f;
 
-        if (ip.isGrounded) {
-            character.currentMaxSpeed = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) ? character.runSpeed : character.walkSpeed;
+        float stickX = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_LEFT_X);
+        float stickY = -inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_LEFT_Y);
+
+        const float deadzone = 0.15f;
+        if (std::abs(stickX) > deadzone) inputDir.x += stickX;
+        if (std::abs(stickY) > deadzone) inputDir.y += stickY;
+
+        float inputMag = glm::length(inputDir);
+        if (inputMag > 1.0f) {
+            inputDir /= inputMag;
+            inputMag = 1.0f;
         }
-        //bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) && ip.isGrounded;
-        float speed = character.currentMaxSpeed;
+
+        const float runThreshold = 0.85f;
+
+        if (ip.isGrounded) {
+            bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) || (inputMag >= runThreshold);
+            character.currentMaxSpeed = isRunning ? character.runSpeed : character.walkSpeed;
+        }
+
+        float maxSpeed = character.currentMaxSpeed;
         if (character.hasAbility(Ability::SpeedBoost)) {
-            speed *= 2;
+            maxSpeed *= 2.0f;
         }
 
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
         JPH::Vec3 currentJoltVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 
-        if (glm::length(inputDir) > 0.001f) {
-            // normalize to prevent faster diagonal movement
-            inputDir = glm::normalize(inputDir);
+        if (inputMag > 0.001f) {
+            glm::vec2 normInputDir = inputDir / inputMag;
 
             // inputdir transform from character space to camera space
-            // cameraYaw decides which direction is "forward" for the character
             float rad = glm::radians(cameraYaw);
             glm::vec3 forward = { -sin(rad), 0, -cos(rad) };
             glm::vec3 right = { cos(rad), 0, -sin(rad) };
 
-            glm::vec3 moveDir = forward * inputDir.y + right * inputDir.x;
+            glm::vec3 moveDir = forward * normInputDir.y + right * normInputDir.x;
 
-            character.velocity.x = moveDir.x * speed;
-            character.velocity.z = moveDir.z * speed;
+            float currentMoveSpeed = maxSpeed;
+            if (inputMag < runThreshold) {
+                float walkRatio = inputMag / runThreshold;
+                currentMoveSpeed = maxSpeed * walkRatio;
+            }
+
+            character.velocity.x = moveDir.x * currentMoveSpeed;
+            character.velocity.z = moveDir.z * currentMoveSpeed;
 
             // record target facing direction (character faces movement direction)
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
             // final speed = playerspeed + platformspeed！
-            glm::vec3 finalVel = character.velocity + ip.groundVelocity;
+            glm::vec3 finalVel = character.velocity + ip.PointVelocity;
 
             glm::vec3 newVel = glm::vec3(finalVel.x, currentJoltVel.GetY(), finalVel.z);
 
-            if (character.hasAbility(Ability::Dash) && inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) && dashTimer <= 0.0f) {
-                newVel += moveDir * speed * 100.0f; // Dash adds a burst of speed
+            // Dash 
+            bool isDashPressed = inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) ||
+                inputManager.isGamepadButtonDown(GLFW_GAMEPAD_BUTTON_X);
+
+            if (character.hasAbility(Ability::Dash) && isDashPressed && dashTimer <= 0.0f) {
+                newVel += moveDir * maxSpeed * 100.0f; // Dash adds a burst of speed
                 dashTimer = 1.0f; // Dash cooldown
             }
             physics.setEntityVelocity(playerEntity, newVel);
         }
-
         else {
             if (ip.isGrounded) {
                 character.velocity.x = 0.0f;
                 character.velocity.z = 0.0f;
 
-                glm::vec3 newVel = glm::vec3(ip.groundVelocity.x, currentJoltVel.GetY(), ip.groundVelocity.z);
+                glm::vec3 newVel = glm::vec3(ip.PointVelocity.x, currentJoltVel.GetY(), ip.PointVelocity.z);
                 physics.setEntityVelocity(playerEntity, newVel);
             }
             else {
@@ -210,14 +233,7 @@ private:
                 character.velocity.z = currentJoltVel.GetZ();
             }
         }
-        //if (character.hasAbility(Ability::SpeedBoost)) {
-        //    transform.position += character.velocity * dt * 1.5f; // Apply speed boost multiplier
-        //}
-        //else transform.position += character.velocity * dt;
-		//PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
-  //              physics.setEntityVelocity(playerEntity, character.velocity);
 
-        //transform.position += character.velocity * dt;
         transform.dirty = true;
     }
     void HandleJump(
@@ -227,7 +243,7 @@ private:
         PhysicalAttributesComponent& ip,
         float dt)
     {
-        if (inputManager.isKeyJustDown(GLFW_KEY_SPACE) ){
+        if (inputManager.isKeyJustDown(GLFW_KEY_SPACE) || inputManager.isGamepadButtonJustDown(GLFW_GAMEPAD_BUTTON_A)) {
             if (character.state != Kiki::CharacterState::Jumping) {
                 PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
                 auto* rb = World::Get().GetComponent<RigidBodyComponent>(entity);
@@ -249,7 +265,7 @@ private:
                 character.state = Kiki::CharacterState::Jumping;
                 character.jumpTimer = 0.15f;
                 isDoubleJumping = true; // prevent further double jumps until grounded again
-			}
+            }
         }
     }
 	// smoothly rotate character to face movement direction
