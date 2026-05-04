@@ -334,6 +334,4 @@ target_compile_definitions(KikiDeps INTERFACE
 
 # --- Subdirectories ---
 add_subdirectory(kiki-engine)
-add_subdirectory(asset-baking)
-add_subdirectory(games/demo)
 add_subdirectory(games/KikiRunner)

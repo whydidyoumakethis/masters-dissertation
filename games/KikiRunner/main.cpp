@@ -14,12 +14,12 @@ int main(int argc, char** argv) {
 
 	// example of setting a custom skybox
 	Kiki::RenderManager::get().setCustomSkybox(
-		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_right.png",
-		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_left.png",
-		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_up.png",
-		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_down.png",
-		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_front.png",
-		std::filesystem::path(PROJECT_ROOT_PATH) / "games/demo/assets/custom_skybox_back.png"
+		std::filesystem::path(PROJECT_ROOT_PATH) / "assets/custom_skybox_right.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "assets/custom_skybox_left.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "assets/custom_skybox_up.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "assets/custom_skybox_down.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "assets/custom_skybox_front.png",
+		std::filesystem::path(PROJECT_ROOT_PATH) / "assets/custom_skybox_back.png"
 	);
 
 	engine.RegisterSystem<LevelSystem>();

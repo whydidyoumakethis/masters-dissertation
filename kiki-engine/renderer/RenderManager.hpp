@@ -83,10 +83,10 @@ namespace Kiki {
         float tonemapMaxWhite = 4.f;
         bool tonemapEnabled = true;
 
-        bool customPostprocessEnabled = false;
+        bool customPostprocessEnabled = true;
         int bayerMatrixMode = 2;
         float bayerExposure = 1.0f;
-        int bayerLevels = 4;
+        int bayerLevels = 3;
 
         float fxaaStrength = 16.f;
         bool fxaaEnabled = true;
