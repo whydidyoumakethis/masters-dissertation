@@ -25,7 +25,7 @@ namespace Kiki {
             auto animComponents = world.Query<InterfaceAnimationComponent>();
 
             for (auto [e, animationComponent] : animComponents.each()) {
-                if (registry.all_of<InterfaceComponent>(e)) {
+                if (registry.all_of<InterfaceComponent>(e) && registry.valid(e)) {
                     auto& interfaceComponent = registry.get<InterfaceComponent>(e);
 
                     if (!animationComponent.init) {

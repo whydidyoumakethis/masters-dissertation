@@ -2,6 +2,7 @@
 #include <kiki.h>
 #include "events/TimerTriggerEvent.h"
 #include "events/ResetLevelEvent.hpp"
+#include "events/RequestLevelChangeEvent.hpp"
 
 class GoalTriggerSystem : public System {
 public:
@@ -24,6 +25,7 @@ public:
 		//MessageCenter::Subscribe<CollisionEvent, OnTriggerEnter>();
 		MessageCenter::Subscribe<CollisionEvent, &GoalTriggerSystem::OnTriggerEnter>(this);
 		MessageCenter::Subscribe<ResetLevelEvent, &GoalTriggerSystem::OnLevelReset>(this);
+		MessageCenter::Subscribe<RequestLevelChangeEvent, &GoalTriggerSystem::OnLevelChange>(this);
 		Reset();
 	}
 
@@ -39,6 +41,11 @@ public:
 				//spdlog::info("Player entity found: {}", (uint32_t)e);
 			}
 		}
+	}
+
+	void OnLevelChange(const RequestLevelChangeEvent& e) {
+		playerEntity = entt::null;
+		goalEntity == entt::null;
 	}
 
 	void OnLevelReset(const ResetLevelEvent& e) {
