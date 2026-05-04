@@ -22,7 +22,7 @@ public:
 		//}
 		auto objects = World::Get().Query<TransformComponent, ThirdPersonCameraComponent, CameraComponent>();
 		for (auto [entity, transform, tpscam,cam] : objects.each()) {
-			HandleCameraRotation( tpscam,transform);
+			HandleCameraRotation( tpscam,transform, dt);
 			HandleCameraZoom(tpscam);
 			HandleCameraPosition(transform, cam, tpscam, dt);
 		
@@ -41,21 +41,40 @@ private:
 	InputManager& inputManager = Kiki::InputManager::get();
 	ThirdPersonCamera camera;
 	bool isDisablingCursor = false;
-	void HandleCameraRotation(ThirdPersonCameraComponent& cam, TransformComponent& trans)
+	void HandleCameraRotation(ThirdPersonCameraComponent& cam, TransformComponent& trans, float dt)
 	{
+		float yawInput = 0.0f;
+		float pitchInput = 0.0f;
+
 		float mousedX = 0.0f, mousedY = 0.0f;
 		if (inputManager.isCursorDisabledFunc()) {
 			inputManager.getMouseDeltaPosition(mousedX, mousedY);
+			yawInput += mousedX * cam.rotateSensitivity;
+			pitchInput += mousedY * cam.rotateSensitivity;
 		}
-		if (mousedX < 0.001f && mousedX > -0.001f && 
-			mousedY < 0.001f && mousedY > -0.001f) return;
 
-		cam.yaw -= mousedX * cam.rotateSensitivity;
-		cam.pitch += mousedY * cam.rotateSensitivity;
+		float stickX = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_RIGHT_X);
+		float stickY = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_RIGHT_Y);
+
+		const float deadzone = 0.15f;
+		if (std::abs(stickX) > deadzone || std::abs(stickY) > deadzone) {
+
+			float curveX = stickX * stickX * stickX;
+			float curveY = stickY * stickY * stickY;
+
+			float gamepadSensitivityX = 180.0f;
+			float gamepadSensitivityY = 120.0f;
+
+			yawInput += curveX * gamepadSensitivityX * dt;
+			pitchInput += curveY * gamepadSensitivityY * dt;
+		}
+
+		if (std::abs(yawInput) < 0.001f && std::abs(pitchInput) < 0.001f) return;
+
+		cam.yaw -= yawInput;
+		cam.pitch += pitchInput;
+
 		cam.pitch = glm::clamp(cam.pitch, cam.minPitch, cam.maxPitch);
-		//glm::quat rotation = glm::quat(glm::radians(glm::vec3(cam.pitch, cam.yaw, 0.0f)));
-		//trans.rotation = rotation;
-		//trans.dirty = true;
 	}
 
 	void Reset() {
