@@ -149,10 +149,12 @@ private:
         float cameraYaw, float dt)
     {
         glm::vec2 inputDir = { 0, 0 };
-        if (inputManager.isKeyDown(GLFW_KEY_W)) inputDir.y += 1.0f;
-        if (inputManager.isKeyDown(GLFW_KEY_S)) inputDir.y -= 1.0f;
-        if (inputManager.isKeyDown(GLFW_KEY_A)) inputDir.x -= 1.0f;
-        if (inputManager.isKeyDown(GLFW_KEY_D)) inputDir.x += 1.0f;
+        bool usingKeyboard = false; 
+
+        if (inputManager.isKeyDown(GLFW_KEY_W)) { inputDir.y += 1.0f; usingKeyboard = true; }
+        if (inputManager.isKeyDown(GLFW_KEY_S)) { inputDir.y -= 1.0f; usingKeyboard = true; }
+        if (inputManager.isKeyDown(GLFW_KEY_A)) { inputDir.x -= 1.0f; usingKeyboard = true; }
+        if (inputManager.isKeyDown(GLFW_KEY_D)) { inputDir.x += 1.0f; usingKeyboard = true; }
 
         float stickX = inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_LEFT_X);
         float stickY = -inputManager.getGamepadAxis(GLFW_GAMEPAD_AXIS_LEFT_Y);
@@ -167,16 +169,35 @@ private:
             inputMag = 1.0f;
         }
 
-        const float runThreshold = 0.85f;
+        float currentMoveSpeed = 0.0f;
 
         if (ip.isGrounded) {
-            bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT) || (inputMag >= runThreshold);
-            character.currentMaxSpeed = isRunning ? character.runSpeed : character.walkSpeed;
+            if (usingKeyboard) {
+                bool isRunning = inputManager.isKeyDown(GLFW_KEY_LEFT_SHIFT);
+                character.currentMaxSpeed = isRunning ? character.runSpeed : character.walkSpeed;
+                currentMoveSpeed = character.currentMaxSpeed;
+            }
+            else {
+				const float runThreshold = 0.85f; //here change the threshold for stick input to trigger running
+                if (inputMag >= runThreshold) {
+                    character.currentMaxSpeed = character.runSpeed;
+                    currentMoveSpeed = character.runSpeed; 
+                }
+                else {
+                    character.currentMaxSpeed = character.walkSpeed;
+                    float walkRatio = inputMag / runThreshold;
+                    currentMoveSpeed = character.walkSpeed * walkRatio; 
+                }
+            }
+        }
+        else {
+            currentMoveSpeed = character.currentMaxSpeed;
         }
 
-        float maxSpeed = character.currentMaxSpeed;
+        float maxDashSpeed = character.currentMaxSpeed; 
         if (character.hasAbility(Ability::SpeedBoost)) {
-            maxSpeed *= 2.0f;
+            currentMoveSpeed *= 2.0f;
+            maxDashSpeed *= 2.0f;
         }
 
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
@@ -193,33 +214,28 @@ private:
 
             glm::vec3 moveDir = forward * normInputDir.y + right * normInputDir.x;
 
-            float currentMoveSpeed = maxSpeed;
-            if (inputMag < runThreshold) {
-                float walkRatio = inputMag / runThreshold;
-                currentMoveSpeed = maxSpeed * walkRatio;
-            }
-
+            // currentMoveSpeed
             character.velocity.x = moveDir.x * currentMoveSpeed;
             character.velocity.z = moveDir.z * currentMoveSpeed;
 
             // record target facing direction (character faces movement direction)
             character.targetYaw = glm::degrees(atan2(-moveDir.x, -moveDir.z));
 
-            // final speed = playerspeed + platformspeed！
+            // final speed = playerspeed + platformspeed
             glm::vec3 finalVel = character.velocity + ip.PointVelocity;
 
             glm::vec3 newVel = glm::vec3(finalVel.x, currentJoltVel.GetY(), finalVel.z);
 
-            // Dash 
             bool isDashPressed = inputManager.isMouseButtonDown(GLFW_MOUSE_BUTTON_2) ||
                 inputManager.isGamepadButtonDown(GLFW_GAMEPAD_BUTTON_X);
 
             if (character.hasAbility(Ability::Dash) && isDashPressed && dashTimer <= 0.0f) {
-                newVel += moveDir * maxSpeed * 100.0f; // Dash adds a burst of speed
-                dashTimer = 1.0f; // Dash cooldown
+                newVel += moveDir * maxDashSpeed * 100.0f;
+                dashTimer = 1.0f;
             }
             physics.setEntityVelocity(playerEntity, newVel);
         }
+
         else {
             if (ip.isGrounded) {
                 character.velocity.x = 0.0f;
