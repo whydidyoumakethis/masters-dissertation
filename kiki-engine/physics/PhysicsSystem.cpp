@@ -28,6 +28,8 @@ namespace Kiki {
     }
 
     void PhysicsSystem::OnUpdate(float dt) {
+        ZoneScopedN("Updating physics system");
+
         auto& reg = World::Get().Registry();
         auto& bodyInterface = _manager.GetBodyInterface();
         auto view = reg.view<TransformComponent, RigidBodyComponent, PhysicalAttributesComponent>();
