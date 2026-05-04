@@ -173,7 +173,10 @@ class UISystem : public System {
 			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
 			textureManager.loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "interface/tick.png", "Tick");
 
-			MessageCenter::Publish(RequestLevelChangeEvent({ std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb" }));
+			MessageCenter::Publish(RequestLevelChangeEvent({ 
+				std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
+				std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb"
+				}));
 
 			createMainMenu();
 			initialised = true;
@@ -379,7 +382,8 @@ class UISystem : public System {
 						}
 
 						MessageCenter::Publish(RequestLevelChangeEvent({
-							std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza.glb"
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb"
 						}));
 
 						createMainMenu();
@@ -646,8 +650,8 @@ class UISystem : public System {
 
 			screen->camera = new Camera;
 			auto& camTransform = registry.get<TransformComponent>(screen->camera->camera);
-			camTransform.position = glm::vec3(4.5f, 2.5f, -1.0f);
-			camTransform.rotation = glm::quat(glm::vec3(glm::radians(170.0f), glm::radians(80.0f), glm::radians(180.0f)));
+			camTransform.position = glm::vec3(-37.494f, 35.741f, -26.41f);
+			camTransform.rotation = glm::quat(glm::vec3(glm::radians(145.200f), glm::radians(-57.050f), glm::radians(-180.0f)));
 			registry.get<CameraComponent>(screen->camera->camera).isMain = true;
 
 			screen->middleContainer = world.CreateEntity();
