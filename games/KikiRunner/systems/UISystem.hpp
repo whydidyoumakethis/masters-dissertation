@@ -194,6 +194,15 @@ class UISystem : public System {
 				// no idea why a red rectangle appears when you click the resume button *and ONLY when you click it* so this is the best fix i could think of
 				registry.get<BackgroundComponent>(screen->playButton).transparency = 1.0f;
 				registry.get<BackgroundComponent>(screen->playButtonInner).transparency = 1.0f;
+
+				registry.get<BackgroundComponent>(screen->respawnButton).transparency = 1.0f;
+				registry.get<BackgroundComponent>(screen->respawnButtonInner).transparency = 1.0f;
+
+				registry.get<BackgroundComponent>(screen->menuButton).transparency = 1.0f;
+				registry.get<BackgroundComponent>(screen->menuButtonInner).transparency = 1.0f;
+
+				registry.get<BackgroundComponent>(screen->quitGameButton).transparency = 1.0f;
+				registry.get<BackgroundComponent>(screen->quitGameButtonInner).transparency = 1.0f;
 			}
 
 			if (inputManager.isKeyJustDown(GLFW_KEY_ESCAPE)) {
@@ -317,7 +326,8 @@ class UISystem : public System {
 
 					MessageCenter::Publish(RequestLevelChangeEvent({
 						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb"
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb",
+						std::filesystem::path(PROJECT_ASSETS_PATH) / "demo_level2.glb"
 					}));
 
 					createLevelScreen();
@@ -395,6 +405,10 @@ class UISystem : public System {
 				MainMenuScreen* screen = static_cast<MainMenuScreen*>(currentScreen);
 
 				if (e.button == screen->playButton) {
+					{
+						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+						registry.erase<ButtonComponent>(screen->playButton);
+					}
 					createLoadingScreen();
 				} else if (e.button == screen->quitGameButton) {
 					glfwSetWindowShouldClose(renderManager.getWindow(), true);
@@ -405,6 +419,7 @@ class UISystem : public System {
 				if (e.button == screen->playButton) {
 					TogglePause();
 				} else if (e.button == screen->respawnButton) {
+					TogglePause();
 					MessageCenter::Publish(RespawnCharacterEvent());
 				} else if (e.button == screen->menuButton) {
 					createLoadingScreen();
