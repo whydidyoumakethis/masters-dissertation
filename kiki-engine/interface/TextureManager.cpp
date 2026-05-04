@@ -29,6 +29,8 @@ namespace Kiki {
         }
 
         textures[key] = renderManager.loadInterfaceTexture(data, baseWidthi, baseHeighti);
+
+        stbi_set_flip_vertically_on_load(1);
       
         return key;
     }
