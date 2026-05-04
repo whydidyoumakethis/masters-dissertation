@@ -45,7 +45,7 @@ public:
 
 	void OnLevelChange(const RequestLevelChangeEvent& e) {
 		playerEntity = entt::null;
-		goalEntity == entt::null;
+		goalEntity = entt::null;
 	}
 
 	void OnLevelReset(const ResetLevelEvent& e) {
