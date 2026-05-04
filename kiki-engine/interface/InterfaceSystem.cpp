@@ -25,7 +25,7 @@ namespace Kiki {
             auto animComponents = world.Query<InterfaceAnimationComponent>();
 
             for (auto [e, animationComponent] : animComponents.each()) {
-                if (registry.all_of<InterfaceComponent>(e)) {
+                if (registry.all_of<InterfaceComponent>(e) && registry.valid(e)) {
                     auto& interfaceComponent = registry.get<InterfaceComponent>(e);
 
                     if (!animationComponent.init) {
@@ -170,6 +170,14 @@ namespace Kiki {
                     float cursorY = 0.0f;
                     float width = (float)extent.width;
                     float height = (float)extent.height;
+
+                    for (auto [potentialChild, potentialChildComp] : uiComponents.each()) {
+                        if (e == potentialChild)
+                            continue;
+
+                        if (e == potentialChildComp.parent)
+                            potentialChildComp.dirty = true;
+                    }
 
                     if (interfaceComponent.parent != entt::null && registry.all_of<InterfaceComponent>(interfaceComponent.parent)) {
                         auto& parentComp = registry.get<InterfaceComponent>(interfaceComponent.parent);

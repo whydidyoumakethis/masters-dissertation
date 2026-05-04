@@ -16,10 +16,10 @@ class ThirdPersonCameraSystem : public System {
 public:
 	Phase GetPhase()    const override { return Phase::Update; }
 	void OnUpdate(float dt) override {
-		if (inputManager.isKeyJustDown(GLFW_KEY_SPACE) && !inputManager.isCursorDisabledFunc()) {
-			inputManager.disableCursor();
-			//spdlog::info("Right mouse button down, cursor disabled");
-		}
+		//if (inputManager.isKeyJustDown(GLFW_KEY_SPACE) && !inputManager.isCursorDisabledFunc()) {
+		//	inputManager.disableCursor();
+		//	//spdlog::info("Right mouse button down, cursor disabled");
+		//}
 		auto objects = World::Get().Query<TransformComponent, ThirdPersonCameraComponent, CameraComponent>();
 		for (auto [entity, transform, tpscam,cam] : objects.each()) {
 			HandleCameraRotation( tpscam,transform);
