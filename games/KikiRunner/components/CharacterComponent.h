@@ -26,9 +26,9 @@ inline Ability& operator&=(Ability& a, Ability b) {
     return a = a & b;
 }
 struct CharacterComponent {
-    float walkSpeed = 2.0f;
-    float runSpeed = 5.0f;
-    float jumpForce = 5.0f;
+    float walkSpeed = 4.0f;
+    float runSpeed = 8.0f;
+    float jumpForce = 8.0f;
 	float rotateSpeed = 10.0f; // character rotation speed (for interpolating facing direction)
 
     float currentMaxSpeed = walkSpeed;
@@ -44,7 +44,7 @@ struct CharacterComponent {
 	float          facingYaw = 0.0f;   // current facing direction
 	float          targetYaw = 0.0f;   // target facing direction
 
-    std::vector<float> timeLimits = { 90.f,60.f,50.f,20.f }; // time limits for each ability, in the same order as the Ability enum
+    std::vector<float> timeLimits = { 120.f,100.f,70.f,40.f }; // time limits for each ability, in the same order as the Ability enum
     std::vector<std::u32string> labels = {
             U"double jump",
             U"speed boost",

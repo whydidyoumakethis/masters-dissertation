@@ -138,7 +138,7 @@ namespace Kiki {
         // 7. Instantiate the listener and register it in the system.
         m_ContactListener = std::make_unique<PhysicsContactListener>();
         m_PhysicsSystem->SetContactListener(m_ContactListener.get());
-
+        m_PhysicsSystem->SetGravity(JPH::Vec3(0.0f, -14.81f, 0.0f));
         std::cout << "KikiEngine: Jolt Physics System Initialized." << std::endl;
 
         m_IsInitialized = true;
