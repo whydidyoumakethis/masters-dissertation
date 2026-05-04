@@ -323,9 +323,8 @@ private:
         for (size_t i = 0; i < timelimits.size(); ++i) {
 			if (cc->isDone[i]) continue; // skip already completed tiers
 
-            MessageCenter::Publish(ObjectiveAchievedEvent(i));
-
             if (timelimits[i] > elapsed) {
+                MessageCenter::Publish(ObjectiveAchievedEvent(i));
                 cc->isDone[i] = true;
                 spdlog::info("You completed the level in {:.2f} seconds! You earned a new ability!", elapsed);
                 if (i == 0) {

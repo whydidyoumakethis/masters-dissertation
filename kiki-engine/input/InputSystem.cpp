@@ -38,13 +38,15 @@ namespace Kiki {
         }
         
 		// handle window closing
-        //if (inputManager.isKeyJustDown(GLFW_KEY_ESCAPE) ) {
-        //    if (!inputManager.isCursorDisabledFunc()) {
-        //        glfwSetWindowShouldClose(RenderManager::get().getWindow(), true);
-        //    }
-        //    else inputManager.enableCursor();
-        //    //spdlog::info("Escape key down, cursor enabled");
-        //}
+#       ifndef NDEBUG
+        if (inputManager.isKeyJustDown(GLFW_KEY_TAB) ) {
+            if (!inputManager.isCursorDisabledFunc()) {
+                inputManager.disableCursor();
+            }
+            else inputManager.enableCursor();
+            //spdlog::info("Escape key down, cursor enabled");
+        }
+#       endif
 
         // example usage
         //if (inputManager.isKeyJustDown(GLFW_KEY_E)) {
