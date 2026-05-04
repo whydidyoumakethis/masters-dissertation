@@ -8,6 +8,7 @@
 #include "events/ResetThirdPersonCameraEvent.hpp"
 #include "events/ObjectiveAchievedEvent.hpp"
 #include "events/RequestLevelChangeEvent.hpp"
+#include "events/RespawnCharacterEvent.hpp"
 #include "../../../kiki-engine/Audio/BGMController.h"
 class CharacterSystem : public System {
 public:
@@ -35,6 +36,7 @@ public:
         MessageCenter::Subscribe<TimerTriggerEvent, &CharacterSystem::OnTimerTrigger>(this);
         MessageCenter::Subscribe<ResetLevelEvent, &CharacterSystem::OnResetEvent>(this);
         MessageCenter::Subscribe<RequestLevelChangeEvent, &CharacterSystem::OnLevelChange>(this);
+        MessageCenter::Subscribe<RespawnCharacterEvent, &CharacterSystem::OnRespawnEvent>(this);
     }
     void OnStop() override {
        
@@ -43,6 +45,42 @@ public:
     void OnResetEvent(const ResetLevelEvent& e) {
         Reset();
         MessageCenter::Publish(ResetThirdPersonCameraEvent());
+    }
+
+    void OnRespawnEvent(const RespawnCharacterEvent& e) {
+        Timer::get().Reset();
+        auto objects2 = World::Get().Query<MiscComponent>();
+        glm::vec3 spawnPos = glm::vec3(0, 0, 0);
+        //Entity playerEntity = NullEntity;
+        for (auto [e, misc] : objects2.each()) {
+            if (misc.miscTag == MmiscTags::SPAWN) {
+                auto* transform = World::Get().GetComponent<TransformComponent>(e);
+                if (transform) {
+                    spawnPos = transform->position;
+                }
+            }
+        }
+
+        if (playerEntity != NullEntity) {
+            auto* character = World::Get().GetComponent<CharacterComponent>(playerEntity);
+            auto* transform = World::Get().GetComponent<TransformComponent>(playerEntity);
+            auto* physics = World::Get().GetComponent<PhysicalAttributesComponent>(playerEntity);
+            if (character) {
+                character->spawnPosition = spawnPos;
+            }
+            if (transform) {
+                transform->position = spawnPos;
+                float modelRotationOffset = 180.0f;
+                transform->rotation = glm::angleAxis(
+                    glm::radians(character->facingYaw + modelRotationOffset),
+                    glm::vec3(0, 1, 0)
+                );
+                transform->dirty = true;
+            }
+            if (physics) {
+                physics->isGroundedNeedsUpdate = true;
+            }
+        }
     }
 
     void OnLevelChange(const RequestLevelChangeEvent& e) {
