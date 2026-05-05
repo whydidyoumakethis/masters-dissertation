@@ -9,8 +9,11 @@
 #include <stb_image.h>
 #include <Components/ColourComponent.hpp>
 #include <assimp/GltfMaterial.h>
+#include <spdlog/spdlog.h>
+#include "Animation/Skeleton.h"
+#include "Animation/AnimationLoader.h"
 
-#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals
+#define ASSIMP_FLAGS aiProcess_Triangulate | aiProcess_JoinIdenticalVertices | aiProcess_CalcTangentSpace | aiProcess_GenSmoothNormals | aiProcess_LimitBoneWeights
 
 using namespace std;
 struct Mmesh {
@@ -19,7 +22,11 @@ struct Mmesh {
 	std::vector<glm::vec3> normals;
 	std::vector<glm::vec2> uvs;
 	std::vector<uint32_t> indices;
-	int matIndex = 0;
+
+	std::vector<glm::ivec4> boneIDs;
+	std::vector<glm::vec4> weights;
+
+	int matIndex;
 
 	std::vector<glm::vec4> tangents;
 	std::vector<glm::vec3> bitangents;
@@ -161,11 +168,25 @@ enum class MmiscTags {
 	NONE,
 	FLOOR,
 	LAVA,
-	ITEM,
+	SPEED_BOOST,
+	DOUBLE_JUMP,
+	DASH,
 	TRIGGER,
 	PLAYER,
 	GOAL,
 	SPAWN
+};
+
+enum class MsimpleAnimType {
+	NONE,
+	UP_DOWN,
+	DOWN_UP,
+	LEFT_RIGHT,
+	RIGHT_LEFT,
+	FORWARD_BACKWARD,
+	BACKWARD_FORWARD,
+	ROTATE_CLOCKWISE,
+	ROTATE_COUNTERCLOCKWISE
 };
 
 
@@ -175,6 +196,10 @@ struct MmeshInstance {
 	MbodyType bodyType = MbodyType::STATIC;
 	McolliderType colliderType = McolliderType::NONE;
 	MmiscTags miscTag = MmiscTags::NONE;
+	MsimpleAnimType simpleAnim = MsimpleAnimType::NONE;
+	float anim_distance = 5.f;
+	float anim_speed = 1.f;
+	float anim_rotation_speed = 90.f;
 };
 struct MemtpyInstance {
 	glm::mat4 transform;
@@ -197,12 +222,35 @@ struct Mscene {
 	std::vector<Mtexture> textures;
 	std::vector<Mlights> lights;
 	glm::mat4 worldTransform;
+	// === 新增：用于存储动画和骨骼数据 ===
+	std::unique_ptr<Kiki::Skeleton> skeleton = nullptr;
+	std::map<std::string, std::unique_ptr<Kiki::Animation>> animations;
+	bool hasAnimations = false;
 };
 
 namespace Kiki {
 	class GltfLoaderAssimp {
 	public:
-		static Mmesh loadMesh(const std::filesystem::path& path, int index) {
+		static void AddBoneData(
+			glm::ivec4& ids,
+			glm::vec4& weights,
+			int boneID,
+			float weight
+		) {
+			for (int i = 0; i < 4; i++) {
+				if (weights[i] == 0.0f) {
+					ids[i] = boneID;
+					weights[i] = weight;
+					return;
+				}
+			}
+		}
+
+		static Mmesh loadMesh(
+			const std::filesystem::path& path,
+			int index,
+			const Skeleton& skeleton)
+		{
 			Assimp::Importer importer;
 			const aiScene* scene = importer.ReadFile(path.string(), ASSIMP_FLAGS);
 			if (!scene || scene->mFlags & AI_SCENE_FLAGS_INCOMPLETE || !scene->mRootNode) {
@@ -215,6 +263,8 @@ namespace Kiki {
 			out.normals.reserve(mesh->mNumVertices);
 			out.uvs.reserve(mesh->mNumVertices);
 			out.matIndex = mesh->mMaterialIndex;
+			out.boneIDs.resize(mesh->mNumVertices, glm::ivec4(0));
+			out.weights.resize(mesh->mNumVertices, glm::vec4(0.0f));
 			for (unsigned int i = 0; i < mesh->mNumVertices; i++) {
 				out.vertices.emplace_back(mesh->mVertices[i].x, mesh->mVertices[i].y, mesh->mVertices[i].z);
 				if (mesh->HasNormals()) {
@@ -228,6 +278,39 @@ namespace Kiki {
 				aiFace face = mesh->mFaces[i];
 				for (unsigned int j = 0; j < face.mNumIndices; j++) {
 					out.indices.push_back(face.mIndices[j]);
+				}
+			}
+			
+
+			for (unsigned int i = 0; i < mesh->mNumBones; i++) {
+				aiBone* bone = mesh->mBones[i];
+
+				std::string boneName = bone->mName.C_Str();
+
+				int boneID = skeleton.FindBoneIndex(boneName);
+				if (boneID == -1) continue;
+
+				for (unsigned int w = 0; w < bone->mNumWeights; w++) {
+					int vertexID = bone->mWeights[w].mVertexId;
+					float weight = bone->mWeights[w].mWeight;
+
+					AddBoneData(
+						out.boneIDs[vertexID],
+						out.weights[vertexID],
+						boneID,
+						weight
+					);
+				}
+			}
+			for (size_t i = 0; i < out.weights.size(); i++) {
+				float sum =
+					out.weights[i].x +
+					out.weights[i].y +
+					out.weights[i].z +
+					out.weights[i].w;
+
+				if (sum > 0.0f) {
+					out.weights[i] /= sum;
 				}
 			}
 			return out;
@@ -312,7 +395,9 @@ namespace Kiki {
 
 			if (s == "floor")   return MmiscTags::FLOOR;
 			if (s == "lava")    return MmiscTags::LAVA;
-			if (s == "item")    return MmiscTags::ITEM;
+			if (s == "speed_boost") return MmiscTags::SPEED_BOOST;
+			if (s == "double_jump") return MmiscTags::DOUBLE_JUMP;
+			if (s == "dash") return MmiscTags::DASH;
 			if (s == "trigger") return MmiscTags::TRIGGER;
 			if (s == "player")  return MmiscTags::PLAYER;
 			if (s == "goal")    return MmiscTags::GOAL;
@@ -320,6 +405,26 @@ namespace Kiki {
 
 			return MmiscTags::NONE;
 
+		}
+
+		static MsimpleAnimType parseSimpleAnimType(aiNode* node) {
+			if (!node || !node->mMetaData) {
+				return MsimpleAnimType::NONE;
+			}
+			aiString animTypeStr;
+			if (!node->mMetaData->Get("anim", animTypeStr)) {
+				return MsimpleAnimType::NONE;
+			}
+			std::string s = animTypeStr.C_Str();
+			if (s == "up_down") return MsimpleAnimType::UP_DOWN;
+			if (s == "down_up") return MsimpleAnimType::DOWN_UP;
+			if (s == "left_right") return MsimpleAnimType::LEFT_RIGHT;
+			if (s == "right_left") return MsimpleAnimType::RIGHT_LEFT;
+			if (s == "forward_backward") return MsimpleAnimType::FORWARD_BACKWARD;
+			if (s == "backward_forward") return MsimpleAnimType::BACKWARD_FORWARD;
+			if (s == "rotate_clockwise") return MsimpleAnimType::ROTATE_CLOCKWISE;
+			if (s == "rotate_counterclockwise") return MsimpleAnimType::ROTATE_COUNTERCLOCKWISE;
+			return MsimpleAnimType::NONE;
 		}
 
 		static void collectNodeInstances(
@@ -339,7 +444,7 @@ namespace Kiki {
 					aiString bodyTypeStr;
 					node->mMetaData->Get("body", bodyTypeStr);
 
-					cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
+					//cout << "Body type for node " << node->mName.C_Str() << ": " << bodyTypeStr.C_Str() << endl;
 
 					if (string(bodyTypeStr.C_Str()) == "dynamic") {
 						instance.bodyType = MbodyType::DYNAMIC;
@@ -354,7 +459,7 @@ namespace Kiki {
 					aiString colliderTypeStr;
 					node->mMetaData->Get("collider", colliderTypeStr);
 
-					cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
+					//cout << "Collider type for node " << node->mName.C_Str() << ": " << colliderTypeStr.C_Str() << endl;
 
 					if (string(colliderTypeStr.C_Str()) == "box") {
 						instance.colliderType = McolliderType::BOX;
@@ -376,6 +481,20 @@ namespace Kiki {
 					}
 
 					instance.miscTag = parseMiscTag(node);
+
+					instance.simpleAnim = parseSimpleAnimType(node);
+					float animDistance;
+					if (node->mMetaData->Get("anim_distance", animDistance)) {
+						instance.anim_distance = animDistance;
+					}
+					float animSpeed;
+					if (node->mMetaData->Get("anim_speed", animSpeed)) {
+						instance.anim_speed = animSpeed;
+					}
+					float animRotationSpeed;
+					if (node->mMetaData->Get("anim_rotation_speed", animRotationSpeed)) {
+						instance.anim_rotation_speed = animRotationSpeed;
+					}
 				}
 
 				out.instances.push_back(instance);
@@ -387,7 +506,11 @@ namespace Kiki {
 				emptyInstance.bodyType = MbodyType::STATIC; // Default to static for empty instances
 				emptyInstance.colliderType = McolliderType::NONE; // Default to no collider for empty instances
 				emptyInstance.miscTag = miscTag;
-				std::cout << "Empty instance for node " << node->mName.C_Str() << " with misc tag: " << static_cast<int>(miscTag) << std::endl;
+				spdlog::info("Empty instance for node {} with misc tag: {}", node->mName.C_Str(), static_cast<int>(miscTag));
+				spdlog::info("Transform for empty instance:");
+				for (int i = 0; i < 4; i++) {
+					spdlog::info("{} {} {} {}", worldTransform[i][0], worldTransform[i][1], worldTransform[i][2], worldTransform[i][3]);
+				}
 				out.emptyInstances.push_back(emptyInstance);
 			}
 
@@ -436,18 +559,17 @@ namespace Kiki {
 					light.direction = glm::normalize(glm::vec3(worldDir));
 				}
 
-				std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
-				std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
+				// std::cout << "Light " << light.name << " position: " << light.position.x << ", " << light.position.y << ", " << light.position.z << std::endl;
+				// std::cout << "Light " << light.name << " color: " << rawcolor.r << ", " << rawcolor.g << ", " << rawcolor.b << std::endl;
 
-				std::cout << "Light " << light.name << " type: " <<
-				(light.type == MlightType::POINT ? "POINT" : light.type == MlightType::DIRECTIONAL ? "DIRECTIONAL" : light.type == MlightType::SPOT ? "SPOT" : "UNKNOWN")
-				<< std::endl;
+				// std::cout << "Light " << light.name << " type: " <<
+				// (light.type == MlightType::POINT ? "POINT" : light.type == MlightType::DIRECTIONAL ? "DIRECTIONAL" : light.type == MlightType::SPOT ? "SPOT" : "UNKNOWN")
+				// << std::endl;
 
-				std::cout << "Light " << light.name << " direction: " << light.direction.x << ", " << light.direction.y << ", " << light.direction.z << std::endl;
+				// std::cout << "Light " << light.name << " direction: " << light.direction.x << ", " << light.direction.y << ", " << light.direction.z << std::endl;
 				light.color = rawcolor;
 				out.lights.push_back(light);
 			}
-
 		}
 
 		static Mscene loadScene(const std::filesystem::path& path){
@@ -459,6 +581,19 @@ namespace Kiki {
 			Mscene out{};
 			auto& t = scene->mRootNode->mTransformation;
 			out.worldTransform = toglmMat4(t);
+
+			if (scene->HasAnimations()) {
+				out.hasAnimations = true;
+				out.skeleton = AnimationLoader::LoadSkeleton(scene);
+
+				if (out.skeleton) {
+					for (unsigned int i = 0; i < scene->mNumAnimations; i++) {
+						std::string animName = scene->mAnimations[i]->mName.C_Str();
+						std::transform(animName.begin(), animName.end(), animName.begin(), ::tolower);
+						out.animations[animName] = AnimationLoader::LoadAnimation(scene, *out.skeleton, i);
+					}
+				}
+			}
 
 			collectNodeInstances(scene->mRootNode, glm::mat4(1.0f), out);
 
@@ -504,6 +639,36 @@ namespace Kiki {
 					aiFace face = aiMesh->mFaces[j];
 					for (unsigned int k = 0; k < face.mNumIndices; k++) {
 						mesh.indices.push_back(face.mIndices[k]);
+					}
+				}
+
+				mesh.boneIDs.resize(aiMesh->mNumVertices, glm::ivec4(0));
+				mesh.weights.resize(aiMesh->mNumVertices, glm::vec4(0.0f));
+
+				if (out.skeleton) {
+					for (unsigned int b = 0; b < aiMesh->mNumBones; b++) {
+						aiBone* bone = aiMesh->mBones[b];
+						std::string boneName = bone->mName.C_Str();
+
+						int boneID = out.skeleton->FindBoneIndex(boneName);
+						if (boneID == -1) continue;
+
+						for (unsigned int w = 0; w < bone->mNumWeights; w++) {
+							int vertexID = bone->mWeights[w].mVertexId;
+							float weight = bone->mWeights[w].mWeight;
+
+							AddBoneData(
+								mesh.boneIDs[vertexID],
+								mesh.weights[vertexID],
+								boneID,
+								weight
+							);
+						}
+					}
+
+					for (size_t v = 0; v < mesh.weights.size(); v++) {
+						float sum = mesh.weights[v].x + mesh.weights[v].y + mesh.weights[v].z + mesh.weights[v].w;
+						if (sum > 0.0f) mesh.weights[v] /= sum;
 					}
 				}
 				out.meshes.push_back(mesh);

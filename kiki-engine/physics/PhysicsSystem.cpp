@@ -1,12 +1,11 @@
 #include "physics/PhysicsSystem.hpp"
-
+#include "physics/PhysicsDebugRenderer.hpp"
 
 #include <Jolt/Physics/Collision/Shape/BoxShape.h>
 #include <Jolt/Physics/Collision/Shape/SphereShape.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
-
-
+#include <Jolt/Physics/Collision/Shape/RotatedTranslatedShape.h>
 
 #include "ECS/World.h"
 #include <spdlog/spdlog.h>
@@ -29,16 +28,33 @@ namespace Kiki {
     }
 
     void PhysicsSystem::OnUpdate(float dt) {
+        ZoneScopedN("Updating physics system");
+
         auto& reg = World::Get().Registry();
         auto& bodyInterface = _manager.GetBodyInterface();
         auto view = reg.view<TransformComponent, RigidBodyComponent, PhysicalAttributesComponent>();
 
         for (auto [entity, transform, rb,ip] : view.each()) {
             if (transform.dirty) {
-                JPH::RVec3 jPos = bodyInterface.GetPosition(rb.bodyID);
-                if (glm::distance(transform.position, ToGLM(jPos)) > 0.01f) {
-                    bodyInterface.SetPositionAndRotation(
-                        rb.bodyID, ToJPHR(transform.position), ToJPH(transform.rotation), JPH::EActivation::Activate
+                if (rb.motionType == JPH::EMotionType::Kinematic) {
+                    if (dt > 0.0f) {
+                        bodyInterface.MoveKinematic(
+                            rb.bodyID,
+                            ToJPHR(transform.position),
+                            ToJPH(transform.rotation),
+                            dt
+                        );
+                    }
+                }
+                else {
+                    JPH::RVec3 jPos = bodyInterface.GetPosition(rb.bodyID);
+                    if (glm::distance(transform.position, ToGLM(jPos)) > 0.01f) {
+                        bodyInterface.SetPosition(
+                            rb.bodyID, ToJPHR(transform.position), JPH::EActivation::Activate
+                        );
+                    }
+                    bodyInterface.SetRotation(
+                        rb.bodyID, ToJPH(transform.rotation), JPH::EActivation::Activate
                     );
                 }
             }
@@ -51,29 +67,66 @@ namespace Kiki {
         // Pure physics simulation
         _manager.Update(dt);
 
+		auto& debugRenderer = PhysicsDebugRenderer::get();
+		debugRenderer.clear();
+		if (debugRenderer.enabled) {
+            if (debugRenderer.drawBodies) {
+                JPH::BodyManager::DrawSettings settings;
+                settings.mDrawShape = true;
+                settings.mDrawShapeWireframe = true;
+                settings.mDrawBoundingBox = debugRenderer.drawBoundingBoxes;
+                settings.mDrawVelocity = debugRenderer.drawVelocity;
+                _manager.GetSystem()->DrawBodies(settings, &debugRenderer);
+            }
+        }
+
         //write back the results to ECS
-        for (auto [entity, transform, rb,ip] : view.each()) {
+        for (auto [entity, transform, rb, ip] : view.each()) {
             if (rb.motionType == JPH::EMotionType::Dynamic) {
                 bool isActive = bodyInterface.IsActive(rb.bodyID);
 
-                if (!isActive) {
-                    static bool loggedSleep = false;
-                    if (!loggedSleep) {
-                        spdlog::warn("=== [PHYSICS DEACTIVATED] Entity {} is now SLEEPING. ===", (uint32_t)entity);
-                        loggedSleep = true;
-                    }
-                }
-
                 if (isActive) {
+                    JPH::Vec3 vel = bodyInterface.GetLinearVelocity(rb.bodyID);
+                    bool needsClamp = false;
+
+                    float horizontalSpeedSq = vel.GetX() * vel.GetX() + vel.GetZ() * vel.GetZ();
+                    float maxSafeHorizontalSq = 1600.0f; // (40m/s)^2
+
+                    if (horizontalSpeedSq > maxSafeHorizontalSq) {
+                        vel.SetX(0.0f);
+                        vel.SetZ(0.0f);
+                        needsClamp = true;
+                    }
+
+                    float maxSafeUpwardSpeed = 10.0f;
+
+                    if (vel.GetY() > maxSafeUpwardSpeed) {
+                        vel.SetY(0.0f);
+                        needsClamp = true;
+                    }
+
+                    if (needsClamp) {
+                        bodyInterface.SetLinearVelocity(rb.bodyID, vel);
+                        //spdlog::warn("=== [PHYSICS CLAMP] Clamped! H-Sq: {:.2f}, V-Up: {:.2f} ===", horizontalSpeedSq, vel.GetY());
+                    }
+
                     JPH::RVec3 pos; JPH::Quat rot;
                     bodyInterface.GetPositionAndRotation(rb.bodyID, pos, rot);
                     transform.position = ToGLM(pos);
                     transform.rotation = ToGLM(rot);
                     transform.dirty = true;
                 }
+                else {
+                    static bool loggedSleep = false;
+                    if (!loggedSleep) {
+                        //spdlog::warn("=== [PHYSICS DEACTIVATED] Entity {} is now SLEEPING. ===", (uint32_t)entity);
+                        loggedSleep = true;
+                    }
+                }
             }
-            if (ip.isGroundedNeedsUpdate) {
-				UpdateIsGrounded(entity);
+
+            if (rb.motionType == JPH::EMotionType::Dynamic) {
+                UpdateIsGrounded(entity);
             }
         }
     }
@@ -108,14 +161,25 @@ namespace Kiki {
         auto& transform = reg.get<TransformComponent>(entity);
 
         JPH::ShapeRefC shape;
-        
+
         if (auto* meshColl = reg.try_get<MeshColliderComponent>(entity)) {
             shape = meshColl->shape;
             spdlog::info("Entity {} using pre-computed MeshCollider.", (uint32_t)entity);
         }
         else if (auto* capsule = reg.try_get<CapsuleColliderComponent>(entity)) {
-            shape = new JPH::CapsuleShape(capsule->radius, capsule->height);
-		}
+            JPH::Ref<JPH::Shape> baseCapsule = new JPH::CapsuleShape(capsule->halfHeight, capsule->radius);
+
+            // calculate the offset to move the capsule up so that its bottom is at the Transform's position
+            float offsetUp = capsule->halfHeight + capsule->radius;
+
+            JPH::RotatedTranslatedShapeSettings offsetShapeSettings(
+                JPH::Vec3(0, offsetUp, 0),
+                JPH::Quat::sIdentity(),
+                baseCapsule
+            );
+
+            shape = offsetShapeSettings.Create().Get();
+        }
         else if (auto* box = reg.try_get<BoxColliderComponent>(entity)) {
             shape = new JPH::BoxShape(ToJPH(box->halfExtents));
         }
@@ -138,7 +202,31 @@ namespace Kiki {
         settings.mFriction = rb.friction;
         settings.mRestitution = rb.restitution;
         settings.mIsSensor = rb.isSensor;
-        settings.mMassPropertiesOverride = settings.GetShape()->GetMassProperties(); // default mass multiplier
+
+        if (rb.lockRotationXZ) {
+            settings.mAllowedDOFs = JPH::EAllowedDOFs::TranslationX |
+                JPH::EAllowedDOFs::TranslationY |
+                JPH::EAllowedDOFs::TranslationZ;
+        }
+        else {
+            settings.mAllowedDOFs = JPH::EAllowedDOFs::All;
+        }
+
+        if (rb.motionType == JPH::EMotionType::Dynamic) {
+            settings.mMotionQuality = JPH::EMotionQuality::LinearCast;
+        }
+
+        JPH::MassProperties massProps = settings.GetShape()->GetMassProperties();
+
+        if (massProps.mMass <= 0.0f && rb.motionType != JPH::EMotionType::Static) {
+
+            massProps.mMass = 1000.0f;
+            massProps.mInertia = JPH::Mat44::sIdentity();
+            settings.mOverrideMassProperties = JPH::EOverrideMassProperties::MassAndInertiaProvided;
+        }
+
+        settings.mMassPropertiesOverride = massProps;
+
         auto& bi = _manager.GetBodyInterface();
         JPH::Body* body = bi.CreateBody(settings);
         bi.AddBody(body->GetID(), JPH::EActivation::Activate);
@@ -156,62 +244,83 @@ namespace Kiki {
         }
     }
 
-    //RaycastHit PhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID) {
-    //    RaycastHit result;
+    RaycastHit PhysicsSystem::Raycast(const glm::vec3& origin, const glm::vec3& direction, float maxDistance, JPH::BodyID ignoreID) {
+        RaycastHit result;
+        result.hasHit = false;
+        result.entity = entt::null;
 
-    //    JPH::RRayCast ray;
-    //    ray.mOrigin = ToJPHR(origin);
-    //    ray.mDirection = ToJPH(direction * maxDistance);
+        JPH::RRayCast ray;
+        ray.mOrigin = ToJPHR(origin);
+        ray.mDirection = ToJPH(direction * maxDistance);
 
-    //    JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
+        JPH::IgnoreSingleBodyFilter bodyFilter(ignoreID);
+        JPH::RayCastResult joltResult;
 
-    //    JPH::RayCastResult joltResult;
+        bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
+            ray,
+            joltResult,
+            {}, {},
+            bodyFilter
+        );
 
-    //    bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
-    //        ray,
-    //        joltResult,
-    //        {},
-    //        {},
-    //        bodyFilter
-    //    );
+        if (hit) {
+            result.hasHit = true;
+            result.distance = joltResult.mFraction * maxDistance;
+            result.position = origin + direction * result.distance;
 
-    //    if (hit) {
-    //        result.hasHit = true;
-    //        result.distance = joltResult.mFraction * maxDistance;
-    //        result.position = origin + direction * result.distance;
+            JPH::uint64 userData = _manager.GetBodyInterface().GetUserData(joltResult.mBodyID);
+            result.entity = (entt::entity)userData;
 
-    //        auto& reg = World::Get().Registry();
-    //        auto view = reg.view<RigidBodyComponent>();
-    //        for (auto [ent, rb] : view.each()) {
-    //            if (rb.bodyID == joltResult.mBodyID) {
-    //                result.entity = ent;
-
-    //                JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
-    //                if (lock.Succeeded()) {
-    //                    result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
-    //                }
-    //                break;
-    //            }
-    //        }
-    //    }
-
-    //    return result;
-    //}
+            JPH::BodyLockRead lock(_manager.GetSystem()->GetBodyLockInterface(), joltResult.mBodyID);
+            if (lock.Succeeded()) {
+                result.normal = ToGLM(lock.GetBody().GetWorldSpaceSurfaceNormal(joltResult.mSubShapeID2, ray.GetPointOnRay(joltResult.mFraction)));
+            }
+        }
+        return result;
+    }
 
     void PhysicsSystem::UpdateIsGrounded(entt::entity entity, float maxDistance) {
         auto& reg = World::Get().Registry();
-        if (auto* mcc = reg.try_get<MeshColliderComponent>(entity)) {
-			auto box = mcc->shape.GetPtr()->GetLocalBounds();
-            float bottom = box.mMin.GetY();
-			auto physic = reg.ctx().get<PhysicsService>();
-            auto result = physic.Raycast(
-                reg.get<TransformComponent>(entity).position,
-                glm::vec3(0, -1, 0),
-                -bottom + maxDistance,
-                reg.get<RigidBodyComponent>(entity).bodyID);
-			if (auto* ip = reg.try_get<PhysicalAttributesComponent>(entity)) {
-                ip->isGrounded = result.hasHit;
+        auto* ip = reg.try_get<PhysicalAttributesComponent>(entity);
+        if (!ip) return;
+
+        glm::vec3 rayOrigin = reg.get<TransformComponent>(entity).position;
+        rayOrigin.y += 0.3f;
+
+        float testRayLength = 0.6f;
+
+        JPH::RRayCast ray;
+        ray.mOrigin = ToJPHR(rayOrigin);
+        ray.mDirection = ToJPH(glm::vec3(0, -1, 0) * testRayLength);
+
+        JPH::IgnoreSingleBodyFilter bodyFilter(reg.get<RigidBodyComponent>(entity).bodyID);
+        JPH::RayCastResult joltResult;
+
+        bool hit = _manager.GetSystem()->GetNarrowPhaseQuery().CastRay(
+            ray, joltResult, {}, {}, bodyFilter
+        );
+
+        ip->isGrounded = hit;
+
+        if (hit) {
+            JPH::uint64 userData = _manager.GetBodyInterface().GetUserData(joltResult.mBodyID);
+            entt::entity hitEntity = (entt::entity)userData;
+
+			glm::vec3 hitPoint = rayOrigin + glm::vec3(0, -1, 0) * (joltResult.mFraction * testRayLength);
+
+            if (hitEntity != entt::null && reg.valid(hitEntity)) {
+                if (auto* groundRb = reg.try_get<RigidBodyComponent>(hitEntity)) {
+                    JPH::Vec3 gVel = _manager.GetBodyInterface().GetLinearVelocity(groundRb->bodyID);
+                    ip->groundVelocity = ToGLM(gVel);
+
+					JPH::Vec3 pVel = _manager.GetBodyInterface().GetPointVelocity(groundRb->bodyID, ToJPHR(hitPoint));
+					ip->PointVelocity = ToGLM(pVel);
+                }
             }
+        }
+        else {
+            ip->groundVelocity = glm::vec3(0.0f);
+            ip->PointVelocity = glm::vec3(0.0f);
         }
     }
 

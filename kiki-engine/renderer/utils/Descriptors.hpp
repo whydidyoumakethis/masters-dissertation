@@ -3,9 +3,11 @@
 
 #include "VulkanWrapper.hpp"
 #include "VulkanWindow.hpp"
+#include "../RenderManager.hpp"
 #include "Image.hpp"
 
 #include <cstdint>
+#include <vector>
 
 namespace rutils {
     DescriptorSetLayout createSceneDescriptorLayout(VulkanWindow const& window);
@@ -14,10 +16,34 @@ namespace rutils {
     DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createCubemapDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createPostProcessingDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createSSAODescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createSSAOBlurredDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createChromaticAberrationDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createTonemapDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createShadowMatrixDescriptorLayout(VulkanWindow const& window);
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors = 2048, std::uint32_t aMaxSets = 1024);
+    DescriptorSetLayout createAnimationDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createBloomDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createCompositeDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createDebugDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createCustomPostprocessDescriptorLayout(VulkanWindow const& window);
     VkDescriptorSet allocDescSet(VulkanWindow const& window, VkDescriptorPool aPool, VkDescriptorSetLayout aSetLayout);
-    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler);
+    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler, std::vector<Kiki::ShadowCubemap> const& shadowCubemaps);
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors);
+    void initialiseSSAODescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoDescriptors);
+    void initialiseSSAOHBlurDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoHBlurDescriptors);
+    void initialiseSSAOBlurredDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoBlurredDescriptors);
+    void initialiseChromaticAberrationDescriptorSet(VulkanWindow const& window, Image& doneChromaticAberrationImage, Sampler& sampler, VkDescriptorSet& chromaticAberrationDescriptors);
+    void initialiseTonemapDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Sampler& sampler, VkDescriptorSet& tonemapDescriptors);
+    void initialiseShadowMatrixDescriptorSet(VulkanWindow const& window, VkBuffer shadowMatricesBuffer, VkDescriptorSet& shadowMatrixDescriptors);
+    void initialiseBloomImageDescriptorSet(VulkanWindow const& window, Image& prevImage, Sampler& sampler, VkDescriptorSet& bloomImageDescriptors);
+    void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors);
+    void initialiseDebugDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, GBuffers& gbuffers, Image& depthBuffer, Image& ssao, Image& bloom, Sampler& sampler, VkDescriptorSet& debugDescriptors);
+    void initialiseCustomPostprocessDescriptorSet(VulkanWindow const& window, Image& inputImage, Sampler& sampler, VkDescriptorSet& customPostprocessDescriptors);
+
+    DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createInterfaceTextureDescriptorLayout(VulkanWindow const& window);
 }
 
 #endif

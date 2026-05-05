@@ -11,5 +11,12 @@ target_sources(kiki
       DebugComponent.hpp
       MiscComponent.hpp
       InterfaceComponent.hpp
+      BackgroundComponent.hpp
+      TextComponent.hpp
       RoughnessMetallicFactorComponent.hpp
+      ButtonComponent.hpp
+      InterfaceAnimationComponent.hpp
+      InterfaceTextureComponent.hpp
+      AspectRatioComponent.hpp
+      SimpleAnimationComponent.hpp
 )

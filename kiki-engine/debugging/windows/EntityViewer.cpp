@@ -335,21 +335,21 @@ namespace debug {
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Position:");
                     ImGui::SameLine(100.0f);
-                    ImGui::InputFloat3("##editpos", &component->position.x, "%.3f");
+                    ImGui::DragFloat3("##editpos", &component->position.x, 0.1f, 0.f, 0.f, "%.3f");
 
                     glm::vec3 rot = glm::degrees(glm::eulerAngles(component->rotation));
 
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Rotation:");
                     ImGui::SameLine(100.0f);
-                    if (ImGui::InputFloat3("##editrot", &rot.x, "%.3f")) {
+                    if (ImGui::DragFloat3("##editrot", &rot.x, 0.1f, 0.f, 0.f, "%.3f")) {
                         component->rotation = glm::quat(glm::radians(rot));
                     }
 
                     ImGui::AlignTextToFramePadding();
                     ImGui::Text("Scale:");
                     ImGui::SameLine(100.0f);
-                    ImGui::InputFloat3("##editscale", &component->scale.x, "%.3f");
+                    ImGui::DragFloat3("##editscale", &component->scale.x, 0.1f, 0.f, 0.f, "%.3f");
 
                     component->dirty = true;
 

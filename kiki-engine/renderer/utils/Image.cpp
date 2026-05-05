@@ -63,20 +63,7 @@ namespace rutils {
 		return *this;
 	}
 
-    Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, VkFormat format) {
-		// // Flip images vertically by default. Vulkan expects the first scanline to be the bottom-most scanline. PNG et al.
-        // // instead define the first scanline to be the top-most one.
-        // stbi_set_flip_vertically_on_load( 1 );
-
-        // // Load base image
-        // int baseWidthi, baseHeighti;// baseChannelsi;
-
-        // stbi_uc* data = stbi_load_from_memory( buffer, bufferLength, &baseWidthi, &baseHeighti, &baseChannelsi, 4 /* want 4 c h a n n e l s = RGBA */);
-
-        // if (!data) {
-        //     throw Kiki::FatalError("{}: unable to load texture base image", stbi_failure_reason());
-        // }
-
+    Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, std::mutex& queueMutex, VkFormat format) {
         auto const baseWidth = std::uint32_t(baseWidthi);
         auto const baseHeight = std::uint32_t(baseHeighti);
 
@@ -87,7 +74,7 @@ namespace rutils {
 
         void* sptr = nullptr;
         if (auto const res = vmaMapMemory(aAllocator.allocator, staging.allocation, &sptr); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Mapping memory for writing\n"
+            throw Kiki::FatalError("Mapping memory for writing\n"
                 "vmaMapMemory() returned {}", toString(res)
             );
         }
@@ -99,9 +86,9 @@ namespace rutils {
         // stbi_image_free(imageData);
 
         // Create image
-        Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, VK_FORMAT_R8G8B8A8_SRGB, aContext, 
+        Image ret = createImageTexture(aAllocator, baseWidth, baseHeight, format, aContext,
             VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
-        
+
         // Create command buffer for data upload and begin recording
         VkCommandBuffer cbuff = allocCommandBuffer(aContext, aCmdPool);
 
@@ -111,7 +98,7 @@ namespace rutils {
         beginInfo.pInheritanceInfo = nullptr;
 
         if (auto const res = vkBeginCommandBuffer(cbuff, &beginInfo); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Beginning command buffer recording\n"
+            throw Kiki::FatalError("Beginning command buffer recording\n"
                 "vkBeginCommandBuffer() returned {}", toString(res)
             );
         }
@@ -119,9 +106,9 @@ namespace rutils {
         // Transition whole image layout
         // When copying data to the image, the image’s layout must be TRANSFER DST OPTIMAL. The current
         // image layout is UNDEFINED (which is the initial layout the image was created in).
-        auto const mipLevels = computeMipLevelCount( baseWidth, baseHeight );
+        auto const mipLevels = computeMipLevelCount(baseWidth, baseHeight);
 
-        imageBarrier( cbuff, ret.image,
+        imageBarrier(cbuff, ret.image,
             /* Before */
             VK_PIPELINE_STAGE_2_NONE,
             VK_ACCESS_2_NONE,
@@ -154,7 +141,7 @@ namespace rutils {
         vkCmdCopyBufferToImage(cbuff, staging.buffer, ret.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
         // Transition base level to TRANSFER SRC OPTIMAL
-        imageBarrier( cbuff, ret.image,
+        imageBarrier(cbuff, ret.image,
             /* Before */
             VK_PIPELINE_STAGE_2_COPY_BIT,
             VK_ACCESS_2_TRANSFER_WRITE_BIT,
@@ -178,17 +165,17 @@ namespace rutils {
             // Blit previous mipmap level (=level-1) to the current level. Note that the loop starts at level = 1.
             // Level = 0 is the base level that we initialied before the loop.
             VkImageBlit blit{};
-                blit.srcSubresource = VkImageSubresourceLayers{
-                VK_IMAGE_ASPECT_COLOR_BIT,
-                level-1,
-                0, 1
+            blit.srcSubresource = VkImageSubresourceLayers{
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            level - 1,
+            0, 1
             };
             blit.srcOffsets[0] = { 0, 0, 0 };
             blit.srcOffsets[1] = { std::int32_t(width), std::int32_t(height), 1 };
 
             // Next mip level
-            width >>= 1; if( width == 0 ) width = 1;
-            height >>= 1; if( height == 0 ) height = 1;
+            width >>= 1; if (width == 0) width = 1;
+            height >>= 1; if (height == 0) height = 1;
 
             blit.dstSubresource = VkImageSubresourceLayers{
                 VK_IMAGE_ASPECT_COLOR_BIT,
@@ -247,7 +234,7 @@ namespace rutils {
 
         // End command recording
         if (auto const res = vkEndCommandBuffer(cbuff); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Ending command buffer recording\n"
+            throw Kiki::FatalError("Ending command buffer recording\n"
                 "vkEndCommandBuffer() returned {}", toString(res)
             );
         }
@@ -265,14 +252,17 @@ namespace rutils {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-        if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Unable to submit command buffer to queue\n"
-                "vkQueueSubmit2() returned {}", toString(res)
-            );
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", toString(res)
+                );
+            }
         }
 
         if (auto const res = vkWaitForFences(aContext.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Waiting for upload to complete\n"
+            throw Kiki::FatalError("Waiting for upload to complete\n"
                 "vkWaitForFences() returned {}", toString(res)
             );
         }
@@ -283,9 +273,197 @@ namespace rutils {
         vkFreeCommandBuffers(aContext.device, aCmdPool, 1, &cbuff);
 
         return ret;
-	}
+    }
 
-    Image loadCubemapTexture(std::array<stbi_uc*, 6> faces, uint32_t width, uint32_t height, VulkanWindow const& context, VkCommandPool commandPool, Allocator const& allocator) {        
+    Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, std::mutex& queueMutex) {
+        // Create staging buffer and copy image data to it
+        auto const sizeInBytes = atlasSize * atlasSize * sizeof(uint8_t) * 4;
+
+        auto staging = createBuffer(aAllocator, sizeInBytes, VK_BUFFER_USAGE_TRANSFER_SRC_BIT, VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT);
+
+        void* sptr = nullptr;
+        if (auto const res = vmaMapMemory(aAllocator.allocator, staging.allocation, &sptr); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Mapping memory for writing\n"
+                "vmaMapMemory() returned {}", toString(res)
+            );
+        }
+
+        std::memcpy(sptr, data.data(), sizeInBytes);
+        vmaUnmapMemory(aAllocator.allocator, staging.allocation);
+
+        // Create image
+        Image ret = createFontAtlasTexture(aAllocator, atlasSize, atlasSize, VK_FORMAT_R8G8B8A8_UNORM, aContext,
+            VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT); //TODO
+
+        // Create command buffer for data upload and begin recording
+        VkCommandBuffer cbuff = allocCommandBuffer(aContext, aCmdPool);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = 0;
+        beginInfo.pInheritanceInfo = nullptr;
+
+        if (auto const res = vkBeginCommandBuffer(cbuff, &beginInfo); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Beginning command buffer recording\n"
+                "vkBeginCommandBuffer() returned {}", toString(res)
+            );
+        }
+
+        // Transition whole image layout
+        // When copying data to the image, the image’s layout must be TRANSFER DST OPTIMAL. The current
+        // image layout is UNDEFINED (which is the initial layout the image was created in)
+
+        imageBarrier(cbuff, ret.image,
+            /* Before */
+            VK_PIPELINE_STAGE_2_NONE,
+            VK_ACCESS_2_NONE,
+            VK_IMAGE_LAYOUT_UNDEFINED,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_COPY_BIT | VK_PIPELINE_STAGE_2_BLIT_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            /* Which p a r t s */
+            VkImageSubresourceRange{
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                0, 1,
+                0, 1
+            }
+        );
+
+        // Upload data from staging buffer to image
+        VkBufferImageCopy copy;
+        copy.bufferOffset = 0;
+        copy.bufferRowLength = 0;
+        copy.bufferImageHeight = 0;
+        copy.imageSubresource = VkImageSubresourceLayers{
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0,
+            0, 1
+        };
+        copy.imageOffset = VkOffset3D{ 0, 0, 0 };
+        copy.imageExtent = VkExtent3D{ (unsigned int)atlasSize, (unsigned int)atlasSize, 1 };
+
+        vkCmdCopyBufferToImage(cbuff, staging.buffer, ret.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
+
+        imageBarrier(cbuff, ret.image,
+            /* Before */
+            VK_PIPELINE_STAGE_2_COPY_BIT,
+            VK_ACCESS_2_TRANSFER_WRITE_BIT,
+            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+            /* A f t e r */
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+            /* Which p a r t s */
+            VkImageSubresourceRange{
+                VK_IMAGE_ASPECT_COLOR_BIT,
+                0, 1,
+                0, 1
+            }
+        );
+
+        // End command recording
+        if (auto const res = vkEndCommandBuffer(cbuff); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Ending command buffer recording\n"
+                "vkEndCommandBuffer() returned {}", toString(res)
+            );
+        }
+
+        // Submit command buffer and wait for commands to complete. Commands must have completed before we can
+        // destroy the temporary resources, such as the staging buffers.
+        Fence uploadComplete = createFence(aContext.device);
+
+        VkCommandBufferSubmitInfo submit[1]{};
+        submit[0].sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        submit[0].commandBuffer = cbuff;
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = submit;
+
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(aContext.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n"
+                    "vkQueueSubmit2() returned {}", toString(res)
+                );
+            }
+        }
+
+        if (auto const res = vkWaitForFences(aContext.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Waiting for upload to complete\n"
+                "vkWaitForFences() returned {}", toString(res)
+            );
+        }
+
+        // Return resulting image
+        // Most temporary resources are destroyed automatically through their destructors. However, the command
+        // buffer we must free manually.
+        vkFreeCommandBuffers(aContext.device, aCmdPool, 1, &cbuff);
+
+        return ret;
+    }
+
+    Image createFontAtlasTexture(Allocator const& aAllocator, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat aFormat, VulkanWindow const& window, VkImageUsageFlags aUsage) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = aFormat;
+        imageInfo.extent.width = aWidth;
+        imageInfo.extent.height = aHeight;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+
+        // 2. Ensure VK_IMAGE_USAGE_TRANSFER_DST_BIT is present
+        // This allows vkCmdCopyBufferToImage to work for runtime updates.
+        imageInfo.usage = aUsage | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+
+        if (auto const res = vmaCreateImage(aAllocator.allocator, &imageInfo, &allocInfo, &image, &allocation, nullptr); VK_SUCCESS != res) {
+            throw std::runtime_error("Unable to allocate font atlas image");
+        }
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = aFormat;
+
+        // Identity mapping is best for RGB MSDF
+        viewInfo.components = {
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY,
+            VK_COMPONENT_SWIZZLE_IDENTITY
+        };
+
+        viewInfo.subresourceRange = {
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0, 1, // mipLevels
+            0, 1  // layers
+        };
+
+        VkImageView view = VK_NULL_HANDLE;
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &view); VK_SUCCESS != res) {
+            throw std::runtime_error("Unable to create font atlas view");
+        }
+
+        return Image(aAllocator.allocator, image, allocation, view);
+    }
+
+    Image loadCubemapTexture(std::array<stbi_uc*, 6> faces, uint32_t width, uint32_t height, VulkanWindow const& context, VkCommandPool commandPool, Allocator const& allocator, std::mutex& queueMutex) {        
         // Create staging buffer and copy image data to it
         uint32_t const faceSizeInBytes = width * height * 4;
         uint32_t const totalSizeInBytes = width * height * 24; // total size is 4 channels * 6 images * width per image * height per image
@@ -406,8 +584,11 @@ namespace rutils {
         submitInfo.commandBufferInfoCount = 1;
         submitInfo.pCommandBufferInfos = submit;
 
-        if (auto const res = vkQueueSubmit2(context.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
-            throw Kiki::FatalError( "Unable to submit command buffer to queue\n" "vkQueueSubmit2() returned {}", toString(res));
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(context.graphicsQueue, 1, &submitInfo, uploadComplete.handle); VK_SUCCESS != res) {
+                throw Kiki::FatalError("Unable to submit command buffer to queue\n" "vkQueueSubmit2() returned {}", toString(res));
+            }
         }
 
         if (auto const res = vkWaitForFences(context.device, 1, &uploadComplete.handle, VK_TRUE, std::numeric_limits<std::uint64_t>::max()); VK_SUCCESS != res) {
@@ -486,7 +667,7 @@ namespace rutils {
         return Image(aAllocator.allocator, image, allocation, view);
 	}
 
-    Sampler createSampler(VulkanWindow const& aContext, bool isCubemapSampler) {
+    Sampler createSampler(VulkanWindow const& aContext, bool doClampToEdge) {
         VkSamplerCreateInfo samplerInfo{};
         samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
         samplerInfo.magFilter = VK_FILTER_LINEAR;
@@ -495,7 +676,7 @@ namespace rutils {
         samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
         samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-        if (isCubemapSampler) {
+        if (doClampToEdge) {
             samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
             samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   
             samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;   
@@ -508,6 +689,36 @@ namespace rutils {
         VkSampler sampler = VK_NULL_HANDLE;
         if (auto const res = vkCreateSampler(aContext.device, &samplerInfo, nullptr, &sampler); VK_SUCCESS != res) {
             throw Kiki::FatalError( "Unable to create sampler\n"
+                "vkCreateSampler() returned {}", toString(res)
+            );
+        }
+
+        return Sampler(aContext.device, sampler);
+    }
+
+    Sampler createFontSampler(VulkanWindow const& aContext) {
+        VkSamplerCreateInfo samplerInfo{};
+        samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+
+        samplerInfo.magFilter = VK_FILTER_LINEAR;
+        samplerInfo.minFilter = VK_FILTER_LINEAR;
+
+        samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+
+        samplerInfo.anisotropyEnable = VK_FALSE;
+        samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        samplerInfo.mipLodBias = 0.0f;
+        samplerInfo.minLod = 0.0f;
+        samplerInfo.maxLod = 0.0f;
+
+        samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_TRANSPARENT_BLACK;
+        samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+        VkSampler sampler = VK_NULL_HANDLE;
+        if (auto const res = vkCreateSampler(aContext.device, &samplerInfo, nullptr, &sampler); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create sampler\n"
                 "vkCreateSampler() returned {}", toString(res)
             );
         }
@@ -578,6 +789,59 @@ namespace rutils {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = window.hdrFormat;
+        imageInfo.extent.width = window.swapchainExtent.width;
+        imageInfo.extent.height = window.swapchainExtent.height;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.flags = 0;
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+
+        if (auto const res = vmaCreateImage(allocator.allocator, &imageInfo, &allocInfo, &image, &allocation, nullptr); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to allocate depth buffer image.\n"
+                "vmaCreateImage() returned {}", toString(res)
+            );
+        }
+
+        Image postProcessingImage( allocator.allocator, image, allocation );
+
+        // Create the image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = postProcessingImage.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = window.hdrFormat;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0, 1,
+            0, 1
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &postProcessingImage.view); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create image view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return postProcessingImage;
+    }
+
+    Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = window.swapchainFormat;
         imageInfo.extent.width = window.swapchainExtent.width;
         imageInfo.extent.height = window.swapchainExtent.height;
@@ -627,6 +891,169 @@ namespace rutils {
         return postProcessingImage;
     }
 
+    Image createBloomImage(VulkanWindow const& window, Allocator const& allocator, int const& width, int const& height) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = window.hdrFormat;
+        imageInfo.extent.width = float(width);
+        imageInfo.extent.height = float(height);
+
+        if (imageInfo.extent.width < 1.f) imageInfo.extent.width = 1.f;
+        if (imageInfo.extent.height < 1.f) imageInfo.extent.height = 1.f;
+
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.flags = 0;
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+
+        if (auto const res = vmaCreateImage(allocator.allocator, &imageInfo, &allocInfo, &image, &allocation, nullptr); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to allocate depth buffer image.\n"
+                "vmaCreateImage() returned {}", toString(res)
+            );
+        }
+
+        Image bloomImage( allocator.allocator, image, allocation );
+
+        // Create the image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = bloomImage.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = window.hdrFormat;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_COLOR_BIT,
+            0, 1,
+            0, 1
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &bloomImage.view); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create image view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return bloomImage;
+    }
+
+
+    Image createShadowCubemap(VulkanWindow const& window, Allocator const& allocator) {
+        VkImageCreateInfo imageInfo{};
+        imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = VK_FORMAT_D32_SFLOAT;
+        imageInfo.extent.width = 1024;
+        imageInfo.extent.height = 1024;
+        imageInfo.extent.depth = 1;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 6; // cubemap
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.flags = VK_IMAGE_CREATE_CUBE_COMPATIBLE_BIT;
+
+        VmaAllocationCreateInfo allocInfo{};
+        allocInfo.flags = 0;
+        allocInfo.usage = VMA_MEMORY_USAGE_AUTO_PREFER_DEVICE;
+
+        VkImage image = VK_NULL_HANDLE;
+        VmaAllocation allocation = VK_NULL_HANDLE;
+
+        if (auto const res = vmaCreateImage(allocator.allocator, &imageInfo, &allocInfo, &image, &allocation, nullptr); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to allocate depth buffer image.\n"
+                "vmaCreateImage() returned {}", toString(res)
+            );
+        }
+
+        Image shadowCubemap( allocator.allocator, image, allocation );
+
+        // Create the image view
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = shadowCubemap.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+        viewInfo.format = VK_FORMAT_D32_SFLOAT;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            0, 1,
+            0, 6
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &shadowCubemap.view); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create image view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return shadowCubemap;
+    }
+
+    VkImageView createShadowCubemapArrayView(VulkanWindow const& window, Image const& cubemap) {
+        VkImageView arrayView = VK_NULL_HANDLE;
+
+        VkImageViewCreateInfo viewInfo{};
+        viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        viewInfo.image = cubemap.image;
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+        viewInfo.format = VK_FORMAT_D32_SFLOAT;
+        viewInfo.components = VkComponentMapping{};
+        viewInfo.subresourceRange = VkImageSubresourceRange{
+            VK_IMAGE_ASPECT_DEPTH_BIT,
+            0, 1,
+            0, 6
+        };
+
+        if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &arrayView); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to create shadow cubemap 2D array view\n"
+                "vkCreateImageView() returned {}", toString(res)
+            );
+        }
+
+        return arrayView;
+    }
+
+	std::array<VkImageView, 6> createShadowCubemapFaceViews(VulkanWindow const& window, Image const& cubemap) {
+        std::array<VkImageView, 6> faceViews;
+
+        for (uint32_t face = 0; face < 6; face++) {
+            VkImageViewCreateInfo viewInfo{};
+            viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            viewInfo.image = cubemap.image;
+            viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            viewInfo.format = VK_FORMAT_D32_SFLOAT;
+            viewInfo.components = VkComponentMapping{};
+            viewInfo.subresourceRange = VkImageSubresourceRange{
+                VK_IMAGE_ASPECT_DEPTH_BIT,
+                0, 1,
+                face, 1
+            };
+
+            if (auto const res = vkCreateImageView(window.device, &viewInfo, nullptr, &faceViews[face]); res != VK_SUCCESS) {
+                throw Kiki::FatalError("Unable to create image view\n"
+                    "vkCreateImageView() returned {}", toString(res)
+                );
+            }
+        }
+
+        return faceViews;
+    }
+
+
     GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator) {
         GBuffers gbuffers;
 
@@ -634,6 +1061,9 @@ namespace rutils {
         gbuffers.normals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
         gbuffers.roughnessMetalness = createGBufferImage(window, allocator, VK_FORMAT_R8G8_UNORM);
         gbuffers.mappedNormals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gbuffers.ssao = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
+        gbuffers.ssao_hblur = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
+        gbuffers.ssao_blurred = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
 
         return gbuffers;
     }
@@ -651,7 +1081,7 @@ namespace rutils {
         imageInfo.arrayLayers = 1;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 

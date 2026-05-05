@@ -1,11 +1,12 @@
 # Ignore compiled code
 build/output/
 .vscode/
+.idea/
 
 out/
 
 CMakeSettings.json
-
+CMakePresets.json
 ##################################################
 ## Standard GitHub C++ gitignore template below ##
 ##################################################

@@ -7,6 +7,10 @@
 #include <renderer/RenderManager.hpp>
 #include <Components/DebugComponent.hpp>
 #include <renderer/SceneManager.hpp>
+#include <physics/PhysicsDebugRenderer.hpp>
+
+#include <cstdlib>
+#include <filesystem>
 
 
 namespace Kiki {
@@ -114,6 +118,182 @@ namespace Kiki {
             }
 
             if (ImGui::CollapsingHeader("Render Settings")) {
+                ImGui::Text("Mode:");
+                ImGui::SameLine(110.f);
+                const char* modes[] = {"Standard", "Base colour", "Normals (mapped)", "Normals (geometric)", "Depth", "Metalness", "Roughness", "SSAO", "Bloom"};
+                int currentMode = static_cast<int>(renderManager.renderSettings.renderMode);
+                if (ImGui::Combo("##editrendermode", &currentMode, modes, IM_ARRAYSIZE(modes))) {
+                    renderManager.renderSettings.renderMode = static_cast<Kiki::RenderMode>(currentMode);
+                }
+
+                ImGui::Text("Preset:");
+                ImGui::SameLine(110.f);
+                const char* presets[] = {"Fast", "Fancy", "Ultra"};
+                int currentPreset = static_cast<int>(renderManager.renderSettings.renderPreset);
+                if (ImGui::Combo("##editrenderpreset", &currentPreset, presets, IM_ARRAYSIZE(presets))) {
+                    renderManager.setRenderPreset(static_cast<Kiki::RenderPreset>(currentPreset));
+                }
+
+                ImGui::SeparatorText("SSAO");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##ssaoenabled", &renderManager.renderSettings.ssaoEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Samples:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssaomaxsamples", &renderManager.renderSettings.ssaoSamples, 1, 2);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssaoradius", &renderManager.renderSettings.ssaoRadius, 0.05f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Blur size:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssaoblursize", &renderManager.renderSettings.ssaoBlurRange, 1, 1);
+
+
+                ImGui::SeparatorText("Shadows");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##shadowsenabled", &renderManager.renderSettings.shadowsEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("PCF samples:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editshadowspcfsamples", &renderManager.renderSettings.shadowPcfSamples, 1, 2);
+
+
+                ImGui::SeparatorText("SSR");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##ssrenabled", &renderManager.renderSettings.ssrEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Max steps:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssrmaxsteps", &renderManager.renderSettings.ssrMaxSteps, 1, 4);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Binary steps:");
+                ImGui::SameLine(110.f);
+                ImGui::InputInt("##editssrmaxbinarysteps", &renderManager.renderSettings.ssrBinarySteps, 1, 2);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Step size:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssrstepsize", &renderManager.renderSettings.ssrStepSize, 0.05f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Tolerance:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editssrthicknesstolerance", &renderManager.renderSettings.ssrThicknessTolerance, 0.02f, 0.1f, "%.2f");
+
+
+                ImGui::SeparatorText("Bloom");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##bloomenabled", &renderManager.renderSettings.bloomEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomstrength", &renderManager.renderSettings.bloomStrength, 0.01f, 0.1f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius (x):");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomradiusx", &renderManager.renderSettings.bloomRadius_x, 0.001f, 0.005f, "%.3f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Radius (y):");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editbloomradiusy", &renderManager.renderSettings.bloomRadius_y, 0.001f, 0.005f, "%.3f");
+
+
+                ImGui::SeparatorText("Chromatic aberration");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##chromaticaberrationenabled", &renderManager.renderSettings.chromaticAberrationEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Red shift:");
+                ImGui::SameLine(110.0f);
+                ImGui::DragFloat2("##editchromaticredshift", &renderManager.renderSettings.chromaticRedShift.x, 0.00001f, 0.f, 0.f, "%.5f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Green shift:");
+                ImGui::SameLine(110.0f);
+                ImGui::DragFloat2("##editchromaticgreenshift", &renderManager.renderSettings.chromaticGreenShift.x, 0.00001f, 0.f, 0.f, "%.5f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Blue shift:");
+                ImGui::SameLine(110.0f);
+                ImGui::DragFloat2("##editchromaticblueshift", &renderManager.renderSettings.chromaticBlueShift.x, 0.00001f, 0.f, 0.f, "%.5f");
+
+
+                ImGui::SeparatorText("Tonemapping");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##tonemapenabled", &renderManager.renderSettings.tonemapEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Max white:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##edittonemapmaxwhite", &renderManager.renderSettings.tonemapMaxWhite, 0.5f, 1.f, "%.2f");
+
+
+                ImGui::SeparatorText("Bayer dithering");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##custompostprocessenabled", &renderManager.renderSettings.customPostprocessEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Bayer size:");
+                ImGui::SameLine(110.f);
+                const char* bayerModes[] = {"2x2", "4x4", "8x8"};
+                ImGui::Combo("##editbayermode", &renderManager.renderSettings.bayerMatrixMode, bayerModes, IM_ARRAYSIZE(bayerModes));
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Exposure:");
+                ImGui::SameLine(110.f);
+                ImGui::SliderFloat("##editbayerexposure", &renderManager.renderSettings.bayerExposure, 0.0f, 4.0f, "%.2f");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Levels:");
+                ImGui::SameLine(110.f);
+                ImGui::SliderInt("##editbayerlevels", &renderManager.renderSettings.bayerLevels, 2, 16);
+
+
+                ImGui::SeparatorText("FXAA");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##fxaaenabled", &renderManager.renderSettings.fxaaEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
+
+
                 ImGui::Indent();
                 if (ImGui::CollapsingHeader("Shaders")) {
                     ImGui::Text("Shader Path:");
@@ -230,7 +410,39 @@ namespace Kiki {
                     ImGui::Separator();
 
                     if (ImGui::Button("Reload Shaders", ImVec2(150.0f, 0.0f))) {
-                        RenderManager::get().recreatePipelines();
+                        std::filesystem::path shaderDir = std::filesystem::path(PROJECT_ROOT_PATH) / "kiki-engine/renderer/shaders";
+                        std::filesystem::path outDir = std::filesystem::path(PROJECT_SHADER_PATH);
+
+                        std::error_code error;
+
+                        bool success = true;
+                        for (auto& file : std::filesystem::directory_iterator(shaderDir, error)) {
+                            const std::filesystem::path& shaderPath = file.path();
+
+                            // check that the extension is valid
+                            if (shaderPath.extension().string() != ".vert" && shaderPath.extension().string() != ".frag") {
+                                continue;
+                            }
+
+                            std::filesystem::path outputFilename = outDir / (shaderPath.filename().string() + ".spv");
+
+                            // prepare glslangValidator command and compile shader
+                            std::string cmd = "glslangValidator -V \"" + shaderPath.string() + "\" -o \"" + outputFilename.string() + "\"";
+                            spdlog::info("Compiling shader: {}", shaderPath.filename().string());
+
+                            if (std::system(cmd.c_str()) != 0) {
+                                spdlog::error("Shader compile failed for {}", shaderPath.filename().string());
+                                success = false;
+                            }
+                        }
+
+                        if (success) {
+                            RenderManager::get().recreatePipelines();
+                            spdlog::info("Successfully recreated pipelines");
+                        }
+                        else {
+                            spdlog::warn("Not recreating pipelines - at least one shader failed to compile");
+                        }
                     }
                 }
 
@@ -305,6 +517,16 @@ namespace Kiki {
                 ImGui::Spacing();
                 if (ImGui::Button("Reset"))
                     debugCam.reset();
+            }
+
+			if (ImGui::CollapsingHeader("Physics Debug")) {
+				auto& physicsDebugRenderer = PhysicsDebugRenderer::get();
+
+                ImGui::Checkbox("Draw wireframes", &physicsDebugRenderer.enabled);
+                ImGui::Checkbox("Bodies", &physicsDebugRenderer.drawBodies);
+                ImGui::Checkbox("Bounding boxes", &physicsDebugRenderer.drawBoundingBoxes);
+                ImGui::Checkbox("Velocity", &physicsDebugRenderer.drawVelocity);
+                ImGui::Text("Lines: %zu", physicsDebugRenderer.getVertices().size() / 2);
             }
 
             if (ImGui::CollapsingHeader("Scene Settings")) {

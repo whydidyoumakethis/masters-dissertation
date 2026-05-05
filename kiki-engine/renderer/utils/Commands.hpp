@@ -15,33 +15,63 @@ namespace rutils {
     VkCommandBuffer allocCommandBuffer(VulkanWindow const& window, VkCommandPool pool);
 
     void recordCommands(
-		VkCommandBuffer,
-		Pipelines const&,
-		PipelineLayouts const&,
-		ImageAndView const& swapchainImage,
-		Image const& aDepthAttach,
-		GBuffers& gbuffers,
-		VkExtent2D const&,
-		VkBuffer aSceneUBO,
-		Kiki::RenderManager::SceneUniform const&,
-		VkDescriptorSet aSceneDescriptors,
-		VkDescriptorSet deferredLightingDescriptors,
-		VkDescriptorSet ffxaDescriptors,
-		VkDescriptorSet ssrDescriptors,
-		VkDescriptorSet ssaoDescriptors,
-		VkDescriptorSet noTexture,
-		Kiki::Skybox const& skybox,
-		Image const& doneLightingImage,
-		Image const& doneSSAOImage,
-		Image const& doneSSRImage
-	);
+        VkCommandBuffer aCmdBuff,
+# ifdef TRACY_VK_ENABLE
+        TracyVkCtx tracyVkCtx,
+		# endif
+        Pipelines const&,
+        PipelineLayouts const&,
+        ImageAndView const& swapchainImage,
+        Image const& aDepthAttach,
+        GBuffers& gbuffers,
+        VkExtent2D const&,
+        VkBuffer aSceneUBO,
+        Kiki::RenderManager::SceneUniform const&,
+        VkDescriptorSet aSceneDescriptors,
+        VkDescriptorSet ssaoDescriptors,
+        VkDescriptorSet ssaoHBlurDescriptors,
+        VkDescriptorSet ssaoBlurredDescriptors,
+        VkDescriptorSet deferredLightingDescriptors,
+        VkDescriptorSet ffxaDescriptors,
+        VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet tonemapDescriptors,
+        VkDescriptorSet shadowMatrixDescriptors,
+        VkDescriptorSet compositeDescriptors,
+        VkDescriptorSet debugDescriptors,
+        VkDescriptorSet customPostprocessDescriptors,
+        VkDescriptorSet chromaticAberrationDescriptors,
+        VkDescriptorSet noTexture,
+        Kiki::Skybox const& skybox,
+        Image const& doneLightingImage,
+        Image const& doneSSRImage,
+        Image const& doneCompositeImage,
+        Image const& doneChromaticAberrationImage,
+        Image const& doneTonemapImage,
+        Image const& doneDebugImage,
+        Image const& doneCustomPostprocessImage,
+        VkBuffer interfaceUBO,
+        Kiki::RenderManager::InterfaceUniform const& interfaceUniform,
+        VkDescriptorSet interfaceDescriptors,
+        VkBuffer interfaceIndexBuffer,
+        VkBuffer shapeVertexBuffer,
+        VkDescriptorSet dummyAnimationDesc,
+        std::vector<Kiki::ShadowCubemap> const& shadowCubemaps,
+        std::vector<Kiki::Light> const& lights,
+        std::array<Image, N_BLOOM_IMAGES> const& bloomImages,
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets,
+        std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageUpsampleDescriptorSets,
+        Kiki::RenderSettings& renderSettings,
+        VkBuffer debugLineVertexBuffer,
+        std::uint32_t debugLineVertexCount
+    );
 
 	void submitCommands(
 		VulkanWindow const&,
 		VkCommandBuffer,
 		VkFence,
 		VkSemaphore,
-		VkSemaphore
+		VkSemaphore, 
+        std::mutex& queueMutex
 	);
 }
 

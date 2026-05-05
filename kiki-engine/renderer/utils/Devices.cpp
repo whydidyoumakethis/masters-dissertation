@@ -11,9 +11,13 @@
 
 
 std::vector<char const*> checkRequiredDeviceFeatures(VkPhysicalDevice device) {
-    VkPhysicalDeviceVulkan13Features vk13{};
+    VkPhysicalDeviceVulkan11Features vk11{};
+	vk11.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+
+	VkPhysicalDeviceVulkan13Features vk13{};
 	vk13.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
-		
+	vk13.pNext  = &vk11;
+
 	VkPhysicalDeviceVulkan14Features vk14{};
 	vk14.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_4_FEATURES;
 	vk14.pNext  = &vk13;
@@ -33,6 +37,9 @@ std::vector<char const*> checkRequiredDeviceFeatures(VkPhysicalDevice device) {
 	}
 	if(!vk14.maintenance5) {
 		missingFeat.emplace_back("maintenance5");
+	}
+	if(!vk11.multiview) {
+		missingFeat.emplace_back("multiview");
 	}
 
 	return missingFeat;
@@ -142,8 +149,13 @@ namespace rutils {
 		VkPhysicalDeviceFeatures deviceFeatures{};
 		// No extra Vulkan 1.0 features for now.
 
+		VkPhysicalDeviceVulkan11Features vk11{};
+		vk11.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+		vk11.multiview  = VK_TRUE;
+
 		VkPhysicalDeviceVulkan13Features vk13{};
 		vk13.sType  = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_3_FEATURES;
+		vk13.pNext  = &vk11;
 		vk13.synchronization2  = VK_TRUE;
 		vk13.dynamicRendering  = VK_TRUE;
 

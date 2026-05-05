@@ -41,4 +41,4 @@ target_sources(kiki
       SceneManager.hpp
       WindowInfo.hpp
       Camera.hpp
-)
+ )

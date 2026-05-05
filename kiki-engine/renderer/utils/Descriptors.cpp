@@ -1,9 +1,36 @@
 #include "Descriptors.hpp"
+#include <glm/glm.hpp>
+#include <array>
 
 #include "ToString.hpp"
 #include "../../logging/FatalError.hpp"
 
 namespace rutils {
+    DescriptorSetLayout createAnimationDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding binding{};
+
+        binding.binding = 0;
+        binding.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        binding.descriptorCount = 1;
+
+        binding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 1;
+        layoutInfo.pBindings = &binding;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError(
+                "Unable to create animation descriptor set layout\n"
+                "vkCreateDescriptorSetLayout() returned {}", toString(res)
+            );
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorSetLayout createSceneDescriptorLayout(VulkanWindow const& window) {
         VkDescriptorSetLayoutBinding bindings[1]{};
         bindings[0].binding = 0; // number must match the index of the corresponding
@@ -82,7 +109,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createGBufferDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[6]{};
+        VkDescriptorSetLayoutBinding bindings[8]{};
 
         // base colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -119,6 +146,18 @@ namespace rutils {
         bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[5].descriptorCount = 1;
         bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // ambient occlusion
+        bindings[6].binding = 6;
+        bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[6].descriptorCount = 1;
+        bindings[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // shadow cubemaps
+        bindings[7].binding = 7;
+        bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[7].descriptorCount = 8;
+        bindings[7].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -185,10 +224,261 @@ namespace rutils {
         return DescriptorSetLayout(window.device, layout);
     }
 
+    DescriptorSetLayout createSSAODescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[2]{};
+
+        // normals
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // depth buffer
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createSSAOBlurredDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // input SSAO
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createChromaticAberrationDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // input image
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createBloomDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // input bloom or ssr layer
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createTonemapDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // input image
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createCustomPostprocessDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createCompositeDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[2]{};
+
+        // SSR image
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // final bloom image
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createDebugDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[8]{};
+
+        // lit scene
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // base colour
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // mapped normals
+        bindings[2].binding = 2;
+        bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[2].descriptorCount = 1;
+        bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // geometric normals
+        bindings[3].binding = 3;
+        bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[3].descriptorCount = 1;
+        bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // depth
+        bindings[4].binding = 4;
+        bindings[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[4].descriptorCount = 1;
+        bindings[4].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // roughness metalness
+        bindings[5].binding = 5;
+        bindings[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[5].descriptorCount = 1;
+        bindings[5].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // ssao
+        bindings[6].binding = 6;
+        bindings[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[6].descriptorCount = 1;
+        bindings[6].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // bloom
+        bindings[7].binding = 7;
+        bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[7].descriptorCount = 1;
+        bindings[7].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createShadowMatrixDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorPool createDescriptorPool(VulkanWindow const& window, std::uint32_t aMaxDescriptors, std::uint32_t aMaxSets) {
         VkDescriptorPoolSize const pools[] = {
             { VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, aMaxDescriptors },
-            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, aMaxDescriptors }
+            { VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, aMaxDescriptors },
+            { VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, aMaxDescriptors }
         };
 
         VkDescriptorPoolCreateInfo poolInfo{};
@@ -225,8 +515,8 @@ namespace rutils {
         return dset;
     }
 
-    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler) {
-        VkWriteDescriptorSet desc[6]{};
+    void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler, std::vector<Kiki::ShadowCubemap> const& shadowCubemaps) {
+        VkWriteDescriptorSet desc[8]{};
 
         VkDescriptorImageInfo texColourInfo{};
         texColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -257,6 +547,19 @@ namespace rutils {
         depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         depthInfo.imageView = depthBuffer.view;
         depthInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo ambientOcclusionInfo{};
+        ambientOcclusionInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ambientOcclusionInfo.imageView = gbuffers.ssao_blurred.view;
+        ambientOcclusionInfo.sampler = sampler.handle;
+
+        std::array<VkDescriptorImageInfo, 8> shadowInfo{};
+        std::vector<VkImageView> shadowCubemapViews;
+        for (int i = 0; i < 8; i++) {
+            shadowInfo[i].imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            shadowInfo[i].imageView = shadowCubemaps[i].cubemap.view;
+            shadowInfo[i].sampler = cubemapSampler.handle;
+        }
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = deferredLightingDescriptors;
@@ -300,7 +603,21 @@ namespace rutils {
         desc[5].descriptorCount = 1;
         desc[5].pImageInfo = &skyboxInfo;
 
-        vkUpdateDescriptorSets(window.device, 6, desc, 0, nullptr);
+        desc[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[6].dstSet = deferredLightingDescriptors;
+        desc[6].dstBinding = 6;
+        desc[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[6].descriptorCount = 1;
+        desc[6].pImageInfo = &ambientOcclusionInfo;
+
+        desc[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[7].dstSet = deferredLightingDescriptors;
+        desc[7].dstBinding = 7;
+        desc[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[7].descriptorCount = 8;
+        desc[7].pImageInfo = shadowInfo.data();
+
+        vkUpdateDescriptorSets(window.device, 8, desc, 0, nullptr);
     }
 
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors) {
@@ -379,5 +696,385 @@ namespace rutils {
         desc[5].pImageInfo = &mappedNormalsInfo;
 
         vkUpdateDescriptorSets(window.device, 6, desc, 0, nullptr);
+    }
+
+    void initialiseSSAODescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoDescriptors) {
+        VkWriteDescriptorSet desc[2]{};
+
+        VkDescriptorImageInfo normalsInfo{};
+        normalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        normalsInfo.imageView = gbuffers.normals.view;
+        normalsInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo depthInfo{};
+        depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        depthInfo.imageView = depthBuffer.view;
+        depthInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = ssaoDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &normalsInfo;
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = ssaoDescriptors;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &depthInfo;
+
+        vkUpdateDescriptorSets(window.device, 2, desc, 0, nullptr);
+    }
+
+    void initialiseSSAOHBlurDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoHBlurDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo ssaoInfo{};
+        ssaoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ssaoInfo.imageView = gbuffers.ssao.view;
+        ssaoInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = ssaoHBlurDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &ssaoInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseSSAOBlurredDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& ssaoBlurredDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo ssaoInfo{};
+        ssaoInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ssaoInfo.imageView = gbuffers.ssao_hblur.view;
+        ssaoInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = ssaoBlurredDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &ssaoInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseTonemapDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, Sampler& sampler, VkDescriptorSet& tonemapDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo tonemapInfo{};
+        tonemapInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        tonemapInfo.imageView = doneCompositeImage.view;
+        tonemapInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = tonemapDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &tonemapInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseChromaticAberrationDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, Sampler& sampler, VkDescriptorSet& chromaticAberrationDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo chromaticAberrationLayout{};
+        chromaticAberrationLayout.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        chromaticAberrationLayout.imageView = doneCompositeImage.view;
+        chromaticAberrationLayout.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = chromaticAberrationDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &chromaticAberrationLayout;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+
+    void initialiseCustomPostprocessDescriptorSet(VulkanWindow const& window, Image& inputImage, Sampler& sampler, VkDescriptorSet& customPostprocessDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo inputInfo{};
+        inputInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        inputInfo.imageView = inputImage.view;
+        inputInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = customPostprocessDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &inputInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors) {
+        VkWriteDescriptorSet desc[2]{};
+
+        VkDescriptorImageInfo ssrInfo{};
+        ssrInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ssrInfo.imageView = doneSSRImage.view;
+        ssrInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo bloomInfo{};
+        bloomInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        bloomInfo.imageView = bloomResult.view;
+        bloomInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = compositeDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &ssrInfo;
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = compositeDescriptors;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &bloomInfo;
+
+        vkUpdateDescriptorSets(window.device, 2, desc, 0, nullptr);
+    }
+
+    void initialiseShadowMatrixDescriptorSet(VulkanWindow const& window, VkBuffer shadowMatricesBuffer, VkDescriptorSet& shadowMatrixDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = shadowMatricesBuffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = sizeof(glm::mat4) * 8 * 6;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = shadowMatrixDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].dstArrayElement = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        desc[0].descriptorCount = 1;
+        desc[0].pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseBloomImageDescriptorSet(VulkanWindow const& window, Image& prevImage, Sampler& sampler, VkDescriptorSet& bloomImageDescriptors) {
+        VkWriteDescriptorSet desc[1]{};
+
+        VkDescriptorImageInfo bloomImageInfo{};
+        bloomImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        bloomImageInfo.imageView = prevImage.view;
+        bloomImageInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = bloomImageDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &bloomImageInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+        bindings[0].binding = 0; // number must match the index of the corresponding
+        // binding = N declaration in the shader(s)!
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n"
+                "vkCreateDescriptorSetLayout() returned {}", toString(res)
+            );
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // msdf
+        bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // different to create_scene_descriptor_layout
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", rutils::toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    DescriptorSetLayout createInterfaceTextureDescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[1]{};
+
+        // texture
+        bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER; // different to create_scene_descriptor_layout
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); res != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", rutils::toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
+    void updateAnimationDescriptorSet(
+        VulkanWindow const& window,
+        VkDescriptorSet descriptorSet,
+        VkBuffer animationBuffer,
+        VkDeviceSize range
+    ) {
+        VkDescriptorBufferInfo bufferInfo{};
+        bufferInfo.buffer = animationBuffer;
+        bufferInfo.offset = 0;
+        bufferInfo.range = range;
+
+        VkWriteDescriptorSet write{};
+        write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write.dstSet = descriptorSet;
+        write.dstBinding = 0;
+        write.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        write.descriptorCount = 1;
+        write.pBufferInfo = &bufferInfo;
+
+        vkUpdateDescriptorSets(window.device, 1, &write, 0, nullptr);
+    }
+
+    void initialiseDebugDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, GBuffers& gbuffers, Image& depthBuffer, Image& ssao, Image& bloom, Sampler& sampler, VkDescriptorSet& debugDescriptors) {
+        VkWriteDescriptorSet desc[8]{};
+
+        VkDescriptorImageInfo sceneColourInfo{};
+        sceneColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        sceneColourInfo.imageView = doneCompositeImage.view;
+        sceneColourInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo texColourInfo{};
+        texColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        texColourInfo.imageView = gbuffers.textureColour.view;
+        texColourInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo mappedNormalsInfo{};
+        mappedNormalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        mappedNormalsInfo.imageView = gbuffers.mappedNormals.view;
+        mappedNormalsInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo geometricNormalsInfo{};
+        geometricNormalsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        geometricNormalsInfo.imageView = gbuffers.normals.view;
+        geometricNormalsInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo depthInfo{};
+        depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        depthInfo.imageView = depthBuffer.view;
+        depthInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo roughnessMetalnessInfo{};
+        roughnessMetalnessInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        roughnessMetalnessInfo.imageView = gbuffers.roughnessMetalness.view;
+        roughnessMetalnessInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo ambientOcclusionInfo{};
+        ambientOcclusionInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        ambientOcclusionInfo.imageView = gbuffers.ssao_blurred.view;
+        ambientOcclusionInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo bloomInfo{};
+        bloomInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        bloomInfo.imageView = bloom.view;
+        bloomInfo.sampler = sampler.handle;
+
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = debugDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &sceneColourInfo;
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = debugDescriptors;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &texColourInfo;
+
+        desc[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[2].dstSet = debugDescriptors;
+        desc[2].dstBinding = 2;
+        desc[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[2].descriptorCount = 1;
+        desc[2].pImageInfo = &mappedNormalsInfo;
+
+        desc[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[3].dstSet = debugDescriptors;
+        desc[3].dstBinding = 3;
+        desc[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[3].descriptorCount = 1;
+        desc[3].pImageInfo = &geometricNormalsInfo;
+
+        desc[4].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[4].dstSet = debugDescriptors;
+        desc[4].dstBinding = 4;
+        desc[4].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[4].descriptorCount = 1;
+        desc[4].pImageInfo = &depthInfo;
+
+        desc[5].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[5].dstSet = debugDescriptors;
+        desc[5].dstBinding = 5;
+        desc[5].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[5].descriptorCount = 1;
+        desc[5].pImageInfo = &roughnessMetalnessInfo;
+
+        desc[6].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[6].dstSet = debugDescriptors;
+        desc[6].dstBinding = 6;
+        desc[6].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[6].descriptorCount = 1;
+        desc[6].pImageInfo = &ambientOcclusionInfo;
+
+        desc[7].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[7].dstSet = debugDescriptors;
+        desc[7].dstBinding = 7;
+        desc[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[7].descriptorCount = 1;
+        desc[7].pImageInfo = &bloomInfo;
+
+        vkUpdateDescriptorSets(window.device, 8, desc, 0, nullptr);
     }
 }

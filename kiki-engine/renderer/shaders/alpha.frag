@@ -1,5 +1,7 @@
 #version 450
 
+#define MAX_LIGHTS 8
+
 #extension GL_EXT_scalar_block_layout : require
 #extension GL_GOOGLE_include_directive : require
 
@@ -17,9 +19,11 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     mat4 camera;
     mat4 projection;
     mat4 projCam;
-    vec4 lightPos;
-    vec4 lightColour;
+    vec4 lightPos[MAX_LIGHTS];
+    vec4 lightColour[MAX_LIGHTS];
+    vec4 numLights;
     vec4 cameraPos;
+    vec4 ssaoSamples[16];
 } uScene;
 
 layout(push_constant) uniform PushConstants {
@@ -41,12 +45,12 @@ void main() {
     float metalness = texture(uTexRoughnessMetalness, v2fTexCoord).b;
     vec3 emissive = vec3(0.f);
     vec3 baseColour = texture(uTexColor, v2fTexCoord).rgb;
-    vec3 lightColour = uScene.lightColour.xyz;
+    vec3 lightColour = uScene.lightColour[0].xyz;
     vec3 sceneAmbient = vec3(0.08f);
     vec3 normal = normalize(v2fNormal);
 
     // vector pointing towards the light
-    vec3 lightDirection = normalize(uScene.lightPos.xyz - v2fWorldSpace);
+    vec3 lightDirection = normalize(uScene.lightPos[0].xyz - v2fWorldSpace);
     
     // vector pointing towards the camera
     vec3 viewDirection = normalize(uScene.cameraPos.xyz - v2fWorldSpace);

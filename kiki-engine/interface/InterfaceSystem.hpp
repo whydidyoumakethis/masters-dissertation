@@ -1,33 +1,39 @@
 #ifndef KIKI_INTERFACE_INTERFACESYSTEM
 #define KIKI_INTERFACE_INTERFACESYSTEM
 
+#include "Components/InterfaceComponent.hpp"
+#include "Components/BackgroundComponent.hpp"
+#include "Components/TextComponent.hpp"
+#include "Components/ButtonComponent.hpp"
+#include "Components/InterfaceTextureComponent.hpp"
+#include "events/ButtonClickEvent.hpp"
+#include "events/ButtonHoverEvent.hpp"
+#include "events/AnimationEndEvent.hpp"
+#include "Components/InterfaceAnimationComponent.hpp"
+#include "Components/AspectRatioComponent.hpp"
+
 #include "ECS/World.h"
 #include "ECS/System.h"
 #include "FontManager.hpp"
 #include "TextureManager.hpp"
+#include "RenderManager.hpp"
+#include "MessageCenter.h"
+#include "InputManager.hpp"
 
 namespace Kiki {
-    struct ScaleVec2D {
-        float scaleX;
-        float x;
-        float scaleY;
-        float y;
-        bool dirty = true;
-
-        // Absolute values should only be changed by the InterfaceSystem
-        float absoluteX;
-        float absoluteY;
-    };
-
     class InterfaceSystem : public System {
         private:
         FontManager& fontManager = FontManager::get();
         TextureManager& textureManager = TextureManager::get();
+        RenderManager& renderManager = RenderManager::get();
+        MessageCenter& messageCenter = MessageCenter::Get();
+        InputManager& inputManager = InputManager::get();
 
         World& world = World::Get();
+        entt::registry& registry = world.Registry();
 
         public:
-        Phase GetPhase() const override { return Phase::Input; }
+        Phase GetPhase() const override { return Phase::PreUpdate; }
 
         void OnStart() override;
 

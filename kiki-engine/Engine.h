@@ -6,6 +6,8 @@
 #include "PhysicsSystem.cpp"
 #include "renderer/SceneManager.hpp"
 #include "Components/TransparencyComponent.hpp"
+#include "Animation/AnimationSystem.h"
+#include "Animation/SimpleAnimationSystem.h"
 
 #include "../debugging/DebugCamera.hpp"
 #include "debugging/DebugInterface.hpp"
@@ -14,8 +16,10 @@
 #include <spdlog/spdlog.h>
 #include "debugging/DebugSystem.hpp"
 #include "interface/InterfaceSystem.hpp"
+#include "Audio/AudioSystem.h"
+#include "Audio/BGMController.h"
 
-#include <chrono>
+#include "Timer/Timer.h"
 
 namespace Kiki {
 	class Engine {
@@ -23,10 +27,14 @@ namespace Kiki {
 		void Init() {
 			_scheduler.RegisterSystem<Kiki::PhysicsSystem>();
 			_scheduler.RegisterSystem<TransformSystem>();
+			_scheduler.RegisterSystem<AnimationSystem>();
 			_scheduler.RegisterSystem<RenderSystem>();
 			_scheduler.RegisterSystem<Kiki::InputSystem>();
 			_scheduler.RegisterSystem<Kiki::DebugSystem>();
 			_scheduler.RegisterSystem<Kiki::InterfaceSystem>();
+			_scheduler.RegisterSystem<SimpleAnimationSystem>();
+
+			_scheduler.RegisterSystem<Kiki::AudioSystem>();
 		}
 
 		// for game layer to register systems
@@ -42,20 +50,21 @@ namespace Kiki {
 
 		void Run() {
 			_running = true;
-			auto previousClock = std::chrono::steady_clock::now();
 			_scheduler.printSystemOrder();
+			auto _timer = Timer::get();
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
-				// float dt = _timer.Tick();
-				auto const now = std::chrono::steady_clock::now();
-				auto const dt = std::chrono::duration_cast<std::chrono::duration<float, std::ratio<1>>>(now-previousClock).count(); // TODO: calculate delta time
-				previousClock = now;
+				float dt = _timer.Tick();
 				MessageCenter::Flush();
 				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
 				_scheduler.Update(dt);
 				World::Get().FlushDestroy();
 			}
 
+			BGMController::get().Shutdown();
+			AudioManager::get().shutdown();
 			RenderManager::get().shutdown(); // temp addition so i can check shutdown code
+			
+
 		}
 	void Quit() {
 		_running = false;

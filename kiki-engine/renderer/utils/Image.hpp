@@ -4,6 +4,7 @@
 #include <volk.h>
 #include <vk_mem_alloc.h>
 #include <stb_image.h>
+#include <mutex>
 
 #include "VulkanWrapper.hpp"
 #include "Allocator.hpp"
@@ -35,6 +36,9 @@ namespace rutils {
 		rutils::Image normals;
 		rutils::Image roughnessMetalness;
 		rutils::Image mappedNormals;
+		rutils::Image ssao;
+		rutils::Image ssao_hblur;
+		rutils::Image ssao_blurred;
 	};
 
 	struct CubemapPaths {
@@ -47,7 +51,9 @@ namespace rutils {
     };
 
 
-	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+	Image loadImageTexture(stbi_uc* imageData, int baseWidthi, int baseHeighti, VulkanWindow const&, VkCommandPool, Allocator const&, std::mutex& queueMutex, VkFormat format = VK_FORMAT_R8G8B8A8_SRGB);
+	Image loadFontAtlas(std::vector<uint8_t> data, int atlasSize, VulkanWindow const& aContext, VkCommandPool aCmdPool, Allocator const& aAllocator, std::mutex& queueMutex);
+	Image createFontAtlasTexture(Allocator const& aAllocator, std::uint32_t aWidth, std::uint32_t aHeight, VkFormat aFormat, VulkanWindow const& window, VkImageUsageFlags aUsage);
 
 	Image createImageTexture(
 		Allocator const&,
@@ -61,7 +67,8 @@ namespace rutils {
 		VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D
 	);
 
-    Sampler createSampler(VulkanWindow const&, bool isCubemapSampler = false);
+    Sampler createSampler(VulkanWindow const&, bool doClampToEdge = false);
+	Sampler createFontSampler(VulkanWindow const&);
 
 	Image loadCubemapTexture(
 		std::array<stbi_uc*, 6> faces,
@@ -69,13 +76,19 @@ namespace rutils {
 		uint32_t height,
 		VulkanWindow const& context,
 		VkCommandPool commandPool,
-		Allocator const& allocator
+		Allocator const& allocator, 
+		std::mutex& queueMutex
 	);
 
 	std::uint32_t computeMipLevelCount(std::uint32_t aWidth, std::uint32_t aHeight);
 
 	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator);
 	Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator);
+	Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator);
+	Image createBloomImage(VulkanWindow const& window, Allocator const& allocator, int const& width, int const& height);
+	Image createShadowCubemap(VulkanWindow const& window, Allocator const& allocator);
+	std::array<VkImageView, 6> createShadowCubemapFaceViews(VulkanWindow const& window, Image const& cubemap);
+	VkImageView createShadowCubemapArrayView(VulkanWindow const& window, Image const& cubemap);
 	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator);
 	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format);
 }

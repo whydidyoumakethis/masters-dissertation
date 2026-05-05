@@ -2,20 +2,24 @@
 #define KIKI_INTERFACE_FONT
 
 #include "renderer/utils/Image.hpp"
+#include "renderer/utils/Buffer.hpp"
 
 #include <msdfgen.h>
 #include <msdfgen-ext.h>
+#include <hb.h>
 #include <volk.h>
+#include <ft2build.h>
+#include FT_FREETYPE_H
 
 #include <unordered_map>
 
 namespace iutils {
     struct GlyphInfo {
-        uint32_t charCode;
+        uint32_t glyphId;
         float uMin, uMax, vMin, vMax;
         float width, height;
-        float bearingX, bearingY;
-        float advance;
+        float l, r, t, b;
+        rutils::Buffer vertices;
     };
 
     class Font {
@@ -25,8 +29,11 @@ namespace iutils {
         float lineHeight;
         float ascender;
         float descender;
+        float emSize;
 
-        msdfgen::FontHandle* handle;
+        FT_Face freetypeFace;
+        hb_font_t* hbHandle;
+        msdfgen::FontHandle* msdfHandle;
 
         int atlasSize = 2048;
         rutils::Image atlas;
@@ -35,9 +42,15 @@ namespace iutils {
         float currentX = 0, currentY = 0;
         float rowSize = 0;
 
-        ~Font() {
-            msdfgen::destroyFont(handle);
-        }
+        ~Font() = default;
+
+        Font(Font&& other) noexcept = default;
+        Font& operator=(Font&& other) noexcept = default;
+
+        Font() = default;
+
+        Font(const Font&) = delete;
+        Font& operator=(const Font&) = delete;
     };
 }
 

@@ -1,17 +1,21 @@
 #version 450
 
-// edge direction tuning
-// TODO: put this into a push constant
-#define FXAA_STRENGTH 16.f
-#define FXAA_REDUCE_MULT (0.25f * (1.f / FXAA_STRENGTH))
-#define FXAA_REDUCE_MIN (1.f / (FXAA_STRENGTH * 16.f))
-#define FXAA_SPAN_MAX FXAA_STRENGTH
-
 layout(location = 0) in vec2 v2fTexCoord;
 
 layout(set = 1, binding = 0) uniform sampler2D uSceneColour;
 
 layout(location = 0) out vec4 oColor;
+
+layout(push_constant) uniform FXAASettings {
+    float fxaaStrength;
+    int isEnabled;
+} fxaaSettings;
+
+// edge direction tuning
+#define FXAA_STRENGTH fxaaSettings.fxaaStrength
+#define FXAA_REDUCE_MULT (0.25f * (1.f / FXAA_STRENGTH))
+#define FXAA_REDUCE_MIN (1.f / (FXAA_STRENGTH * 16.f))
+#define FXAA_SPAN_MAX FXAA_STRENGTH
 
 float luminance(vec3 colour)
 {
@@ -21,6 +25,11 @@ float luminance(vec3 colour)
 
 void main()
 {
+    if (fxaaSettings.isEnabled == 0) {
+        oColor = vec4(texture(uSceneColour, v2fTexCoord).rgb, 1.f);
+        return;
+    }
+
     vec2 texelSize = vec2(textureSize(uSceneColour, 0));
 
     // sample center pixel and its 4 diagonal neighbours

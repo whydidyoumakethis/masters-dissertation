@@ -10,11 +10,16 @@ target_sources(kiki
     FILES 
       InterfaceSystem.hpp
       TextureManager.hpp
-      FontManager.hpp      
+      FontManager.hpp   
+      events/ButtonClickEvent.hpp
+      events/ButtonHoverEvent.hpp   
+      events/AnimationEndEvent.hpp
+      utils/LatinAlphabet.hpp
 
   PRIVATE
     FILE_SET interfacePrivateHeaders
     TYPE HEADERS
     FILES 
       utils/Font.hpp     
+      utils/InterfaceTexture.hpp
 )
