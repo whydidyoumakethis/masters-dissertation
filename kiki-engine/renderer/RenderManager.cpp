@@ -677,7 +677,9 @@ namespace Kiki {
             ZoneScopedN("Recording commands");
 
             {
-                std::lock_guard<std::mutex> lock(queueMutex);
+                std::lock(queueMutex, SceneManager::get().registryMutex);
+                std::lock_guard<std::mutex> lock(queueMutex, std::adopt_lock);
+                std::lock_guard<std::mutex> lock2(SceneManager::get().registryMutex, std::adopt_lock);
 
                 rutils::recordCommands(
                     commandBuffers[frameIndex],
