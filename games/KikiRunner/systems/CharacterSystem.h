@@ -201,6 +201,7 @@ private:
         }
 
         PhysicsService& physics = World::Get().Registry().ctx().get<PhysicsService>();
+
         auto* rb = World::Get().GetComponent<RigidBodyComponent>(playerEntity);
         JPH::Vec3 currentJoltVel = physics._manager.GetBodyInterface().GetLinearVelocity(rb->bodyID);
 

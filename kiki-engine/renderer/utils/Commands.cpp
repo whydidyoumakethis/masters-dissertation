@@ -305,8 +305,6 @@ namespace rutils {
         renderInfo.pColorAttachments = gBufferAttachments;
         renderInfo.pDepthAttachment = &depthAttach;
 
-        std::lock_guard<std::mutex> lock (Kiki::SceneManager::get().registryMutex);
-
         auto& world = World::Get();
         auto& registry = world.Registry();
         auto view = world.Query<TransformComponent, MeshComponent>();

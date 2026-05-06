@@ -426,6 +426,15 @@ class UISystem : public System {
 					TogglePause();
 					MessageCenter::Publish(RespawnCharacterEvent());
 				} else if (e.button == screen->menuButton) {
+					{
+						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+						auto view = world.Query<CharacterComponent>();
+
+						for (auto [e, comp] : view.each()) {
+							registry.erase<CharacterComponent>(e);
+						}
+					}
+
 					createLoadingScreen();
 				} else if (e.button == screen->quitGameButton) {
 					glfwSetWindowShouldClose(renderManager.getWindow(), true);
