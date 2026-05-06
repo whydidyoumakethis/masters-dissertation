@@ -91,21 +91,24 @@ namespace Kiki {
     }
 
     void SceneManager::clearLevel() {
-        vkDeviceWaitIdle(RenderManager::get().getDevice());
-
-        auto& registry = World::Get().Registry();
-
-        auto view = World::Get().Query<MeshComponent>();
-
         {
-            std::lock_guard<std::mutex> lock(registryMutex);
-            for (auto [e, meshComponent] : view.each()) {
-                registry.destroy(e);
-            }
-        }
+            std::lock_guard<std::mutex> lock(RenderManager::get().queueMutex);
+            vkDeviceWaitIdle(RenderManager::get().getDevice());
 
-        materials.clear();
-        meshes.clear();
+            auto& registry = World::Get().Registry();
+
+            auto view = World::Get().Query<MeshComponent>();
+
+            {
+                std::lock_guard<std::mutex> lock(registryMutex);
+                for (auto [e, meshComponent] : view.each()) {
+                    registry.destroy(e);
+                }
+            }
+
+            materials.clear();
+            meshes.clear();
+        }
     }
 
     entt::entity SceneManager::loadModel(const std::string path, const std::string name, PhysicsType type) {

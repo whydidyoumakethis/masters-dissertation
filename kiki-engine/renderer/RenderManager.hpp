@@ -181,8 +181,6 @@ namespace Kiki {
         bool recreateSwapchain = false;
         bool initialised = false;
 
-        std::mutex queueMutex;
-
         rutils::VulkanWindow window;
 
         rutils::PipelineLayouts pipelineLayouts;
@@ -293,6 +291,8 @@ namespace Kiki {
             std::vector<int> boneIDs,    
             std::vector<float> weights    
         );
+
+        std::mutex queueMutex;
 
         rutils::Buffer allocateAnimationBuffer();
         VkDescriptorSet allocateAnimationDescriptorSet(const rutils::Buffer& buffer);
