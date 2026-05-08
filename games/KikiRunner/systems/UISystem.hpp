@@ -169,7 +169,7 @@ class UISystem : public System {
 	void OnStart() override {
 		createSplashScreen();
 
-		//std::thread([this]() {
+		std::thread([this]() {
 			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
 			textureManager.loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "interface/tick.png", "Tick");
 
@@ -180,7 +180,7 @@ class UISystem : public System {
 
 			createMainMenu();
 			initialised = true;
-		//}).detach();
+		}).detach();
 
 		MessageCenter::Subscribe<AnimationEndEvent, &UISystem::OnAnimationEnd>(this);
 		MessageCenter::Subscribe<LevelLoadedEvent, &UISystem::OnLevelLoaded>(this);
@@ -426,6 +426,15 @@ class UISystem : public System {
 					TogglePause();
 					MessageCenter::Publish(RespawnCharacterEvent());
 				} else if (e.button == screen->menuButton) {
+					{
+						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+						auto view = world.Query<CharacterComponent>();
+
+						for (auto [e, comp] : view.each()) {
+							registry.erase<CharacterComponent>(e);
+						}
+					}
+
 					createLoadingScreen();
 				} else if (e.button == screen->quitGameButton) {
 					glfwSetWindowShouldClose(renderManager.getWindow(), true);
