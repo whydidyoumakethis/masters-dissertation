@@ -8,6 +8,7 @@ class GoalTriggerSystem : public System {
 public:
 	Phase GetPhase() const override { return Phase::PostUpdate; }
 	void OnUpdate(float dt) override {
+		ZoneScopedN("Goal trigger system update");
 		if (goalReached) {
 			goalReached = false; // reset the flag for next time
 			auto* playerTransform = World::Get().GetComponent<TransformComponent>(playerEntity);

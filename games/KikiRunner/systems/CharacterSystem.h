@@ -15,6 +15,9 @@ public:
     Phase GetPhase() const override { return Phase::Update; }
 
     void OnUpdate(float dt) override {
+        
+		ZoneScopedN("Character system update");
+
         auto objects = World::Get().Query<TransformComponent, CharacterComponent,PhysicalAttributesComponent>();
 		for (auto [entity, transform, character,ip] : objects.each()) {
             if (character.jumpTimer > 0.0f) {

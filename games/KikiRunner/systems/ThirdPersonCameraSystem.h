@@ -20,6 +20,7 @@ public:
 		//	inputManager.disableCursor();
 		//	//spdlog::info("Right mouse button down, cursor disabled");
 		//}
+		ZoneScopedN("Third person camera update");
 		auto objects = World::Get().Query<TransformComponent, ThirdPersonCameraComponent, CameraComponent>();
 		for (auto [entity, transform, tpscam,cam] : objects.each()) {
 			HandleCameraRotation( tpscam,transform, dt);

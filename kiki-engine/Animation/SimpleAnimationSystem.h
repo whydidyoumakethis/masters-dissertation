@@ -9,9 +9,13 @@ public:
 	Phase GetPhase() const override { return Phase::Update; }
 
 	void OnUpdate(float dt) override {
+        ZoneScopedN("Simple animation update");
+
 		auto view = World::Get().Query<TransformComponent, SimpleAnimationComponent>();
 		for (auto [entity, transform, anim] : view.each()) {
             anim.time += dt * anim.speed;
+
+
 
             float wave = std::sin(anim.time) * anim.distance;
 

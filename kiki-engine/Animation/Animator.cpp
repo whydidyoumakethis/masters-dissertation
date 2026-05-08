@@ -4,6 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/quaternion.hpp>
 
+#include <tracy/tracy.hpp>
+
 namespace Kiki
 {
 
@@ -35,7 +37,10 @@ namespace Kiki
 
     void Animator::Update(float dt, const Skeleton& skeleton, const Animation& animation)
     {
+        ZoneScopedN("Animation update");
+
         if (animation.duration <= 0.0f) return;
+
 
         currentTime += dt;
 
@@ -98,6 +103,8 @@ namespace Kiki
     {
         currentTime += dt;
         prevTime += dt;
+
+		ZoneScopedN("Animation blended update");
 
         if (looping) {
             while (currentTime > currentAnim.duration && currentAnim.duration > 0) currentTime -= currentAnim.duration;
