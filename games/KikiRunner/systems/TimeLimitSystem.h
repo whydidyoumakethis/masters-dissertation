@@ -8,6 +8,7 @@ public:
     Phase GetPhase() const override { return Phase::PreUpdate; }
     void OnUpdate(float dt) override {
 		//spdlog::info("Elapsed time: {:.2f} seconds", Timer::get().Elapsed());
+        ZoneScopedN("Time limit system update");
         auto& registry = World::Get().Registry();
         auto timerView = registry.view<InterfaceComponent>();
         auto elapsedTime = Timer::get().Elapsed();

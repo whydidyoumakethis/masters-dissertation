@@ -15,6 +15,7 @@ class LevelSystem : public System {
 	}
 
 	void OnUpdate(float dt) override {
+		ZoneScopedN("Level system update");
 		if (loaded) {
 			loaded = false;
 			MessageCenter::Publish(LevelLoadedEvent());
