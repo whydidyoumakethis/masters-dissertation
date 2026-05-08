@@ -19,8 +19,8 @@ void main() {
     
     float sd = median(msd.r, msd.g, msd.b);
     
-    float screenPxDistance = 4.0 * (sd - 0.5);
-    float opacity = clamp(screenPxDistance + 0.5, 0.0, 1.0);
+    float d = sd - 0.5;
+    float opacity = clamp(d/fwidth(d) + 0.5, 0.0, 1.0);
 
     oColour = vec4(pc.colour.rgb, pc.colour.a * opacity);
     
