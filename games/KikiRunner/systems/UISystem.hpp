@@ -66,6 +66,8 @@ struct MainMenuScreen : ScreenBase {
 	entt::entity background = entt::null;
 	entt::entity playButton = entt::null;
 	entt::entity playButtonInner = entt::null;
+	entt::entity play2Button = entt::null;
+	entt::entity play2ButtonInner = entt::null;
 	entt::entity quitGameButton = entt::null;
 	entt::entity quitGameButtonInner = entt::null;
 
@@ -79,6 +81,8 @@ struct MainMenuScreen : ScreenBase {
 			world.DestroyEntity(quitGameButton);
 			world.DestroyEntity(playButtonInner);
 			world.DestroyEntity(playButton);
+			world.DestroyEntity(play2ButtonInner);
+			world.DestroyEntity(play2Button);
 			world.DestroyEntity(background);
 			world.DestroyEntity(gameLogo);
 			world.DestroyEntity(middleContainer);
@@ -167,13 +171,19 @@ class UISystem : public System {
 	Phase GetPhase() const override { return Phase::Input; }
 
 	void OnStart() override {
+		MessageCenter::Subscribe<AnimationEndEvent, &UISystem::OnAnimationEnd>(this);
+		MessageCenter::Subscribe<LevelLoadedEvent, &UISystem::OnLevelLoaded>(this);
+		MessageCenter::Subscribe<ButtonHoverEvent, &UISystem::OnButtonHover>(this);
+		MessageCenter::Subscribe<ButtonClickEvent, &UISystem::OnButtonPress>(this);
+		MessageCenter::Subscribe<ObjectiveAchievedEvent, &UISystem::OnObjectiveComplete>(this);
+
 		createSplashScreen();
 
 		std::thread([this]() {
 			fontManager.loadFont(std::filesystem::path(PROJECT_ASSETS_PATH) / "fonts/Chewy-Regular.ttf", "chewy-regular");
 			textureManager.loadTexture(std::filesystem::path(PROJECT_ASSETS_PATH) / "interface/tick.png", "Tick");
 
-			MessageCenter::Publish(RequestLevelChangeEvent({ 
+			MessageCenter::Publish(RequestLevelChangeEvent({
 				std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
 				std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb"
 				}));
@@ -181,12 +191,6 @@ class UISystem : public System {
 			createMainMenu();
 			initialised = true;
 		}).detach();
-
-		MessageCenter::Subscribe<AnimationEndEvent, &UISystem::OnAnimationEnd>(this);
-		MessageCenter::Subscribe<LevelLoadedEvent, &UISystem::OnLevelLoaded>(this);
-		MessageCenter::Subscribe<ButtonHoverEvent, &UISystem::OnButtonHover>(this);
-		MessageCenter::Subscribe<ButtonClickEvent, &UISystem::OnButtonPress>(this);
-		MessageCenter::Subscribe<ObjectiveAchievedEvent, &UISystem::OnObjectiveComplete>(this);
 	}
 
 	void OnUpdate(float dt) override {
@@ -327,11 +331,19 @@ class UISystem : public System {
 						registry.emplace<InterfaceAnimationComponent>(screen->spinner, animComp);
 					}
 
-					MessageCenter::Publish(RequestLevelChangeEvent({
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb",
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "kiki_player.glb"
-					}));
+					if (levelToLoad == 1) {
+						MessageCenter::Publish(RequestLevelChangeEvent({
+							std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
+							std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb",
+							std::filesystem::path(PROJECT_ASSETS_PATH) / "kiki_player.glb",
+							//std::filesystem::path(PROJECT_ASSETS_PATH) / "tele.glb",
+						}));
+					} else {
+						MessageCenter::Publish(RequestLevelChangeEvent({
+							std::filesystem::path(PROJECT_ASSETS_PATH) / "level2.glb",
+							std::filesystem::path(PROJECT_ASSETS_PATH) / "kiki_player.glb"
+						}));
+					}
 
 					createLevelScreen();
 				}
@@ -382,8 +394,9 @@ class UISystem : public System {
 						}
 
 						MessageCenter::Publish(RequestLevelChangeEvent({
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h1.glb",
-						std::filesystem::path(PROJECT_ASSETS_PATH) / "level_1_h2.glb"
+							std::filesystem::path(PROJECT_ASSETS_PATH) / "level2.glb",
+							//std::filesystem::path(PROJECT_ASSETS_PATH) / "level_l_h2.glb"
+							//std::filesystem::path(PROJECT_ASSETS_PATH) / "tele.glb",
 						}));
 
 						createMainMenu();
@@ -412,7 +425,17 @@ class UISystem : public System {
 					{
 						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
 						registry.erase<ButtonComponent>(screen->playButton);
+						registry.erase<ButtonComponent>(screen->play2Button);
 					}
+					levelToLoad = 1;
+					createLoadingScreen();
+				} else if (e.button == screen->play2Button) {
+					{
+						std::lock_guard<std::mutex> lock(sceneManager.registryMutex);
+						registry.erase<ButtonComponent>(screen->playButton);
+						registry.erase<ButtonComponent>(screen->play2Button);
+					}
+					levelToLoad = 2;
 					createLoadingScreen();
 				} else if (e.button == screen->quitGameButton) {
 					glfwSetWindowShouldClose(renderManager.getWindow(), true);
@@ -572,6 +595,7 @@ class UISystem : public System {
 	ScreenType nextScreenType;
 	bool initialised = false;
 	bool nextReady = false;
+	int levelToLoad = 1;
 
 	void createSplashScreen() {
 		currentScreen = new SplashScreen();
@@ -681,22 +705,32 @@ class UISystem : public System {
 			registry.emplace<InterfaceAnimationComponent>(screen->gameLogo, logoBounce);
 
 			screen->background = world.CreateEntity();
-			registry.emplace<InterfaceComponent>(screen->background, ScaleVec2D(0.0f, 0.0f, 0.45f, 0.0f), ScaleVec2D(1.0f, 0.0f, 0.2f, 0.0f), screen->middleContainer, (unsigned int) 40);
+			registry.emplace<InterfaceComponent>(screen->background, ScaleVec2D(0.0f, 0.0f, 0.45f, 0.0f), ScaleVec2D(1.0f, 0.0f, 0.3f, 0.0f), screen->middleContainer, (unsigned int) 40);
 			registry.emplace<BackgroundComponent>(screen->background, glm::vec3(0.1f, 0.1f, 0.1f), 0.3f, 40.0f);
-			registry.emplace<AspectRatioComponent>(screen->background, 3.0f / 1.8f);
+			registry.emplace<AspectRatioComponent>(screen->background, 3.0f / 2.7f);
 
 			screen->playButton = world.CreateEntity();
-			registry.emplace<InterfaceComponent>(screen->playButton, ScaleVec2D(0.0f, 12.0f, 0.0f, 12.0f), ScaleVec2D(1.0f, -24.0f, 0.5f, -18.0f), screen->background, (unsigned int) 41);
+			registry.emplace<InterfaceComponent>(screen->playButton, ScaleVec2D(0.0f, 12.0f, 0.0f, 12.0f), ScaleVec2D(1.0f, -24.0f, (1.0f / 3.0f), -16.0f), screen->background, (unsigned int) 41);
 			registry.emplace<BackgroundComponent>(screen->playButton, glm::vec3(20.0f / 255.0f, 70.0f / 255.0f, 120.0f / 255.0f), 0.8f, 28.0f);
 			registry.emplace<ButtonComponent>(screen->playButton, glm::vec4(20.0f / 255.0f, 70.0f / 255.0f, 120.0f / 255.0f, 0.2f), glm::vec4(29.0f / 255.0f, 100.0f / 255.0f, 171.0f / 255.0f, 0.2f), glm::vec4(12.0f / 255.0f, 40.0f / 255.0f, 69.0f / 255.0f, 0.2f));
 
 			screen->playButtonInner = world.CreateEntity();
 			registry.emplace<InterfaceComponent>(screen->playButtonInner, ScaleVec2D(0.0f, 12.0f, 0.0f, 12.0f), ScaleVec2D(1.0f, -24.0f, 1.0f, -24.0f), screen->playButton, (unsigned int) 42);
 			registry.emplace<BackgroundComponent>(screen->playButtonInner, glm::vec3(20.0f / 255.0f, 70.0f / 255.0f, 120.0f / 255.0f), 0.6f, 16.0f);
-			registry.emplace<TextComponent>(screen->playButtonInner, "chewy-regular", U"Play Game", 0.6f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+			registry.emplace<TextComponent>(screen->playButtonInner, "chewy-regular", U"Play Level 1", 0.6f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
+
+			screen->play2Button = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->play2Button, ScaleVec2D(0.0f, 12.0f, (1.0f / 3.0f), 8.0f), ScaleVec2D(1.0f, -24.0f, (1.0f / 3.0f), -16.0f), screen->background, (unsigned int) 41);
+			registry.emplace<BackgroundComponent>(screen->play2Button, glm::vec3(20.0f / 255.0f, 70.0f / 255.0f, 120.0f / 255.0f), 0.8f, 28.0f);
+			registry.emplace<ButtonComponent>(screen->play2Button, glm::vec4(20.0f / 255.0f, 70.0f / 255.0f, 120.0f / 255.0f, 0.2f), glm::vec4(29.0f / 255.0f, 100.0f / 255.0f, 171.0f / 255.0f, 0.2f), glm::vec4(12.0f / 255.0f, 40.0f / 255.0f, 69.0f / 255.0f, 0.2f));
+
+			screen->play2ButtonInner = world.CreateEntity();
+			registry.emplace<InterfaceComponent>(screen->play2ButtonInner, ScaleVec2D(0.0f, 12.0f, 0.0f, 12.0f), ScaleVec2D(1.0f, -24.0f, 1.0f, -24.0f), screen->play2Button, (unsigned int) 42);
+			registry.emplace<BackgroundComponent>(screen->play2ButtonInner, glm::vec3(20.0f / 255.0f, 70.0f / 255.0f, 120.0f / 255.0f), 0.6f, 16.0f);
+			registry.emplace<TextComponent>(screen->play2ButtonInner, "chewy-regular", U"Play Level 2", 0.6f, glm::vec3(1.0f, 1.0f, 1.0f), 0.0f, Kiki::HorizontalAlignment::CENTRE, Kiki::VerticalAlignment::CENTRE, true);
 
 			screen->quitGameButton = world.CreateEntity();
-			registry.emplace<InterfaceComponent>(screen->quitGameButton, ScaleVec2D(0.0f, 12.0f, 0.5f, 6.0f), ScaleVec2D(1.0f, -24.0f, 0.5f, -18.0f), screen->background, (unsigned int) 41);
+			registry.emplace<InterfaceComponent>(screen->quitGameButton, ScaleVec2D(0.0f, 12.0f, (2.0f / 3.0f), 4.0f), ScaleVec2D(1.0f, -24.0f, (1.0f / 3.0f), -16.0f), screen->background, (unsigned int) 41);
 			registry.emplace<BackgroundComponent>(screen->quitGameButton, glm::vec3(170.0f / 255.0f, 27.0f / 255.0f, 27.0f / 255.0f), 0.8f, 28.0f);
 			registry.emplace<ButtonComponent>(screen->quitGameButton, glm::vec4(170.0f / 255.0f, 27.0f / 255.0f, 27.0f / 255.0f, 0.2f), glm::vec4(222.0f / 255.0f, 36.0f / 255.0f, 36.0f / 255.0f, 0.2f), glm::vec4(120.0f / 255.0f, 19.0f / 255.0f, 19.0f / 255.0f, 0.2f));
 

@@ -15,6 +15,7 @@ from bpy.props import (
     IntProperty,
     PointerProperty,
     FloatProperty,
+    BoolProperty,
 )
 
 
@@ -61,6 +62,7 @@ class GLTFTAG_PresetItem(PropertyGroup):
             ("PLAYER", "Player", ""),
             ("GOAL", "Goal", ""),
             ("SPAWN", "Spawn", ""),
+            ("DOOR", "Door", ""),
         ],
         default="NONE"
     )
@@ -125,9 +127,27 @@ class GLTFTAG_SceneProps(PropertyGroup):
             ("PLAYER", "Player", ""),
             ("GOAL", "Goal", ""),
             ("SPAWN", "Spawn", ""),
+            ("DOOR", "Door", ""),
         ],
         default="NONE",
     )
+
+    trigger_kind: EnumProperty(
+        name="Trigger Kind",
+        items=[
+            ("NONE", "None", ""),
+            ("GOAL", "Goal", ""),
+            ("TELEPORT", "Teleport", ""),
+        ],
+        default="NONE",
+    )
+
+    trigger_half_x: FloatProperty(name="Trigger Half X", default=1.0, min=0.0)
+    trigger_half_y: FloatProperty(name="Trigger Half Y", default=1.0, min=0.0)
+    trigger_half_z: FloatProperty(name="Trigger Half Z", default=0.1, min=0.0)
+
+    teleport_loop_num: IntProperty(name="Teleport Loop Num", default=0, min=0)
+    teleport_order:    IntProperty(name="Teleport Order",    default=0, min=0)
 
     anim_type: EnumProperty(
         name="Anim Tag",
@@ -161,6 +181,21 @@ class GLTFTAG_SceneProps(PropertyGroup):
         default=90.0,
     )
 
+    door_radius: FloatProperty(
+        name="Door Radius",
+        default=2.0,
+        min=0.0,
+    )
+    door_angle: FloatProperty(
+        name="Door Open Angle",
+        default=90.0,
+    )
+    door_speed: FloatProperty(
+        name="Door Speed",
+        default=540.0,
+        min=0.0,
+    )
+
 
 # ---------------------------------------------------
 # Operators
@@ -175,6 +210,17 @@ def apply_ui_to_object(obj, ui):
     obj["anim_distance"] = ui.anim_distance
     obj["anim_speed"] = ui.anim_speed
     obj["anim_rotation_speed"] = ui.anim_rotation_speed
+
+    obj["trigger_kind"] = ui.trigger_kind.lower()
+    obj["trigger_half_x"] = float(ui.trigger_half_x)
+    obj["trigger_half_y"] = float(ui.trigger_half_y)
+    obj["trigger_half_z"] = float(ui.trigger_half_z)
+    obj["teleport_loop_num"] = int(ui.teleport_loop_num)
+    obj["teleport_order"]    = int(ui.teleport_order)
+
+    obj["door_radius"] = float(ui.door_radius)
+    obj["door_angle"]  = float(ui.door_angle)
+    obj["door_speed"]  = float(ui.door_speed)
 
 
 class GLTFTAG_OT_apply_active(Operator):
@@ -230,6 +276,25 @@ class GLTFTAG_PT_main_panel(Panel):
         layout.prop(ui, "body_type")
         layout.prop(ui, "collider_type")
         layout.prop(ui, "misc_type")
+
+        if ui.misc_type == "TRIGGER":
+            box = layout.box()
+            box.label(text="Trigger Settings")
+            box.prop(ui, "trigger_kind")
+            row = box.row(align=True)
+            row.prop(ui, "trigger_half_x")
+            row.prop(ui, "trigger_half_y")
+            row.prop(ui, "trigger_half_z")
+            if ui.trigger_kind == "TELEPORT":
+                box.prop(ui, "teleport_loop_num")
+                box.prop(ui, "teleport_order")
+
+        if ui.misc_type == "DOOR":
+            box = layout.box()
+            box.label(text="Door Settings")
+            box.prop(ui, "door_radius")
+            box.prop(ui, "door_angle")
+            box.prop(ui, "door_speed")
 
         layout.separator()
 

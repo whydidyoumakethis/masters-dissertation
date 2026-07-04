@@ -19,4 +19,7 @@ target_sources(kiki
       InterfaceTextureComponent.hpp
       AspectRatioComponent.hpp
       SimpleAnimationComponent.hpp
+      TriggerComponent.hpp
+      LevelEntityTag.hpp
+      DoorComponent.hpp
 )
