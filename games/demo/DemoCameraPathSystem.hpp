@@ -1,14 +1,16 @@
 #pragma once
 
 #include <kiki.h>
-
+#include <Components/CamPathPointComponent.hpp>
 #include <algorithm>
+#include <glm/gtx/quaternion.hpp>
 #include <vector>
 
 struct DemoCameraPathPoint {
     glm::vec3 position = { 0.0f, 0.0f, 0.0f };
-    glm::vec3 lookAt = { 0.0f, 0.0f, 0.0f };
+    glm::quat rotation = glm::quat(1.0f, 0.0f, 0.0f, 0.0f);
     float durationToNext = 3.0f;
+    int pathIndex = -1;
 };
 
 class DemoCameraPathSystem : public System {
@@ -16,12 +18,7 @@ public:
     Phase GetPhase() const override { return Phase::Update; }
 
     void OnStart() override {
-        path = {
-            { glm::vec3(0.0f, 3.0f, 8.0f), glm::vec3(0.0f, 1.5f, 0.0f), 3.0f },
-            { glm::vec3(6.0f, 4.0f, 2.0f), glm::vec3(0.0f, 1.5f, 0.0f), 3.0f },
-            { glm::vec3(0.0f, 5.0f, -8.0f), glm::vec3(0.0f, 1.5f, 0.0f), 3.0f },
-        };
-
+        RebuildPathFromScene();
         MakeOnlyMainCamera();
         SnapToPoint(0);
     }
@@ -49,6 +46,42 @@ private:
     float segmentTime = 0.0f;
     bool playing = false;
 
+    void RebuildPathFromScene() {
+        path.clear();
+
+        auto view = World::Get().Query<TransformComponent, CameraPathPointComponent>();
+
+        for (auto [entity, transform, point] : view.each()) {
+            DemoCameraPathPoint pathPoint;
+            pathPoint.position = transform.position;
+            pathPoint.rotation = transform.rotation;
+            pathPoint.durationToNext = point.durationToNext;
+            pathPoint.pathIndex = point.pathIndex;
+            path.push_back(pathPoint);
+        }
+
+        std::sort(path.begin(), path.end(),
+            [](const DemoCameraPathPoint& a, const DemoCameraPathPoint& b) {
+                if (a.pathIndex < 0) return false;
+                if (b.pathIndex < 0) return true;
+                return a.pathIndex < b.pathIndex;
+            });
+
+        if (path.empty()) {
+            spdlog::warn("[DemoCameraPath] No camera path points found in the loaded scene");
+            return;
+        }
+
+        for (const auto& point : path) {
+            if (point.pathIndex < 0) {
+                spdlog::warn("[DemoCameraPath] Found a camera path point with no valid path index");
+                break;
+            }
+        }
+
+        spdlog::info("[DemoCameraPath] Loaded {} camera path point(s)", path.size());
+    }
+
     void MakeOnlyMainCamera() {
         auto& registry = World::Get().Registry();
         auto cameras = World::Get().Query<CameraComponent>();
@@ -60,11 +93,17 @@ private:
     }
 
     void StartPath() {
+        RebuildPathFromScene();
         segmentIndex = 0;
         segmentTime = 0.0f;
         playing = path.size() >= 2;
         SnapToPoint(0);
-        spdlog::info("[DemoCameraPath] Started camera path");
+
+        if (playing) {
+            spdlog::info("[DemoCameraPath] Started camera path");
+        } else {
+            spdlog::warn("[DemoCameraPath] Need at least 2 camera path points to start");
+        }
     }
 
     void StopPath() {
@@ -85,7 +124,7 @@ private:
 
         SetCameraTransform(
             glm::mix(from.position, to.position, t),
-            glm::mix(from.lookAt, to.lookAt, t)
+            glm::slerp(from.rotation, to.rotation, t)
         );
 
         if (segmentTime >= duration) {
@@ -103,19 +142,13 @@ private:
     void SnapToPoint(std::size_t index) {
         if (path.empty()) return;
         index = std::min(index, path.size() - 1);
-        SetCameraTransform(path[index].position, path[index].lookAt);
+        SetCameraTransform(path[index].position, path[index].rotation);
     }
 
-    void SetCameraTransform(const glm::vec3& position, const glm::vec3& lookAt) {
+    void SetCameraTransform(const glm::vec3& position, const glm::quat& rotation) {
         auto& transform = World::Get().Registry().get<TransformComponent>(camera.camera);
         transform.position = position;
-
-        glm::vec3 forward = lookAt - position;
-        if (glm::dot(forward, forward) < 0.0001f) {
-            forward = glm::vec3(0.0f, 0.0f, -1.0f);
-        }
-
-        transform.rotation = glm::quatLookAt(glm::normalize(forward), glm::vec3(0.0f, 1.0f, 0.0f));
+        transform.rotation = glm::normalize(rotation);
         transform.dirty = true;
     }
 };

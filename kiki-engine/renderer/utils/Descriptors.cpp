@@ -361,6 +361,40 @@ namespace rutils {
         return DescriptorSetLayout(window.device, layout);
     }
 
+    DescriptorSetLayout createTAADescriptorLayout(VulkanWindow const& window) {
+        VkDescriptorSetLayoutBinding bindings[3]{};
+
+        // current colour
+        bindings[0].binding = 0;
+        bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[0].descriptorCount = 1;
+        bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // previous resolved history
+        bindings[1].binding = 1;
+        bindings[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[1].descriptorCount = 1;
+        bindings[1].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        // current depth
+        bindings[2].binding = 2;
+        bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        bindings[2].descriptorCount = 1;
+        bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo{};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = sizeof(bindings) / sizeof(bindings[0]);
+        layoutInfo.pBindings = bindings;
+
+        VkDescriptorSetLayout layout = VK_NULL_HANDLE;
+        if (auto const res = vkCreateDescriptorSetLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
+            throw Kiki::FatalError("Unable to create descriptor set layout\n" "vkCreateDescriptorSetLayout() returned {}", toString(res));
+        }
+
+        return DescriptorSetLayout(window.device, layout);
+    }
+
     DescriptorSetLayout createCompositeDescriptorLayout(VulkanWindow const& window) {
         VkDescriptorSetLayoutBinding bindings[2]{};
 
@@ -817,6 +851,48 @@ namespace rutils {
         desc[0].pImageInfo = &inputInfo;
 
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
+    }
+
+    void initialiseTAADescriptorSet(VulkanWindow const& window, Image& currentImage, Image& historyImage, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& taaDescriptors) {
+        VkWriteDescriptorSet desc[3]{};
+
+        VkDescriptorImageInfo currentInfo{};
+        currentInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        currentInfo.imageView = currentImage.view;
+        currentInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo historyInfo{};
+        historyInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+        historyInfo.imageView = historyImage.view;
+        historyInfo.sampler = sampler.handle;
+
+        VkDescriptorImageInfo depthInfo{};
+        depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+        depthInfo.imageView = depthBuffer.view;
+        depthInfo.sampler = sampler.handle;
+
+        desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[0].dstSet = taaDescriptors;
+        desc[0].dstBinding = 0;
+        desc[0].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[0].descriptorCount = 1;
+        desc[0].pImageInfo = &currentInfo;
+
+        desc[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[1].dstSet = taaDescriptors;
+        desc[1].dstBinding = 1;
+        desc[1].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[1].descriptorCount = 1;
+        desc[1].pImageInfo = &historyInfo;
+
+        desc[2].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        desc[2].dstSet = taaDescriptors;
+        desc[2].dstBinding = 2;
+        desc[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+        desc[2].descriptorCount = 1;
+        desc[2].pImageInfo = &depthInfo;
+
+        vkUpdateDescriptorSets(window.device, 3, desc, 0, nullptr);
     }
 
     void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors) {

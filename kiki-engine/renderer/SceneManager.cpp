@@ -11,6 +11,7 @@
 #include "Components/TriggerComponent.hpp"
 #include "Components/LevelEntityTag.hpp"
 #include "Components/DoorComponent.hpp"
+#include "Components/CamPathPointComponent.hpp"
 
 #include "Animation/AnimationLoader.h"
 #include "Animation/AnimationComponent.h"
@@ -510,7 +511,7 @@ namespace Kiki {
                 break;
             }
 
-			if (instance.simpleAnim != MsimpleAnimType::NONE) {
+            if (instance.simpleAnim != MsimpleAnimType::NONE) {
                 {
                     std::lock_guard<std::mutex> lock(registryMutex);
                     registry.emplace<SimpleAnimationComponent>(model);
@@ -524,6 +525,13 @@ namespace Kiki {
                 simpleAnimComp.rotationSpeed = instance.anim_rotation_speed;
                 spdlog::info("[Animation] Attached SimpleAnimationComponent with animation '{}' to mesh: '{}'", 
                     static_cast<int>(instance.simpleAnim), mesh.name);
+            }
+
+            if (instance.camPath == McamPath::camPath) {
+                std::lock_guard<std::mutex> lock(registryMutex);
+                registry.emplace<CameraPathPointComponent>(model, instance.pathIndex);
+                spdlog::info("[CameraPath] Attached path point {} to mesh '{}'",
+                    instance.pathIndex, mesh.name);
             }
 
             //registry.emplace<RigidBodyComponent>(model, joltMotionType, joltLayer);
@@ -598,6 +606,12 @@ namespace Kiki {
             glm::decompose(instance.transform, transform.scale, transform.rotation, transform.position, skew, perspective);
             //transform.rotation = glm::conjugate(transform.rotation);
             // Misc tags
+            if (instance.camPath == McamPath::camPath) {
+                std::lock_guard<std::mutex> lock(registryMutex);
+                registry.emplace<CameraPathPointComponent>(model, instance.pathIndex);
+                spdlog::info("[CameraPath] Attached path point {} to empty entity",
+                    instance.pathIndex);
+            }
             if (instance.miscTag != MmiscTags::NONE) {
                 {
                     std::lock_guard<std::mutex> lock(registryMutex);

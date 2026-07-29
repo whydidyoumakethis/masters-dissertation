@@ -83,6 +83,19 @@ class GLTFTAG_PresetItem(PropertyGroup):
         default="NONE"
     )
 
+    cam_path: EnumProperty(
+        name="Cam Path",
+        items=[
+            ("NONE", "None", ""),
+            ("PATH", "Path", ""),
+        ],
+        default="NONE"
+    )
+
+    path_index: IntProperty(
+        name="Path Index",
+        default=0
+    )
 
 
 
@@ -130,6 +143,19 @@ class GLTFTAG_SceneProps(PropertyGroup):
             ("DOOR", "Door", ""),
         ],
         default="NONE",
+    )
+    cam_path: EnumProperty(
+        name="Cam Path",
+        items=[
+            ("NONE", "None", ""),
+            ("PATH", "Path", ""),
+        ],
+        default="NONE"
+    )
+
+    path_index: IntProperty(
+        name="Path Index",
+        default=0
     )
 
     trigger_kind: EnumProperty(
@@ -206,6 +232,10 @@ def apply_ui_to_object(obj, ui):
     obj["body"] = ui.body_type.lower()
     obj["collider"] = ui.collider_type.lower()
     obj["misc"] = ui.misc_type.lower()
+
+    obj["cam_path"] = ui.cam_path.lower()
+    obj["path_index"] = int(ui.path_index)
+
     obj["anim"] = ui.anim_type.lower()
     obj["anim_distance"] = ui.anim_distance
     obj["anim_speed"] = ui.anim_speed
@@ -276,6 +306,8 @@ class GLTFTAG_PT_main_panel(Panel):
         layout.prop(ui, "body_type")
         layout.prop(ui, "collider_type")
         layout.prop(ui, "misc_type")
+        layout.prop(ui, "cam_path")
+        layout.prop(ui, "path_index")
 
         if ui.misc_type == "TRIGGER":
             box = layout.box()

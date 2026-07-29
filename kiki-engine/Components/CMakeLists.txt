@@ -22,4 +22,5 @@ target_sources(kiki
       TriggerComponent.hpp
       LevelEntityTag.hpp
       DoorComponent.hpp
+      CamPathPointComponent.hpp
 )

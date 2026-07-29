@@ -28,6 +28,71 @@
 
 
 namespace Kiki {
+    namespace {
+
+
+
+        const glm::vec2 offsets[] = {
+            glm::vec2(0.0625f, -0.1875f),
+            glm::vec2(-0.0625f, 0.1875f),
+            glm::vec2(0.3125f, 0.0625f),
+            glm::vec2(-0.1875f, -0.3125f),
+            glm::vec2(-0.3125f, 0.3125f),
+            glm::vec2(-0.4375f, -0.0625f),
+            glm::vec2(0.1875f, 0.4375f),
+            glm::vec2(0.4375f, -0.4375f)
+        };
+
+        float halton(std::uint32_t index, std::uint32_t base) {
+            float result = 0.0f;
+            float fraction = 1.0f / static_cast<float>(base);
+
+            while (index > 0) {
+                result += static_cast<float>(index % base) * fraction;
+                index /= base;
+                fraction /= static_cast<float>(base);
+            }
+
+            return result;
+        }
+
+        int previousTaaHistoryIndex(int currentIndex) {
+            return (currentIndex + N_TAA_HISTORY_IMAGES - 1) % N_TAA_HISTORY_IMAGES;
+        }
+
+        int nextTaaHistoryIndex(int currentIndex) {
+            return (currentIndex + 1) % N_TAA_HISTORY_IMAGES;
+        }
+    }
+
+    void RenderManager::updateRenderExtents() {
+        renderExtents.output = window.swapchainExtent;
+
+        std::uint32_t const scale = renderSettings.ssaaEnabled
+            ? std::max(renderSettings.ssaa_scale, 1u)
+            : 1u;
+
+        VkPhysicalDeviceProperties properties{};
+        vkGetPhysicalDeviceProperties(window.physicalDevice, &properties);
+        auto const maxDimension = properties.limits.maxImageDimension2D;
+
+        if (renderExtents.output.width > maxDimension / scale ||
+            renderExtents.output.height > maxDimension / scale) {
+            throw Kiki::FatalError(
+                "Requested SSAA extent {}x{} at scale {} exceeds maxImageDimension2D ({})",
+                renderExtents.output.width,
+                renderExtents.output.height,
+                scale,
+                maxDimension
+            );
+        }
+
+        renderExtents.scene = {
+            renderExtents.output.width * scale,
+            renderExtents.output.height * scale
+        };
+    }
+
     RenderManager& RenderManager::get() {
         static RenderManager instance;
         return instance;
@@ -39,6 +104,8 @@ namespace Kiki {
 
             // Create window
             window = rutils::makeVulkanWindow(info);
+
+            updateRenderExtents();
 
             // Initialise resources
             sceneLayout = rutils::createSceneDescriptorLayout(window);
@@ -107,6 +174,7 @@ namespace Kiki {
             compositeLayout = rutils::createCompositeDescriptorLayout(window);
             debugLayout = rutils::createDebugDescriptorLayout(window);
             customPostprocessLayout = rutils::createCustomPostprocessDescriptorLayout(window);
+            taaLayout = rutils::createTAADescriptorLayout(window);
 
             pipelineLayouts.pbrPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, materialLayout.handle, animationLayout.handle);
             pipelineLayouts.deferredPipelineLayout = rutils::createPipelineLayout(window, sceneLayout.handle, gBufferLayout.handle, animationLayout.handle);
@@ -121,6 +189,8 @@ namespace Kiki {
             pipelineLayouts.debugPipelineLayout = rutils::createDebugPipelineLayout(window, debugLayout.handle);
             pipelineLayouts.customPostprocessPipelineLayout = rutils::createCustomPostprocessPipelineLayout(window, customPostprocessLayout.handle);
             pipelineLayouts.chromaticAberrationPipelineLayout = rutils::createChromaticAberrationPipelineLayout(window, chromaticAberrationLayout.handle);
+            pipelineLayouts.taaPipelineLayout = rutils::createTAAPipelineLayout(window, sceneLayout.handle, taaLayout.handle);
+            pipelineLayouts.ssaaPipelineLayout = rutils::createSSAAPipelineLayout(window, bloomLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, textureLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -129,21 +199,27 @@ namespace Kiki {
 
             descriptorPool = rutils::createDescriptorPool(window);
 
-            depthBuffer = rutils::createDepthBuffer(window, allocator);
-            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
-            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
-            doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
-            doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator);
-            doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
-            doneDebugImage = rutils::createPostTonemapImage(window, allocator);
-            doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator);
+            depthBuffer = rutils::createDepthBuffer(window, allocator, renderExtents.scene);
+            doneLightingImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
+            doneSSRImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
+            doneCompositeImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+            doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+            doneTonemapImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+            doneDebugImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+            doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+
+            doneSsaaImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+
+            for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
+                taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+            }
 
             for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                 bloomImages[i] = rutils::createBloomImage(
                     window,
                     allocator,
-                    window.swapchainExtent.width >> i,
-                    window.swapchainExtent.height >> i
+                    renderExtents.output.width >> i,
+                    renderExtents.output.height >> i
                 );
             }
 
@@ -155,7 +231,7 @@ namespace Kiki {
                 shadowCubemaps.push_back(std::move(shadowCubemap));
             }
 
-            gbuffers = rutils::createAllGBufferImages(window, allocator);
+            gbuffers = rutils::createAllGBufferImages(window, allocator, renderExtents.scene);
 
             createSkybox(skybox.paths);
 
@@ -197,8 +273,28 @@ namespace Kiki {
             compositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
             initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
 
+            ssaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+            initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, ssaaDescriptors);
+
+            ssaaBloomImageDownsampleDescriptors = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+            initialiseBloomImageDescriptorSet(window, doneSsaaImage, skybox.sampler, ssaaBloomImageDownsampleDescriptors);
+
+            ssaaCompositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
+            initialiseCompositeDescriptorSet(window, doneSsaaImage, bloomImages[0], sampler, ssaaCompositeDescriptors);
+
             chromaticAberrationDescriptors = rutils::allocDescSet(window, descriptorPool.handle, chromaticAberrationLayout.handle);
             initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
+
+            for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
+                taaDescriptors[i] = rutils::allocDescSet(window, descriptorPool.handle, taaLayout.handle);
+                initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, sampler, taaDescriptors[i]);
+
+                taaBloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
+                initialiseBloomImageDescriptorSet(window, taaHistoryImages[i], skybox.sampler, taaBloomImageDownsampleDescriptorSets[i]);
+
+                taaCompositeDescriptors[i] = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
+                initialiseCompositeDescriptorSet(window, taaHistoryImages[i], bloomImages[0], sampler, taaCompositeDescriptors[i]);
+            }
 
             tonemapDescriptors = rutils::allocDescSet(window, descriptorPool.handle, tonemapLayout.handle);
             initialiseTonemapDescriptorSet(window, doneChromaticAberrationImage, sampler, tonemapDescriptors);
@@ -211,6 +307,11 @@ namespace Kiki {
 
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
+
+            appliedSsaaEnabled = renderSettings.ssaaEnabled;
+            appliedSsaaScale = renderSettings.ssaaEnabled
+                ? std::max(renderSettings.ssaa_scale, 1u)
+                : 1u;
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -470,6 +571,25 @@ namespace Kiki {
     void RenderManager::nextFrame() {
         ZoneScoped;
         // glfwPollEvents(); called in input manager
+
+
+        if (renderSettings.ssaaEnabled) {
+            // SSAA is the reference AA method and must not be combined with temporal jitter or FXAA.
+            renderSettings.taaEnabled = false;
+            renderSettings.fxaaEnabled = false;
+        }
+
+        std::uint32_t const requestedSsaaScale = renderSettings.ssaaEnabled
+            ? std::max(renderSettings.ssaa_scale, 1u)
+            : 1u;
+
+        if (renderSettings.ssaaEnabled != appliedSsaaEnabled ||
+            requestedSsaaScale != appliedSsaaScale) {
+            appliedSsaaEnabled = renderSettings.ssaaEnabled;
+            appliedSsaaScale = requestedSsaaScale;
+            recreateSwapchain = true;
+        }
+
         
         if (recreateSwapchain) {
 
@@ -492,16 +612,19 @@ namespace Kiki {
                 ZoneScopedN("Creating resources");
 
                 rutils::recreateSwapchain(window);
+
+                updateRenderExtents();
+
                 pipelines = rutils::createAllPipelines(window, pipelineLayouts);
-                depthBuffer = rutils::createDepthBuffer(window, allocator);
-                gbuffers = rutils::createAllGBufferImages(window, allocator);
+                depthBuffer = rutils::createDepthBuffer(window, allocator, renderExtents.scene);
+                gbuffers = rutils::createAllGBufferImages(window, allocator, renderExtents.scene);
 
                 for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                     bloomImages[i] = rutils::createBloomImage(
                         window,
                         allocator,
-                        window.swapchainExtent.width >> i,
-                        window.swapchainExtent.height >> i
+                        renderExtents.output.width >> i,
+                        renderExtents.output.height >> i
                     );
                 }
             }
@@ -509,13 +632,18 @@ namespace Kiki {
             {
                 ZoneScopedN("Creating post-processing images");
 
-                doneLightingImage = rutils::createPostProcessingImage(window, allocator);
-                doneSSRImage = rutils::createPostProcessingImage(window, allocator);
-                doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
-                doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator);
-                doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
-                doneDebugImage = rutils::createPostTonemapImage(window, allocator);
-                doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator);
+                doneLightingImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
+                doneSSRImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
+                doneCompositeImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+                doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+                doneTonemapImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+                doneDebugImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+                doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+                doneSsaaImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+
+                for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
+                    taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+                }
             }
 
             {
@@ -542,12 +670,23 @@ namespace Kiki {
                 }
 
                 initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
+                initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, ssaaDescriptors);
+                initialiseBloomImageDescriptorSet(window, doneSsaaImage, skybox.sampler, ssaaBloomImageDownsampleDescriptors);
+                initialiseCompositeDescriptorSet(window, doneSsaaImage, bloomImages[0], sampler, ssaaCompositeDescriptors);
                 initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
+                for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
+                    initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, sampler, taaDescriptors[i]);
+                    initialiseBloomImageDescriptorSet(window, taaHistoryImages[i], skybox.sampler, taaBloomImageDownsampleDescriptorSets[i]);
+                    initialiseCompositeDescriptorSet(window, taaHistoryImages[i], bloomImages[0], sampler, taaCompositeDescriptors[i]);
+                }
                 initialiseTonemapDescriptorSet(window, doneChromaticAberrationImage, sampler, tonemapDescriptors);
                 initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
                 initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
             }
+
+            taaHistoryValid = false;
+            taaHistoryIndex = 0;
 
             auto& registry = World::Get().Registry();
             auto view = registry.view<InterfaceComponent>();
@@ -646,7 +785,7 @@ namespace Kiki {
 
             // Record and submit commands for this frame
             // Prepare data for this frame
-            updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
+            updateSceneUniforms(sceneUniforms, renderExtents.scene.width, renderExtents.scene.height);
             updateDebugLineBuffer();
         }
 
@@ -660,7 +799,7 @@ namespace Kiki {
 
         {
             ZoneScopedN("Updating interface uniform")
-            interfaceUniform.projection = glm::ortho(0.0f, (float)window.swapchainExtent.width, 0.0f, (float)window.swapchainExtent.height);
+            interfaceUniform.projection = glm::ortho(0.0f, (float)renderExtents.output.width, 0.0f, (float)renderExtents.output.height);
         }
 
         // std::cout << sceneUniforms.lightColour.r << std::endl;
@@ -691,7 +830,7 @@ namespace Kiki {
                     swapchainColourTarget,
                     depthBuffer,
                     gbuffers,
-                    window.swapchainExtent,
+                    renderExtents,
                     sceneUBO.buffer,
                     sceneUniforms,
                     sceneDescriptors,
@@ -701,9 +840,14 @@ namespace Kiki {
                     deferredLightingDescriptors,
                     fxaaDescriptors,
                     ssrDescriptors,
+                    ssaaDescriptors,
+                    ssaaBloomImageDownsampleDescriptors,
+                    taaDescriptors,
                     tonemapDescriptors,
                     shadowMatrixDescriptors,
                     compositeDescriptors,
+                    ssaaCompositeDescriptors,
+                    taaCompositeDescriptors,
                     debugDescriptors,
                     customPostprocessDescriptors,
                     chromaticAberrationDescriptors,
@@ -711,6 +855,8 @@ namespace Kiki {
                     skybox,
                     doneLightingImage,
                     doneSSRImage,
+                    doneSsaaImage,
+                    taaHistoryImages,
                     doneCompositeImage,
                     doneChromaticAberrationImage,
                     doneTonemapImage,
@@ -726,8 +872,11 @@ namespace Kiki {
                     lights,
                     bloomImages,
                     bloomImageDownsampleDescriptorSets,
+                    taaBloomImageDownsampleDescriptorSets,
                     bloomImageUpsampleDescriptorSets,
                     renderSettings,
+                    taaHistoryIndex,
+                    taaHistoryValid,
                     debugLineVertexBuffer.buffer,
                     debugLineVertexCount
                 );
@@ -777,6 +926,19 @@ namespace Kiki {
                     );
                 }
             }
+        }
+
+        previousProjCam = currentUnjitteredProjCam;
+        previousJitter = currentJitter;
+        taaWasEnabled = renderSettings.taaEnabled;
+
+        if (renderSettings.taaEnabled) {
+            taaHistoryValid = true;
+            taaHistoryIndex = nextTaaHistoryIndex(taaHistoryIndex);
+            taaFrameIndex++;
+        }
+        else {
+            taaHistoryIndex = 0;
         }
 
         FrameMark;
@@ -1567,18 +1729,47 @@ namespace Kiki {
             }
         }
 
-        aSceneUniforms.projection = glm::perspectiveRH_ZO(
+        glm::mat4 unjitteredProjection = glm::perspectiveRH_ZO(
             glm::radians(camComp.fov), // fov
             aspect,
             camComp.nearPlane, // near
             camComp.farPlane // far
         );
 
-        aSceneUniforms.projection[1][1] *= -1.f; // mirror Y axis
+        unjitteredProjection[1][1] *= -1.f; // mirror Y axis
+        aSceneUniforms.projection = unjitteredProjection;
+
+        if (renderSettings.taaEnabled) {
+            //glm::vec2 haltonSample = glm::vec2(
+            //    halton((taaFrameIndex % 8) + 1, 2),
+            //    halton((taaFrameIndex % 8) + 1, 3)
+            //);
+            glm::vec2 jitterOffset = offsets[taaFrameIndex % 8];
+            float jitterscale = 1.f;
+
+            currentJitter = glm::vec2(
+                (((jitterOffset.x) * 2.0f) / static_cast<float>(aFramebufferWidth)) * jitterscale,
+                (((jitterOffset.y) * 2.0f) / static_cast<float>(aFramebufferHeight)) * jitterscale
+            );
+
+            aSceneUniforms.projection[2][0] += currentJitter.x;
+            aSceneUniforms.projection[2][1] += currentJitter.y;
+        }
+        else {
+            currentJitter = glm::vec2(0.0f);
+        }
 
         aSceneUniforms.camera = glm::inverse(transformComp.worldMatrix); 
 
+        currentUnjitteredProjCam = unjitteredProjection * aSceneUniforms.camera;
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
+        aSceneUniforms.previousProjCam = previousProjCam;
+        aSceneUniforms.inverseProjCam = glm::inverse(aSceneUniforms.projCam);
+        aSceneUniforms.taaData = glm::vec4(
+            currentJitter,
+            renderSettings.taaHistoryWeight,
+            (!taaHistoryValid || !taaWasEnabled) ? 1.0f : 0.0f
+        );
 
         int numLights = std::min<size_t>(lights.size(), 8);
         for (int i = 0; i < numLights; i++) {
@@ -1717,6 +1908,10 @@ namespace Kiki {
 
             initialiseBloomImageDescriptorSet(window, bloomImages[(N_BLOOM_IMAGES - 1) - i], skybox.sampler, bloomImageUpsampleDescriptorSets[i]);
         }
+
+        for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
+            initialiseBloomImageDescriptorSet(window, taaHistoryImages[i], skybox.sampler, taaBloomImageDownsampleDescriptorSets[i]);
+        }
     }
 
     void RenderManager::createSkybox(const rutils::CubemapPaths& paths) {
@@ -1780,6 +1975,9 @@ namespace Kiki {
     void RenderManager::setRenderPreset(RenderPreset preset) {
         // ignore simple/custom shaders like bayer, chromatic aberration, tonemap,... when applying settings
         renderSettings.renderPreset = preset;
+        renderSettings.ssaaEnabled = false;
+        renderSettings.taaEnabled = false;
+        renderSettings.fxaaEnabled = false;
 
         if (preset == FAST) {
             // very basic settings
@@ -1811,6 +2009,32 @@ namespace Kiki {
 
             renderSettings.fxaaEnabled = true;
             renderSettings.fxaaStrength = 16.f;
+        }
+		else if (preset == DISS) {
+            renderSettings.ssaoEnabled = false;
+            renderSettings.ssaoRadius = 0.5f;
+            renderSettings.ssaoSamples = 16;
+            renderSettings.ssaoBlurRange = 2;
+
+            renderSettings.shadowsEnabled = false;
+            renderSettings.shadowPcfSamples = 20;
+
+            renderSettings.ssrEnabled = false;
+            renderSettings.ssrMaxSteps = 16;
+            renderSettings.ssrBinarySteps = 4;
+            renderSettings.ssrStepSize = 0.5f;
+            renderSettings.ssrThicknessTolerance = 0.2f;
+
+            renderSettings.bloomEnabled = false;
+            renderSettings.bloomRadius_x = 0.005f;
+            renderSettings.bloomRadius_y = 0.005f;
+            renderSettings.bloomStrength = 0.04f;
+
+            renderSettings.fxaaEnabled = false;
+
+			renderSettings.taaEnabled = true;
+			renderSettings.taaHistoryWeight = 0.9f;
+
         }
         else {  // ULTRA, default
             renderSettings.ssaoEnabled = true;
@@ -1916,6 +2140,8 @@ namespace Kiki {
 		pipelines.debug_line = {};
         pipelines.customPostprocess = {};
         pipelines.chromaticAberration = {};
+        pipelines.taa = {};
+        pipelines.ssaa = {};
 
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
@@ -1933,6 +2159,8 @@ namespace Kiki {
         pipelineLayouts.debugPipelineLayout = {};
         pipelineLayouts.customPostprocessPipelineLayout = {};
         pipelineLayouts.chromaticAberrationPipelineLayout = {};
+        pipelineLayouts.taaPipelineLayout = {};
+        pipelineLayouts.ssaaPipelineLayout = {};
 
         for (auto& shadowCubemap : shadowCubemaps) {
             if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
@@ -1950,6 +2178,8 @@ namespace Kiki {
         doneDebugImage = {};
         doneCustomPostprocessImage = {};
         doneChromaticAberrationImage = {};
+        doneSsaaImage = {};
+        for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaHistoryImages[i] = {};
         
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImages[i] = {};
 
@@ -1981,6 +2211,7 @@ namespace Kiki {
         debugLayout = {};
         customPostprocessLayout = {};
         chromaticAberrationLayout = {};
+        taaLayout = {};
 
         descriptorPool = {};
         sceneDescriptors = {};
@@ -1990,6 +2221,12 @@ namespace Kiki {
         debugDescriptors = {};
         customPostprocessDescriptors = {};
         chromaticAberrationDescriptors = {};
+        ssaaDescriptors = {};
+        ssaaBloomImageDownsampleDescriptors = {};
+        ssaaCompositeDescriptors = {};
+        for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaDescriptors[i] = {};
+        for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaBloomImageDownsampleDescriptorSets[i] = {};
+        for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaCompositeDescriptors[i] = {};
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImageDownsampleDescriptorSets[i] = {};
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImageUpsampleDescriptorSets[i] = {};
 

@@ -3,6 +3,7 @@
 
 #define N_BLOOM_IMAGES 6
 
+#define N_TAA_HISTORY_IMAGES 2
 #include "Components/MaterialComponent.hpp"
 #include "Components/MeshComponent.hpp"
 #include "Components/TransparencyComponent.hpp"
@@ -50,8 +51,32 @@ namespace Kiki {
     enum RenderPreset {
         FAST,
         FANCY,
-        ULTRA
+        ULTRA,
+        DISS
     };
+
+    struct TAAState {
+        glm::mat4 previousProjCam;
+        glm::mat4 inverseProjCam;
+        glm::vec2 currentJitter;
+        glm::vec2 previousJitter;
+        int taaFrameIndex;
+        bool taaResetHistory;
+	};
+
+    enum TAAOptions {
+        NONE,
+        RGBCLAMP,
+        AABBCLIP,
+        VARIANCECLIP,
+        SIMPLIFIEDKDOP
+	};
+
+    struct TaaSettings {
+		TAAOptions taaOption = NONE;
+        float taaHistoryWeight = 0.9f;
+
+	};
 
     struct RenderSettings {
         int ssaoSamples = 16;
@@ -89,10 +114,26 @@ namespace Kiki {
         int bayerLevels = 3;
 
         float fxaaStrength = 16.f;
+
+
         bool fxaaEnabled = true;
+
+        bool ssaaEnabled = false;
+        uint32_t ssaa_scale = 2;
+
+
+		bool taaEnabled = false;
+
+
+        float taaHistoryWeight = 0.9f;
+        float taaVarianceGamma = 1.25f;
+
+		TAAOptions taaOption = NONE;
 
         RenderMode renderMode = STANDARD;
         RenderPreset renderPreset = ULTRA;
+
+
     };
 
     struct Mesh {
@@ -169,6 +210,13 @@ namespace Kiki {
         std::filesystem::path debug_line_f = "debug_line.frag.spv";
         std::filesystem::path custom_postprocess_f = "custom_postprocess.frag.spv";
         std::filesystem::path chromatic_aberration_f = "chromatic_aberration.frag.spv";
+        std::filesystem::path taa_f = "taa.frag.spv";
+        std::filesystem::path ssaa_f = "ssaa_resolve.frag.spv";
+    };
+
+    struct RenderExtents {
+        VkExtent2D output{};
+        VkExtent2D scene{};
     };
 
     class RenderManager {
@@ -180,7 +228,8 @@ namespace Kiki {
 
         bool recreateSwapchain = false;
         bool initialised = false;
-
+        bool appliedSsaaEnabled = false;
+        std::uint32_t appliedSsaaScale = 1;
         rutils::VulkanWindow window;
 
         rutils::PipelineLayouts pipelineLayouts;
@@ -223,6 +272,7 @@ namespace Kiki {
         rutils::DescriptorSetLayout compositeLayout;
         rutils::DescriptorSetLayout debugLayout;
         rutils::DescriptorSetLayout customPostprocessLayout;
+        rutils::DescriptorSetLayout taaLayout;
         VkDescriptorSet sceneDescriptors;
         VkDescriptorSet interfaceDescriptors;
         VkDescriptorSet deferredLightingDescriptors;
@@ -237,6 +287,12 @@ namespace Kiki {
         VkDescriptorSet compositeDescriptors;
         VkDescriptorSet debugDescriptors;
         VkDescriptorSet customPostprocessDescriptors;
+        VkDescriptorSet ssaaDescriptors;
+        VkDescriptorSet ssaaBloomImageDownsampleDescriptors;
+        VkDescriptorSet ssaaCompositeDescriptors;
+        std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaDescriptors;
+        std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaBloomImageDownsampleDescriptorSets;
+        std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaCompositeDescriptors;
 
         rutils::Image doneLightingImage;
         rutils::Image doneSSRImage;
@@ -247,9 +303,23 @@ namespace Kiki {
         rutils::Image doneCustomPostprocessImage;
         rutils::Image depthBuffer;
 
+        rutils::Image doneSsaaImage;
+
         std::array<rutils::Image, N_BLOOM_IMAGES> bloomImages;
         std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets;
         std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageUpsampleDescriptorSets;
+
+		std::array<rutils::Image, N_TAA_HISTORY_IMAGES> taaHistoryImages;
+		int taaHistoryIndex = 0;
+        bool taaHistoryValid = false;
+        bool taaWasEnabled = false;
+        std::uint32_t taaFrameIndex = 0;
+        glm::mat4 previousProjCam = glm::mat4(1.0f);
+        glm::mat4 currentUnjitteredProjCam = glm::mat4(1.0f);
+        glm::vec2 previousJitter = glm::vec2(0.0f);
+        glm::vec2 currentJitter = glm::vec2(0.0f);
+
+        RenderExtents renderExtents;
 
         rutils::Buffer shadowMatricesBuffer;
 
@@ -335,6 +405,9 @@ namespace Kiki {
             glm::vec4 numLights;
             glm::vec4 cameraPos;
             glm::vec4 ssaoSamples[16];
+            glm::mat4 previousProjCam;
+            glm::mat4 inverseProjCam;
+            glm::vec4 taaData;
         };
 
         struct InterfaceUniform {
@@ -358,6 +431,7 @@ namespace Kiki {
         void updateShadowMatrices(rutils::Allocator const& allocator, rutils::Buffer const& shadowMatricesBuffer, std::vector<Light>& lights);
         void createSkybox(const rutils::CubemapPaths& paths);
 		void updateDebugLineBuffer();
+        void updateRenderExtents();
 
         World& world = World::Get();
         entt::registry& registry = world.Registry();

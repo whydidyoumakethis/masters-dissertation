@@ -27,6 +27,7 @@ namespace rutils {
     DescriptorSetLayout createCompositeDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createDebugDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createCustomPostprocessDescriptorLayout(VulkanWindow const& window);
+    DescriptorSetLayout createTAADescriptorLayout(VulkanWindow const& window);
     VkDescriptorSet allocDescSet(VulkanWindow const& window, VkDescriptorPool aPool, VkDescriptorSetLayout aSetLayout);
     void initialiseDeferredLightingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& deferredLightingDescriptors, Image& skyboxCubemap, Sampler& cubemapSampler, std::vector<Kiki::ShadowCubemap> const& shadowCubemaps);
     void initialisePostProcessingDescriptorSet(VulkanWindow const& window, GBuffers& gbuffers, Image& depthBuffer, Image& postProcessingImage, Sampler& sampler, VkDescriptorSet& postProcessingDescriptors);
@@ -40,6 +41,7 @@ namespace rutils {
     void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors);
     void initialiseDebugDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, GBuffers& gbuffers, Image& depthBuffer, Image& ssao, Image& bloom, Sampler& sampler, VkDescriptorSet& debugDescriptors);
     void initialiseCustomPostprocessDescriptorSet(VulkanWindow const& window, Image& inputImage, Sampler& sampler, VkDescriptorSet& customPostprocessDescriptors);
+    void initialiseTAADescriptorSet(VulkanWindow const& window, Image& currentImage, Image& historyImage, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& taaDescriptors);
 
     DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window);

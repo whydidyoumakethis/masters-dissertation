@@ -177,6 +177,10 @@ enum class MmiscTags {
 	SPAWN,
 	DOOR
 };
+enum class McamPath {
+	NONE,
+	camPath
+};
 
 enum class MtriggerKind {
 	NONE,
@@ -203,6 +207,8 @@ struct MmeshInstance {
 	MbodyType bodyType = MbodyType::STATIC;
 	McolliderType colliderType = McolliderType::NONE;
 	MmiscTags miscTag = MmiscTags::NONE;
+	McamPath camPath = McamPath::NONE;
+	int pathIndex = -1;
 	MsimpleAnimType simpleAnim = MsimpleAnimType::NONE;
 	float anim_distance = 5.f;
 	float anim_speed = 1.f;
@@ -222,6 +228,8 @@ struct MemtpyInstance {
 	MbodyType bodyType = MbodyType::STATIC;
 	McolliderType colliderType = McolliderType::NONE;
 	MmiscTags miscTag = MmiscTags::NONE;
+	McamPath camPath = McamPath::NONE;
+	int pathIndex = -1;
 
 	MtriggerKind triggerKind = MtriggerKind::NONE;
 	glm::vec3    triggerHalfExtents = { 1.f, 1.f, 0.1f };
@@ -482,6 +490,17 @@ namespace Kiki {
 			if (s == "rotate_counterclockwise") return MsimpleAnimType::ROTATE_COUNTERCLOCKWISE;
 			return MsimpleAnimType::NONE;
 		}
+		static McamPath parseCamPath(aiNode* node) {
+			if (!node || !node->mMetaData) return McamPath::NONE;
+
+			aiString s;
+			if (!node->mMetaData->Get("cam_path", s)) return McamPath::NONE;
+
+			std::string str = s.C_Str();
+			if (str == "path") return McamPath::camPath;
+
+			return McamPath::NONE;
+		}
 
 		static void collectNodeInstances(
 			aiNode* node,
@@ -537,6 +556,8 @@ namespace Kiki {
 					}
 
 					instance.miscTag = parseMiscTag(node);
+					instance.camPath = parseCamPath(node);
+					instance.pathIndex = parseIntExtra(node, "path_index", -1);
 
 					instance.triggerKind = parseTriggerKind(node);
 					instance.triggerHalfExtents = glm::vec3(
@@ -568,12 +589,15 @@ namespace Kiki {
 				out.instances.push_back(instance);
 			}
 			MmiscTags miscTag = parseMiscTag(node);
-			if (miscTag != MmiscTags::NONE && node->mNumMeshes == 0) {
+			McamPath camPath = parseCamPath(node);
+			if ((miscTag != MmiscTags::NONE || camPath != McamPath::NONE) && node->mNumMeshes == 0) {
 				MemtpyInstance emptyInstance;
 				emptyInstance.transform = worldTransform;
 				emptyInstance.bodyType = MbodyType::STATIC; // Default to static for empty instances
 				emptyInstance.colliderType = McolliderType::NONE; // Default to no collider for empty instances
 				emptyInstance.miscTag = miscTag;
+				emptyInstance.camPath = camPath;
+				emptyInstance.pathIndex = parseIntExtra(node, "path_index", -1);
 				emptyInstance.triggerKind = parseTriggerKind(node);
 				emptyInstance.triggerHalfExtents = glm::vec3(
 					parseFloatExtra(node, "trigger_half_x", emptyInstance.triggerHalfExtents.x),

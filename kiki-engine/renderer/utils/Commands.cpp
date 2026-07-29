@@ -25,6 +25,22 @@
 #include <tracy/TracyVulkan.hpp>
 
 namespace rutils {
+    namespace {
+        void setViewportAndScissor(VkCommandBuffer commandBuffer, VkExtent2D extent) {
+            VkViewport viewport{};
+            viewport.width = static_cast<float>(extent.width);
+            viewport.height = static_cast<float>(extent.height);
+            viewport.minDepth = 0.0f;
+            viewport.maxDepth = 1.0f;
+
+            VkRect2D scissor{};
+            scissor.extent = extent;
+
+            vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+            vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+        }
+    }
+
     CommandPool createCommandPool(VulkanWindow const& window, VkCommandPoolCreateFlags flags) {
         VkCommandPoolCreateInfo poolInfo{};
         poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
@@ -68,7 +84,7 @@ namespace rutils {
         ImageAndView const& swapchainImage,
         Image const& aDepthAttach,
         GBuffers& gbuffers,
-        VkExtent2D const& aImageExtent, 
+        Kiki::RenderExtents const& renderExtents,
         VkBuffer aSceneUBO,
         Kiki::RenderManager::SceneUniform const& aSceneUniform,
         VkDescriptorSet aSceneDescriptors,
@@ -78,9 +94,14 @@ namespace rutils {
         VkDescriptorSet deferredLightingDescriptors,
         VkDescriptorSet fxaaDescriptors,
         VkDescriptorSet ssrDescriptors,
+        VkDescriptorSet ssaaDescriptors,
+        VkDescriptorSet ssaaBloomImageDownsampleDescriptors,
+        std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> const& taaDescriptors,
         VkDescriptorSet tonemapDescriptors,
         VkDescriptorSet shadowMatrixDescriptors,
         VkDescriptorSet compositeDescriptors,
+        VkDescriptorSet ssaaCompositeDescriptors,
+        std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> const& taaCompositeDescriptors,
         VkDescriptorSet debugDescriptors,
         VkDescriptorSet customPostprocessDescriptors,
         VkDescriptorSet chromaticAberrationDescriptors,
@@ -88,6 +109,8 @@ namespace rutils {
         Kiki::Skybox const& skybox,
         Image const& doneLightingImage,
         Image const& doneSSRImage,
+        Image const& doneSsaaImage,
+        std::array<Image, N_TAA_HISTORY_IMAGES> const& taaHistoryImages,
         Image const& doneCompositeImage,
         Image const& doneChromaticAberrationImage,
         Image const& doneTonemapImage,
@@ -103,8 +126,11 @@ namespace rutils {
         std::vector<Kiki::Light> const& lights,
         std::array<Image, N_BLOOM_IMAGES> const& bloomImages,
         std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets,
+        std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> const& taaBloomImageDownsampleDescriptorSets,
         std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageUpsampleDescriptorSets,
         Kiki::RenderSettings& renderSettings,
+        int taaHistoryIndex,
+        bool taaHistoryValid,
 		VkBuffer debugLineVertexBuffer,
 		std::uint32_t debugLineVertexCount
     ) {
@@ -119,6 +145,8 @@ namespace rutils {
                 "vkBeginCommandBuffer() returned {}", toString(res)
             );
         }
+
+        setViewportAndScissor(aCmdBuff, renderExtents.scene);
 
         {
             ZoneScopedN("Uploading scene UBO");
@@ -299,7 +327,7 @@ namespace rutils {
         renderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         renderInfo.layerCount = 1;
         renderInfo.renderArea.offset = VkOffset2D{ 0, 0 };
-        renderInfo.renderArea.extent = aImageExtent;
+        renderInfo.renderArea.extent = renderExtents.scene;
 
         renderInfo.colorAttachmentCount = 4;
         renderInfo.pColorAttachments = gBufferAttachments;
@@ -547,6 +575,7 @@ namespace rutils {
             // Kiki::SceneManager& shadowSceneManager = Kiki::SceneManager::get();
 
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.shadowMap.handle);
+            setViewportAndScissor(aCmdBuff, VkExtent2D{1024, 1024});
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.shadowMapPipelineLayout.handle, 0, 1, &shadowMatrixDescriptors, 0, nullptr);
 
             for (int lightIndex = 0; lightIndex < lights.size(); lightIndex++) {
@@ -670,6 +699,8 @@ namespace rutils {
             }
         }
 
+        setViewportAndScissor(aCmdBuff, renderExtents.scene);
+
         {
             ZoneScopedN("G-buffer pass to lighting pass barriers");
 
@@ -764,7 +795,7 @@ namespace rutils {
             ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             ssaoRenderInfo.layerCount = 1;
             ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            ssaoRenderInfo.renderArea.extent = renderExtents.scene;
 
             ssaoRenderInfo.colorAttachmentCount = 1;
             ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
@@ -781,8 +812,8 @@ namespace rutils {
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.ssaoPipelineLayout.handle, 0, 2, ssaoSets, 0, nullptr);
 
             SSAOSettings ssaoSettings;
-            ssaoSettings.width = aImageExtent.width;
-            ssaoSettings.height = aImageExtent.height;
+            ssaoSettings.width = renderExtents.scene.width;
+            ssaoSettings.height = renderExtents.scene.height;
             ssaoSettings.samples = renderSettings.ssaoSamples;
             ssaoSettings.radius = renderSettings.ssaoRadius;
 
@@ -837,7 +868,7 @@ namespace rutils {
             ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             ssaoRenderInfo.layerCount = 1;
             ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            ssaoRenderInfo.renderArea.extent = renderExtents.scene;
 
             ssaoRenderInfo.colorAttachmentCount = 1;
             ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
@@ -904,7 +935,7 @@ namespace rutils {
             ssaoRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             ssaoRenderInfo.layerCount = 1;
             ssaoRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            ssaoRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            ssaoRenderInfo.renderArea.extent = renderExtents.scene;
 
             ssaoRenderInfo.colorAttachmentCount = 1;
             ssaoRenderInfo.pColorAttachments = &ssaoColourAttach;
@@ -995,7 +1026,7 @@ namespace rutils {
         lightingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
         lightingInfo.layerCount = 1;
         lightingInfo.renderArea.offset = VkOffset2D{0, 0};
-        lightingInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+        lightingInfo.renderArea.extent = renderExtents.scene;
 
         lightingInfo.colorAttachmentCount = 1;
         lightingInfo.pColorAttachments = &lightingAttach;
@@ -1072,7 +1103,7 @@ namespace rutils {
             ssrRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             ssrRenderInfo.layerCount = 1;
             ssrRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            ssrRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            ssrRenderInfo.renderArea.extent = renderExtents.scene;
 
             ssrRenderInfo.colorAttachmentCount = 1;
             ssrRenderInfo.pColorAttachments = &ssrColourAttach;
@@ -1119,6 +1150,159 @@ namespace rutils {
             VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
         );
 
+        int currentTaaIndex = taaHistoryIndex;
+        int previousTaaIndex = (currentTaaIndex + N_TAA_HISTORY_IMAGES - 1) % N_TAA_HISTORY_IMAGES;
+
+        if (renderSettings.ssaaEnabled) {
+            ZoneScopedN("Recording SSAA resolve pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "SSAA resolve pass");
+            #endif
+
+            setViewportAndScissor(aCmdBuff, renderExtents.output);
+
+            imageBarrier(aCmdBuff, doneSsaaImage.image,
+                VK_PIPELINE_STAGE_2_NONE,
+                VK_ACCESS_2_NONE,
+                VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo ssaaColourAttach{};
+            ssaaColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            ssaaColourAttach.imageView = doneSsaaImage.view;
+            ssaaColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            ssaaColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            ssaaColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo ssaaRenderInfo{};
+            ssaaRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            ssaaRenderInfo.layerCount = 1;
+            ssaaRenderInfo.renderArea.extent = renderExtents.output;
+            ssaaRenderInfo.colorAttachmentCount = 1;
+            ssaaRenderInfo.pColorAttachments = &ssaaColourAttach;
+
+            vkCmdBeginRendering(aCmdBuff, &ssaaRenderInfo);
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.ssaa.handle);
+            vkCmdBindDescriptorSets(
+                aCmdBuff,
+                VK_PIPELINE_BIND_POINT_GRAPHICS,
+                pipelineLayouts.ssaaPipelineLayout.handle,
+                0,
+                1,
+                &ssaaDescriptors,
+                0,
+                nullptr
+            );
+
+            SSAASettings settings{};
+            settings.scale = std::max(renderSettings.ssaa_scale, 1u);
+            vkCmdPushConstants(
+                aCmdBuff,
+                pipelineLayouts.ssaaPipelineLayout.handle,
+                VK_SHADER_STAGE_FRAGMENT_BIT,
+                0,
+                sizeof(SSAASettings),
+                &settings
+            );
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+            vkCmdEndRendering(aCmdBuff);
+
+            imageBarrier(aCmdBuff, doneSsaaImage.image,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
+
+        if (renderSettings.taaEnabled && !renderSettings.ssaaEnabled) {
+            ZoneScopedN("Recording TAA pass");
+
+            #ifdef TRACY_VK_ENABLE
+            TracyVkZone(tracyVkCtx, aCmdBuff, "TAA pass");
+            #endif
+
+            setViewportAndScissor(aCmdBuff, renderExtents.output);
+
+            if (!taaHistoryValid) {
+                imageBarrier(aCmdBuff, taaHistoryImages[previousTaaIndex].image,
+                    VK_PIPELINE_STAGE_2_NONE,
+                    VK_ACCESS_2_NONE,
+                    VK_IMAGE_LAYOUT_UNDEFINED,
+                    VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                    VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                    VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+                );
+            }
+
+            imageBarrier(aCmdBuff, taaHistoryImages[currentTaaIndex].image,
+                taaHistoryValid ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE,
+                taaHistoryValid ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE,
+                taaHistoryValid ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+            );
+
+            VkRenderingAttachmentInfo taaColourAttach{};
+            taaColourAttach.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+            taaColourAttach.imageView = taaHistoryImages[currentTaaIndex].view;
+            taaColourAttach.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+            taaColourAttach.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+            taaColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+            VkRenderingInfo taaRenderInfo{};
+            taaRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+            taaRenderInfo.layerCount = 1;
+            taaRenderInfo.renderArea.offset = VkOffset2D{0, 0};
+            taaRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
+            taaRenderInfo.colorAttachmentCount = 1;
+            taaRenderInfo.pColorAttachments = &taaColourAttach;
+
+            TAASettings settings{};
+			settings.taaOption = static_cast<std::int32_t>(renderSettings.taaOption);
+			settings.taaHistoryWeight = renderSettings.taaHistoryWeight;
+            settings.taaVarianceGamma = renderSettings.taaVarianceGamma;
+            vkCmdPushConstants(
+                aCmdBuff,
+                pipelineLayouts.taaPipelineLayout.handle,
+                VK_SHADER_STAGE_FRAGMENT_BIT,
+                0,
+                sizeof(TAASettings),
+                &settings
+            );
+
+            vkCmdBeginRendering(aCmdBuff, &taaRenderInfo);
+
+            VkDescriptorSet taaSets[] = {
+                aSceneDescriptors,
+                taaDescriptors[currentTaaIndex]
+            };
+
+
+
+            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.taa.handle);
+            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.taaPipelineLayout.handle, 0, 2, taaSets, 0, nullptr);
+            vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
+
+            vkCmdEndRendering(aCmdBuff);
+
+            imageBarrier(aCmdBuff, taaHistoryImages[currentTaaIndex].image,
+                VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+                VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+                VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+                VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+                VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+                VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+            );
+        }
+
         if (renderSettings.bloomEnabled) {
             ZoneScopedN("Recording bloom downsample pass");
 
@@ -1149,8 +1333,8 @@ namespace rutils {
                 bloomColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
                 VkExtent2D bloomExtent{
-                    std::max(1u, aImageExtent.width >> i),
-                    std::max(1u, aImageExtent.height >> i)
+                    std::max(1u, renderExtents.output.width >> i),
+                    std::max(1u, renderExtents.output.height >> i)
                 };
 
                 VkRenderingInfo bloomRenderInfo{};
@@ -1164,7 +1348,11 @@ namespace rutils {
                 vkCmdBeginRendering(aCmdBuff, &bloomRenderInfo);
 
                 VkDescriptorSet bloomSets[] = {
-                    bloomImageDownsampleDescriptorSets[i] // render from
+                    (renderSettings.ssaaEnabled && i == 0)
+                        ? ssaaBloomImageDownsampleDescriptors
+                        : ((renderSettings.taaEnabled && i == 0)
+                            ? taaBloomImageDownsampleDescriptorSets[currentTaaIndex]
+                            : bloomImageDownsampleDescriptorSets[i])
                 };
 
                 // we're using dynamic viewports and scissor
@@ -1243,8 +1431,8 @@ namespace rutils {
                 bloomColourAttach.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
                 VkExtent2D bloomExtent{
-                    std::max(1u, aImageExtent.width >> target),
-                    std::max(1u, aImageExtent.height >> target)
+                    std::max(1u, renderExtents.output.width >> target),
+                    std::max(1u, renderExtents.output.height >> target)
                 };
 
                 VkRenderingInfo bloomRenderInfo{};
@@ -1342,6 +1530,8 @@ namespace rutils {
             TracyVkZone(tracyVkCtx, aCmdBuff, "Composite pass");
             #endif
 
+            setViewportAndScissor(aCmdBuff, renderExtents.output);
+
             // begin composite pass
             imageBarrier(aCmdBuff, doneCompositeImage.image,
                 // before
@@ -1365,7 +1555,7 @@ namespace rutils {
             compositeRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             compositeRenderInfo.layerCount = 1;
             compositeRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            compositeRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            compositeRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
 
             compositeRenderInfo.colorAttachmentCount = 1;
             compositeRenderInfo.pColorAttachments = &compositeColourAttach;
@@ -1373,7 +1563,9 @@ namespace rutils {
             vkCmdBeginRendering(aCmdBuff, &compositeRenderInfo);
 
             VkDescriptorSet compositeSets[] = {
-                compositeDescriptors
+                renderSettings.ssaaEnabled
+                    ? ssaaCompositeDescriptors
+                    : (renderSettings.taaEnabled ? taaCompositeDescriptors[currentTaaIndex] : compositeDescriptors)
             };
 
             // draw fullscreen quad with post-processing shader
@@ -1433,7 +1625,7 @@ namespace rutils {
             chromaticAberrationRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             chromaticAberrationRenderInfo.layerCount = 1;
             chromaticAberrationRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            chromaticAberrationRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            chromaticAberrationRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
 
             chromaticAberrationRenderInfo.colorAttachmentCount = 1;
             chromaticAberrationRenderInfo.pColorAttachments = &chromaticAberrationColourAttach;
@@ -1507,7 +1699,7 @@ namespace rutils {
             tonemapRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             tonemapRenderInfo.layerCount = 1;
             tonemapRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            tonemapRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            tonemapRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
 
             tonemapRenderInfo.colorAttachmentCount = 1;
             tonemapRenderInfo.pColorAttachments = &tonemapColourAttach;
@@ -1574,7 +1766,7 @@ namespace rutils {
             customPostprocessRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             customPostprocessRenderInfo.layerCount = 1;
             customPostprocessRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            customPostprocessRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            customPostprocessRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
             customPostprocessRenderInfo.colorAttachmentCount = 1;
             customPostprocessRenderInfo.pColorAttachments = &customPostprocessColourAttach;
 
@@ -1642,7 +1834,7 @@ namespace rutils {
             debugRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             debugRenderInfo.layerCount = 1;
             debugRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            debugRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            debugRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
 
             debugRenderInfo.colorAttachmentCount = 1;
             debugRenderInfo.pColorAttachments = &debugColourAttach;
@@ -1710,7 +1902,7 @@ namespace rutils {
             fxaaRenderInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
             fxaaRenderInfo.layerCount = 1;
             fxaaRenderInfo.renderArea.offset = VkOffset2D{0, 0};
-            fxaaRenderInfo.renderArea.extent = VkExtent2D{aImageExtent.width, aImageExtent.height};
+            fxaaRenderInfo.renderArea.extent = VkExtent2D{renderExtents.output.width, renderExtents.output.height};
 
             fxaaRenderInfo.colorAttachmentCount = 1;
             fxaaRenderInfo.pColorAttachments = &fxaaColourAttach;
@@ -1727,7 +1919,7 @@ namespace rutils {
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.postprocessPipelineLayout.handle, 0, 2, fxaaSets, 0, nullptr);
 
             FXAASettings fxaaSettings;
-            fxaaSettings.strength = renderSettings.fxaaStrength;
+            fxaaSettings.strength = std::max(renderSettings.fxaaStrength, 1.0f);
             fxaaSettings.isEnabled = 1;
 
             if (!renderSettings.fxaaEnabled) {
@@ -1774,6 +1966,7 @@ namespace rutils {
             #ifdef TRACY_VK_ENABLE
             TracyVkZone(tracyVkCtx, aCmdBuff, "Interface pass");
             #endif
+            setViewportAndScissor(aCmdBuff, renderExtents.output);
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
 

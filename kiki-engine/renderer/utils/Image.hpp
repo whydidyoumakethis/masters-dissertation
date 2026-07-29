@@ -82,15 +82,15 @@ namespace rutils {
 
 	std::uint32_t computeMipLevelCount(std::uint32_t aWidth, std::uint32_t aHeight);
 
-	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator);
-	Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator);
-	Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator);
+	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten);
+	Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten);
+	Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten);
 	Image createBloomImage(VulkanWindow const& window, Allocator const& allocator, int const& width, int const& height);
 	Image createShadowCubemap(VulkanWindow const& window, Allocator const& allocator);
 	std::array<VkImageView, 6> createShadowCubemapFaceViews(VulkanWindow const& window, Image const& cubemap);
 	VkImageView createShadowCubemapArrayView(VulkanWindow const& window, Image const& cubemap);
-	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator);
-	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format);
+	GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten);
+	Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format, VkExtent2D const& exten);
 }
 
 #endif

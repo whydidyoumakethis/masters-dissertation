@@ -128,7 +128,7 @@ namespace Kiki {
 
                 ImGui::Text("Preset:");
                 ImGui::SameLine(110.f);
-                const char* presets[] = {"Fast", "Fancy", "Ultra"};
+                const char* presets[] = {"Fast", "Fancy", "Ultra", "Diss"};
                 int currentPreset = static_cast<int>(renderManager.renderSettings.renderPreset);
                 if (ImGui::Combo("##editrenderpreset", &currentPreset, presets, IM_ARRAYSIZE(presets))) {
                     renderManager.setRenderPreset(static_cast<Kiki::RenderPreset>(currentPreset));
@@ -293,6 +293,51 @@ namespace Kiki {
                 ImGui::SameLine(110.f);
                 ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
 
+                ImGui::SeparatorText("SSAA");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##ssaaenabled", &renderManager.renderSettings.ssaaEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Scale:");
+                ImGui::SameLine(110.f);
+                int ssaaScale = static_cast<int>(renderManager.renderSettings.ssaa_scale);
+                if (ImGui::SliderInt("##editssayscale", &ssaaScale, 1, 4)) {
+                    renderManager.renderSettings.ssaa_scale = static_cast<std::uint32_t>(ssaaScale);
+                }
+
+                ImGui::SeparatorText("TAA");
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Enabled:");
+                ImGui::SameLine(110.f);
+                ImGui::Checkbox("##taaenabled", &renderManager.renderSettings.taaEnabled);
+
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Strength:");
+                ImGui::SameLine(110.f);
+                ImGui::InputFloat("##edittaahistory", &renderManager.renderSettings.taaHistoryWeight, 0.5f, 1.f, "%.2f");
+
+                const char* historyMethods[] = {
+                    "None",
+                    "RGB min/max clamp",
+                    "Neighbourhood AABB clip",
+                    "Variance clip",
+                    "Simplified k-DOP"
+                };
+                ImGui::AlignTextToFramePadding();
+                ImGui::Text("Option:");
+                ImGui::SameLine(110.f);
+                int currentOption = static_cast<int>(renderManager.renderSettings.taaOption);
+                if (ImGui::Combo("##edittaamethod", &currentOption, historyMethods, IM_ARRAYSIZE(historyMethods))) {
+                    renderManager.renderSettings.taaOption = static_cast<Kiki::TAAOptions>(currentOption);
+                }
+
+                if (renderManager.renderSettings.taaOption == TAAOptions::VARIANCECLIP) {
+                    ImGui::InputFloat("##Variance Gamma", &renderManager.renderSettings.taaVarianceGamma, 0.5f, 3.0f, "%.2f");
+                }
 
                 ImGui::Indent();
                 if (ImGui::CollapsingHeader("Shaders")) {
