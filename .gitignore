@@ -58,3 +58,4 @@ CMakePresets.json
 out/*
 
 .DS_STORE
+/assets
