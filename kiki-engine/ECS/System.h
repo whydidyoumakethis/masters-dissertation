@@ -62,6 +62,27 @@ public:
         return nullptr;
     }
 
+    void UpdatePhase(System::Phase phase, float dt) {
+        for (auto& system : _systems) {
+            if (system->GetPhase() == phase) {
+                system->OnUpdate(dt);
+            }
+        }
+    }
+
+    void UpdateSimulation(float dt) {
+        for (auto& system : _systems) {
+            const auto phase = system->GetPhase();
+
+            if (phase == System::Phase::Render ||
+                phase == System::Phase::Input) {
+                continue;
+            }
+
+            system->OnUpdate(dt);
+        }
+    }
+
     void Update(float dt) {
         for (auto& sys : _systems)
             sys->OnUpdate(dt);

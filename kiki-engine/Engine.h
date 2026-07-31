@@ -21,6 +21,10 @@
 
 #include "Timer/Timer.h"
 
+
+#include <chrono>
+#include <thread>
+
 namespace Kiki {
 	class Engine {
 	public:
@@ -51,13 +55,56 @@ namespace Kiki {
 		void Run() {
 			_running = true;
 			_scheduler.printSystemOrder();
-			auto _timer = Timer::get();
+			auto& timer = Timer::get();
+			auto& input = Kiki::InputManager::get();
+			timer.UseFixedTime(1.f / 200.f);
+			bool paused = false;
+
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
-				float dt = _timer.Tick();
+
+				const bool stepRequested =
+					paused &&
+					input.isKeyJustDown(GLFW_KEY_F9);
+
+				const float dt = stepRequested
+					? timer.Step()
+					: timer.Tick();
+
+				_scheduler.UpdatePhase(System::Phase::Input, 0.0f);
+				if (input.isKeyJustDown(GLFW_KEY_F8)) {
+					paused = !paused;
+					if (paused) {
+						timer.Pause();
+						spdlog::info("Engine paused");
+					}
+					else {
+						timer.Resume();
+						spdlog::info("Engine resumed");
+					}
+
+
+				}
+				if (paused && !stepRequested) {
+					// Avoid consuming an entire CPU core while frozen.
+					std::this_thread::sleep_for(
+						std::chrono::milliseconds(8)
+					);
+
+					continue;
+				}
 				MessageCenter::Flush();
-				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
-				_scheduler.Update(dt);
+
+				_scheduler.UpdateSimulation(dt);
+
+				// Rendering occurs exactly once after simulation.
+				_scheduler.UpdatePhase(System::Phase::Render, dt);
+
 				World::Get().FlushDestroy();
+
+				//MessageCenter::Flush();
+				//glfwSetWindowShouldClose(RenderManager::get().getWindow(), InputManager::get().isKeyJustDown(GLFW_KEY_ESCAPE) && InputManager::get().isCursorDisabledFunc());
+				//_scheduler.Update(dt);
+				//World::Get().FlushDestroy();
 			}
 
 			BGMController::get().Shutdown();
