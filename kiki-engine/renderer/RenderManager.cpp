@@ -209,6 +209,9 @@ namespace Kiki {
             doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
 
             doneSsaaImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+            frozenTaaImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+            frozenTaaExtent = renderExtents.output;
+            frozenTaaValid = false;
 
             for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
                 taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
@@ -282,6 +285,9 @@ namespace Kiki {
             ssaaCompositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
             initialiseCompositeDescriptorSet(window, doneSsaaImage, bloomImages[0], sampler, ssaaCompositeDescriptors);
 
+            aaDifferenceDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
+            initialiseCompositeDescriptorSet(window, doneTonemapImage, frozenTaaImage, sampler, aaDifferenceDescriptors);
+
             chromaticAberrationDescriptors = rutils::allocDescSet(window, descriptorPool.handle, chromaticAberrationLayout.handle);
             initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
 
@@ -301,6 +307,9 @@ namespace Kiki {
 
             customPostprocessDescriptors = rutils::allocDescSet(window, descriptorPool.handle, customPostprocessLayout.handle);
             initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
+
+            frozenTaaSourceDescriptor = rutils::allocDescSet(window, descriptorPool.handle, customPostprocessLayout.handle);
+            initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, frozenTaaSourceDescriptor);
 
             debugDescriptors = rutils::allocDescSet(window, descriptorPool.handle, debugLayout.handle);
             initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
@@ -568,6 +577,191 @@ namespace Kiki {
         }
     }
 
+    bool RenderManager::captureCompletedTAAFrame() {
+        if (!renderSettings.taaEnabled || !taaHistoryValid) {
+            spdlog::warn("[AA Comparison] TAA must be enabled and have valid history before pausing");
+            return false;
+        }
+
+        if (vkDeviceWaitIdle(window.device) != VK_SUCCESS) {
+            throw Kiki::FatalError("Unable to wait for the GPU before capturing the TAA frame");
+        }
+
+        VkCommandBuffer commandBuffer = rutils::allocCommandBuffer(window, commandPool.handle);
+
+        VkCommandBufferBeginInfo beginInfo{};
+        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        if (auto const res = vkBeginCommandBuffer(commandBuffer, &beginInfo); res != VK_SUCCESS) {
+            throw Kiki::FatalError(
+                "Unable to begin the paused TAA capture command buffer\n"
+                "vkBeginCommandBuffer() returned {}",
+                rutils::toString(res)
+            );
+        }
+
+        rutils::imageBarrier(
+            commandBuffer,
+            frozenTaaImage.image,
+            frozenTaaValid ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE,
+            frozenTaaValid ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE,
+            frozenTaaValid ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+        );
+
+        VkViewport viewport{};
+        viewport.width = static_cast<float>(renderExtents.output.width);
+        viewport.height = static_cast<float>(renderExtents.output.height);
+        viewport.minDepth = 0.0f;
+        viewport.maxDepth = 1.0f;
+
+        VkRect2D scissor{};
+        scissor.extent = renderExtents.output;
+
+        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
+
+        VkRenderingAttachmentInfo colourAttachment{};
+        colourAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        colourAttachment.imageView = frozenTaaImage.view;
+        colourAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        colourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+        colourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+
+        VkRenderingInfo renderingInfo{};
+        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+        renderingInfo.renderArea.extent = renderExtents.output;
+        renderingInfo.layerCount = 1;
+        renderingInfo.colorAttachmentCount = 1;
+        renderingInfo.pColorAttachments = &colourAttachment;
+
+        vkCmdBeginRendering(commandBuffer, &renderingInfo);
+        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.customPostprocess.handle);
+        vkCmdBindDescriptorSets(
+            commandBuffer,
+            VK_PIPELINE_BIND_POINT_GRAPHICS,
+            pipelineLayouts.customPostprocessPipelineLayout.handle,
+            0,
+            1,
+            &frozenTaaSourceDescriptor,
+            0,
+            nullptr
+        );
+
+        rutils::CustomPostprocessSettings copySettings{};
+        copySettings.isEnabled = 0;
+        vkCmdPushConstants(
+            commandBuffer,
+            pipelineLayouts.customPostprocessPipelineLayout.handle,
+            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+            0,
+            sizeof(copySettings),
+            &copySettings
+        );
+        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
+        vkCmdEndRendering(commandBuffer);
+
+        rutils::imageBarrier(
+            commandBuffer,
+            frozenTaaImage.image,
+            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
+            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
+            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
+            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+        );
+
+        if (auto const res = vkEndCommandBuffer(commandBuffer); res != VK_SUCCESS) {
+            throw Kiki::FatalError(
+                "Unable to end the paused TAA capture command buffer\n"
+                "vkEndCommandBuffer() returned {}",
+                rutils::toString(res)
+            );
+        }
+
+        VkCommandBufferSubmitInfo commandInfo{};
+        commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+        commandInfo.commandBuffer = commandBuffer;
+
+        VkSubmitInfo2 submitInfo{};
+        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+        submitInfo.commandBufferInfoCount = 1;
+        submitInfo.pCommandBufferInfos = &commandInfo;
+
+        {
+            std::lock_guard<std::mutex> lock(queueMutex);
+            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE); res != VK_SUCCESS) {
+                throw Kiki::FatalError(
+                    "Unable to submit the paused TAA capture\n"
+                    "vkQueueSubmit2() returned {}",
+                    rutils::toString(res)
+                );
+            }
+            if (auto const res = vkQueueWaitIdle(window.graphicsQueue); res != VK_SUCCESS) {
+                throw Kiki::FatalError(
+                    "Unable to wait for the paused TAA capture\n"
+                    "vkQueueWaitIdle() returned {}",
+                    rutils::toString(res)
+                );
+            }
+        }
+
+        vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
+        frozenTaaValid = true;
+        return true;
+    }
+
+    bool RenderManager::beginPausedAAComparison() {
+        if (aaComparisonActive) return true;
+        if (!captureCompletedTAAFrame()) return false;
+
+        savedAAComparisonSettings.ssaaEnabled = renderSettings.ssaaEnabled;
+        savedAAComparisonSettings.ssaaScale = renderSettings.ssaa_scale;
+        savedAAComparisonSettings.taaEnabled = renderSettings.taaEnabled;
+        savedAAComparisonSettings.fxaaEnabled = renderSettings.fxaaEnabled;
+        savedAAComparisonSettings.bloomEnabled = renderSettings.bloomEnabled;
+        savedAAComparisonSettings.chromaticAberrationEnabled = renderSettings.chromaticAberrationEnabled;
+        savedAAComparisonSettings.customPostprocessEnabled = renderSettings.customPostprocessEnabled;
+        savedAAComparisonSettings.renderMode = renderSettings.renderMode;
+
+        aaComparisonActive = true;
+        renderSettings.ssaaEnabled = true;
+        renderSettings.taaEnabled = false;
+        renderSettings.fxaaEnabled = false;
+        renderSettings.renderMode = STANDARD;
+        renderSettings.aaDifferenceEnabled = true;
+
+        spdlog::info(
+            "[AA Comparison] Captured TAA and rendering {}x SSAA difference (gain {:.1f})",
+            std::max(renderSettings.ssaa_scale, 1u),
+            renderSettings.aaDifferenceAmplification
+        );
+
+        nextFrame();
+        return true;
+    }
+
+    void RenderManager::endPausedAAComparison() {
+        if (!aaComparisonActive) return;
+
+        renderSettings.ssaaEnabled = savedAAComparisonSettings.ssaaEnabled;
+        renderSettings.ssaa_scale = savedAAComparisonSettings.ssaaScale;
+        renderSettings.taaEnabled = savedAAComparisonSettings.taaEnabled;
+        renderSettings.fxaaEnabled = savedAAComparisonSettings.fxaaEnabled;
+        renderSettings.bloomEnabled = savedAAComparisonSettings.bloomEnabled;
+        renderSettings.chromaticAberrationEnabled = savedAAComparisonSettings.chromaticAberrationEnabled;
+        renderSettings.customPostprocessEnabled = savedAAComparisonSettings.customPostprocessEnabled;
+        renderSettings.renderMode = savedAAComparisonSettings.renderMode;
+        renderSettings.aaDifferenceEnabled = false;
+        aaComparisonActive = false;
+
+        spdlog::info("[AA Comparison] Restored normal rendering; TAA history will restart");
+    }
+
     void RenderManager::nextFrame() {
         ZoneScoped;
         // glfwPollEvents(); called in input manager
@@ -614,6 +808,13 @@ namespace Kiki {
                 rutils::recreateSwapchain(window);
 
                 updateRenderExtents();
+
+                if (frozenTaaExtent.width != renderExtents.output.width ||
+                    frozenTaaExtent.height != renderExtents.output.height) {
+                    frozenTaaImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
+                    frozenTaaExtent = renderExtents.output;
+                    frozenTaaValid = false;
+                }
 
                 pipelines = rutils::createAllPipelines(window, pipelineLayouts);
                 depthBuffer = rutils::createDepthBuffer(window, allocator, renderExtents.scene);
@@ -673,6 +874,8 @@ namespace Kiki {
                 initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, ssaaDescriptors);
                 initialiseBloomImageDescriptorSet(window, doneSsaaImage, skybox.sampler, ssaaBloomImageDownsampleDescriptors);
                 initialiseCompositeDescriptorSet(window, doneSsaaImage, bloomImages[0], sampler, ssaaCompositeDescriptors);
+                initialiseCompositeDescriptorSet(window, doneTonemapImage, frozenTaaImage, sampler, aaDifferenceDescriptors);
+
                 initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
                 for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
                     initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, sampler, taaDescriptors[i]);
@@ -681,6 +884,7 @@ namespace Kiki {
                 }
                 initialiseTonemapDescriptorSet(window, doneChromaticAberrationImage, sampler, tonemapDescriptors);
                 initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
+                initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, frozenTaaSourceDescriptor);
                 initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
             }
@@ -847,6 +1051,7 @@ namespace Kiki {
                     shadowMatrixDescriptors,
                     compositeDescriptors,
                     ssaaCompositeDescriptors,
+                    aaDifferenceDescriptors,
                     taaCompositeDescriptors,
                     debugDescriptors,
                     customPostprocessDescriptors,
@@ -1747,10 +1952,12 @@ namespace Kiki {
             glm::vec2 jitterOffset = offsets[taaFrameIndex % 8];
             float jitterscale = 1.f;
 
-            currentJitter = glm::vec2(
-                (((jitterOffset.x) * 2.0f) / static_cast<float>(aFramebufferWidth)) * jitterscale,
-                (((jitterOffset.y) * 2.0f) / static_cast<float>(aFramebufferHeight)) * jitterscale
-            );
+            //currentJitter = glm::vec2(
+            //    (((jitterOffset.x) * 2.0f) / static_cast<float>(aFramebufferWidth)) * jitterscale,
+            //    (((jitterOffset.y) * 2.0f) / static_cast<float>(aFramebufferHeight)) * jitterscale
+            //);
+
+			currentJitter = glm::vec2(0.f, 0.f);
 
             aSceneUniforms.projection[2][0] += currentJitter.x;
             aSceneUniforms.projection[2][1] += currentJitter.y;
@@ -2142,7 +2349,7 @@ namespace Kiki {
         pipelines.chromaticAberration = {};
         pipelines.taa = {};
         pipelines.ssaa = {};
-
+        pipelines.aaDifference = {};
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
@@ -2179,6 +2386,7 @@ namespace Kiki {
         doneCustomPostprocessImage = {};
         doneChromaticAberrationImage = {};
         doneSsaaImage = {};
+        frozenTaaImage = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaHistoryImages[i] = {};
         
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImages[i] = {};
@@ -2224,6 +2432,8 @@ namespace Kiki {
         ssaaDescriptors = {};
         ssaaBloomImageDownsampleDescriptors = {};
         ssaaCompositeDescriptors = {};
+        aaDifferenceDescriptors = {};
+        frozenTaaSourceDescriptor = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaDescriptors[i] = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaBloomImageDownsampleDescriptorSets[i] = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaCompositeDescriptors[i] = {};

@@ -40,6 +40,7 @@ class Timer {
 		_mode = Mode::Fixed;
 		_fixedDelta = fixedDelta;
 		_fixedElapsed = 0.0f;
+		_paused = false;
 	}
 
 	float Step() {
@@ -57,6 +58,7 @@ class Timer {
 		const auto now = std::chrono::steady_clock::now();
 		_startTime = now;
 		_lastTickTime = now;
+		_paused = false;
 	}
 
 	// Resets the timer to zero
@@ -100,7 +102,7 @@ class Timer {
 		Mode _mode = Mode::RealTime;
 		float _fixedDelta = 1.f / 60.f;
 		float _fixedElapsed = 0.f;
-		bool _paused;
+		bool _paused = false;
 		std::chrono::steady_clock::time_point _pauseTime;
 		std::chrono::steady_clock::time_point _startTime;
 		std::chrono::steady_clock::time_point _lastTickTime;

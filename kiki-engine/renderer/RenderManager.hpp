@@ -128,6 +128,9 @@ namespace Kiki {
         float taaHistoryWeight = 0.9f;
         float taaVarianceGamma = 1.25f;
 
+        bool aaDifferenceEnabled = false;
+        float aaDifferenceAmplification = 1.0f;
+
 		TAAOptions taaOption = NONE;
 
         RenderMode renderMode = STANDARD;
@@ -212,6 +215,8 @@ namespace Kiki {
         std::filesystem::path chromatic_aberration_f = "chromatic_aberration.frag.spv";
         std::filesystem::path taa_f = "taa.frag.spv";
         std::filesystem::path ssaa_f = "ssaa_resolve.frag.spv";
+        std::filesystem::path aa_difference_f = "aa_difference.frag.spv";
+
     };
 
     struct RenderExtents {
@@ -290,6 +295,8 @@ namespace Kiki {
         VkDescriptorSet ssaaDescriptors;
         VkDescriptorSet ssaaBloomImageDownsampleDescriptors;
         VkDescriptorSet ssaaCompositeDescriptors;
+        VkDescriptorSet aaDifferenceDescriptors;
+        VkDescriptorSet frozenTaaSourceDescriptor;
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaDescriptors;
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaBloomImageDownsampleDescriptorSets;
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaCompositeDescriptors;
@@ -304,6 +311,22 @@ namespace Kiki {
         rutils::Image depthBuffer;
 
         rutils::Image doneSsaaImage;
+
+        rutils::Image frozenTaaImage;
+        VkExtent2D frozenTaaExtent{};
+        bool frozenTaaValid = false;
+
+        struct AAComparisonSettings {
+            bool ssaaEnabled = false;
+            std::uint32_t ssaaScale = 1;
+            bool taaEnabled = false;
+            bool fxaaEnabled = false;
+            bool bloomEnabled = false;
+            bool chromaticAberrationEnabled = false;
+            bool customPostprocessEnabled = false;
+            RenderMode renderMode = STANDARD;
+        } savedAAComparisonSettings;
+        bool aaComparisonActive = false;
 
         std::array<rutils::Image, N_BLOOM_IMAGES> bloomImages;
         std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets;
@@ -383,6 +406,8 @@ namespace Kiki {
 
         void nextFrame();
         void shutdown();
+        bool beginPausedAAComparison();
+        void endPausedAAComparison();
 
         VkDevice& getDevice() { return window.device; };
         GLFWwindow* getWindow() { return window.window; };
@@ -432,6 +457,7 @@ namespace Kiki {
         void createSkybox(const rutils::CubemapPaths& paths);
 		void updateDebugLineBuffer();
         void updateRenderExtents();
+        bool captureCompletedTAAFrame();
 
         World& world = World::Get();
         entt::registry& registry = world.Registry();

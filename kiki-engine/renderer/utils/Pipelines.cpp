@@ -53,6 +53,7 @@ namespace rutils {
         pipelines.chromaticAberration = createChromaticAberrationPipeline(window, pipelineLayouts.chromaticAberrationPipelineLayout.handle);
         pipelines.taa = createTAAPipeline(window, pipelineLayouts.taaPipelineLayout.handle);
         pipelines.ssaa = createSSAAPipeline(window, pipelineLayouts.ssaaPipelineLayout.handle);
+        pipelines.aaDifference = createAADifferencePipeline(window, pipelineLayouts.compositePipelineLayout.handle);
 
         pipelines.interfaceShape = createInterfacePipeline(window, pipelineLayouts.interfaceShapeLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_shape_f);
         pipelines.interfaceText = createInterfacePipeline(window, pipelineLayouts.interfaceTextLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_text_f);
@@ -1635,11 +1636,16 @@ namespace rutils {
         return Pipeline(aWindow.device, pipe);
     }
 
-    Pipeline createCompositePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+    static Pipeline createFullscreenPipeline(
+        VulkanWindow const& aWindow,
+        VkPipelineLayout aPipelineLayout,
+        std::filesystem::path const& fragmentShader,
+        VkFormat colourFormat
+    ) {
         // load shader code
         // we only use the vertex and fragment shaders here
         auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
-        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.composite_f.string().c_str());
+        auto const fShader = rutils::loadShader(fragmentShader.string().c_str());
 
         VkShaderModuleCreateInfo code[2]{};
         code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
@@ -1724,7 +1730,7 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
 
-        VkFormat const colorFormats[] = {aWindow.hdrFormat};
+        VkFormat const colorFormats[] = {colourFormat};
         renderingInfo.colorAttachmentCount = 1;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
@@ -1760,6 +1766,25 @@ namespace rutils {
 
         return Pipeline(aWindow.device, pipe);
     }
+
+    Pipeline createCompositePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        return createFullscreenPipeline(
+            aWindow,
+            aPipelineLayout,
+            Kiki::RenderManager::get().shaderPaths.composite_f,
+            aWindow.hdrFormat
+        );
+    }
+
+    Pipeline createAADifferencePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
+        return createFullscreenPipeline(
+            aWindow,
+            aPipelineLayout,
+            Kiki::RenderManager::get().shaderPaths.aa_difference_f,
+            aWindow.swapchainFormat
+        );
+    }
+
 
     Pipeline createChromaticAberrationPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code

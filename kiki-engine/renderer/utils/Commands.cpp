@@ -101,6 +101,7 @@ namespace rutils {
         VkDescriptorSet shadowMatrixDescriptors,
         VkDescriptorSet compositeDescriptors,
         VkDescriptorSet ssaaCompositeDescriptors,
+        VkDescriptorSet aaDifferenceDescriptors,
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> const& taaCompositeDescriptors,
         VkDescriptorSet debugDescriptors,
         VkDescriptorSet customPostprocessDescriptors,
@@ -1568,14 +1569,13 @@ namespace rutils {
                     : (renderSettings.taaEnabled ? taaCompositeDescriptors[currentTaaIndex] : compositeDescriptors)
             };
 
-            // draw fullscreen quad with post-processing shader
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.composite.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.compositePipelineLayout.handle, 0, 1, compositeSets, 0, nullptr);
 
-            CompositeSettings compositeSettings;
-            compositeSettings.bloomStrength = renderSettings.bloomStrength;
-
-            if (!renderSettings.bloomEnabled) compositeSettings.bloomStrength = 0; // essentially disables bloom
+            CompositeSettings compositeSettings{};
+            compositeSettings.bloomStrength = renderSettings.bloomEnabled
+                ? renderSettings.bloomStrength
+                : 0.0f;
 
             vkCmdPushConstants(aCmdBuff, pipelineLayouts.compositePipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CompositeSettings), &compositeSettings);
 
@@ -1772,20 +1772,51 @@ namespace rutils {
 
             vkCmdBeginRendering(aCmdBuff, &customPostprocessRenderInfo);
 
-            VkDescriptorSet customPostprocessSets[] = {
-                customPostprocessDescriptors
-            };
+            if (renderSettings.aaDifferenceEnabled) {
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.aaDifference.handle);
+                vkCmdBindDescriptorSets(
+                    aCmdBuff,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    pipelineLayouts.compositePipelineLayout.handle,
+                    0,
+                    1,
+                    &aaDifferenceDescriptors,
+                    0,
+                    nullptr
+                );
 
-            vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.customPostprocess.handle);
-            vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.customPostprocessPipelineLayout.handle, 0, 1, customPostprocessSets, 0, nullptr);
+                DifferenceSettings differenceSettings{};
+                differenceSettings.amplification = renderSettings.aaDifferenceAmplification;
+                vkCmdPushConstants(
+                    aCmdBuff,
+                    pipelineLayouts.compositePipelineLayout.handle,
+                    VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
+                    0,
+                    sizeof(DifferenceSettings),
+                    &differenceSettings
+                );
+            }
+            else {
+                vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.customPostprocess.handle);
+                vkCmdBindDescriptorSets(
+                    aCmdBuff,
+                    VK_PIPELINE_BIND_POINT_GRAPHICS,
+                    pipelineLayouts.customPostprocessPipelineLayout.handle,
+                    0,
+                    1,
+                    &customPostprocessDescriptors,
+                    0,
+                    nullptr
+                );
 
-            CustomPostprocessSettings customPostprocessSettings;
-            customPostprocessSettings.isEnabled = renderSettings.customPostprocessEnabled ? 1 : 0;
-            customPostprocessSettings.params.x = static_cast<float>(renderSettings.bayerMatrixMode);
-            customPostprocessSettings.params.y = renderSettings.bayerExposure;
-            customPostprocessSettings.params.z = static_cast<float>(renderSettings.bayerLevels);
+                CustomPostprocessSettings customPostprocessSettings{};
+                customPostprocessSettings.isEnabled = renderSettings.customPostprocessEnabled ? 1 : 0;
+                customPostprocessSettings.params.x = static_cast<float>(renderSettings.bayerMatrixMode);
+                customPostprocessSettings.params.y = renderSettings.bayerExposure;
+                customPostprocessSettings.params.z = static_cast<float>(renderSettings.bayerLevels);
 
-            vkCmdPushConstants(aCmdBuff, pipelineLayouts.customPostprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CustomPostprocessSettings), &customPostprocessSettings);
+                vkCmdPushConstants(aCmdBuff, pipelineLayouts.customPostprocessPipelineLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(CustomPostprocessSettings), &customPostprocessSettings);
+            }
 
             vkCmdDraw(aCmdBuff, 3, 1, 0, 0);
 
@@ -1942,7 +1973,7 @@ namespace rutils {
 
             // begin imgui pass
     #       ifndef NDEBUG
-            {
+            if (!renderSettings.aaDifferenceEnabled) {
                 ZoneScopedN("Recording ImGui pass");
 
                 #ifdef TRACY_VK_ENABLE
@@ -1950,7 +1981,6 @@ namespace rutils {
                 #endif
                 ImGui::Render();
                 ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), aCmdBuff);
-
             }
     #       endif
             // end imgui pass
@@ -1970,61 +2000,63 @@ namespace rutils {
             vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
             vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceShapeLayout.handle, 0, 1, &interfaceDescriptors, 0, nullptr);
 
-            auto uiComponents = world.Query<InterfaceComponent>();
+            if (!renderSettings.aaDifferenceEnabled) {
+                auto uiComponents = world.Query<InterfaceComponent>();
 
-            for (auto [e, interfaceComponent] : uiComponents.each()) {
-                if (registry.all_of<BackgroundComponent>(e)) {
-                    auto& backgroundComponent = registry.get<BackgroundComponent>(e);
+                for (auto [e, interfaceComponent] : uiComponents.each()) {
+                    if (registry.all_of<BackgroundComponent>(e)) {
+                        auto& backgroundComponent = registry.get<BackgroundComponent>(e);
 
-                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
-
-                    VkDeviceSize offsets[1]{};
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &shapeVertexBuffer, offsets);
-                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                    ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)), interfaceComponent.model, glm::vec2(interfaceComponent.size.absoluteX, interfaceComponent.size.absoluteY), backgroundComponent.cornerRadius);
-                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
-
-                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
-                    
-                }
-
-                if (registry.all_of<InterfaceTextureComponent>(e)) {
-                    auto& textureComponent = registry.get<InterfaceTextureComponent>(e);
-                    auto& texture = Kiki::TextureManager::get().getTexture(textureComponent.texture);
-
-                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceTexture.handle);
-
-                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextureLayout.handle, 1, 1, &texture.descriptorSet, 0, nullptr);
-
-                    VkDeviceSize offsets[1]{};
-                    vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &shapeVertexBuffer, offsets);
-                    vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-
-                    ShapeData shapeData = ShapeData(textureComponent.colour, interfaceComponent.model);
-                    vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
-
-                    vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
-                }
-
-                if (registry.all_of<TextComponent>(e)) {
-                    auto& textComponent = registry.get<TextComponent>(e);
-                    auto& font = Kiki::FontManager::get().getFont(textComponent.font);
-
-                    vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceText.handle);
-
-                    vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
-
-                    for (auto characterTransform : textComponent.characters) {
-                        ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)), characterTransform.transform);
-                        vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+                        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceShape.handle);
 
                         VkDeviceSize offsets[1]{};
+                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &shapeVertexBuffer, offsets);
+                        vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
-                        if (characterTransform.buffer->buffer != VK_NULL_HANDLE) {
-                            vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &characterTransform.buffer->buffer, offsets);
-                            vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-                            vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                        ShapeData shapeData = ShapeData(glm::vec4(backgroundComponent.colour, (1.0f - backgroundComponent.transparency)), interfaceComponent.model, glm::vec2(interfaceComponent.size.absoluteX, interfaceComponent.size.absoluteY), backgroundComponent.cornerRadius);
+                        vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                        vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+
+                    }
+
+                    if (registry.all_of<InterfaceTextureComponent>(e)) {
+                        auto& textureComponent = registry.get<InterfaceTextureComponent>(e);
+                        auto& texture = Kiki::TextureManager::get().getTexture(textureComponent.texture);
+
+                        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceTexture.handle);
+
+                        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextureLayout.handle, 1, 1, &texture.descriptorSet, 0, nullptr);
+
+                        VkDeviceSize offsets[1]{};
+                        vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &shapeVertexBuffer, offsets);
+                        vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+
+                        ShapeData shapeData = ShapeData(textureComponent.colour, interfaceComponent.model);
+                        vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                        vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                    }
+
+                    if (registry.all_of<TextComponent>(e)) {
+                        auto& textComponent = registry.get<TextComponent>(e);
+                        auto& font = Kiki::FontManager::get().getFont(textComponent.font);
+
+                        vkCmdBindPipeline(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.interfaceText.handle);
+
+                        vkCmdBindDescriptorSets(aCmdBuff, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayouts.interfaceTextLayout.handle, 1, 1, &font.descriptorSet, 0, nullptr);
+
+                        for (auto characterTransform : textComponent.characters) {
+                            ShapeData shapeData = ShapeData(glm::vec4(textComponent.colour, (1.0f - textComponent.transparency)), characterTransform.transform);
+                            vkCmdPushConstants(aCmdBuff, pipelineLayouts.interfaceShapeLayout.handle, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(shapeData), &shapeData);
+
+                            VkDeviceSize offsets[1]{};
+
+                            if (characterTransform.buffer->buffer != VK_NULL_HANDLE) {
+                                vkCmdBindVertexBuffers(aCmdBuff, 0, 1, &characterTransform.buffer->buffer, offsets);
+                                vkCmdBindIndexBuffer(aCmdBuff, interfaceIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+                                vkCmdDrawIndexed(aCmdBuff, 6, 1, 0, 0, 0);
+                            }
                         }
                     }
                 }

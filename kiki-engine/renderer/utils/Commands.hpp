@@ -41,6 +41,7 @@ namespace rutils {
         VkDescriptorSet shadowMatrixDescriptors,
         VkDescriptorSet compositeDescriptors,
         VkDescriptorSet ssaaCompositeDescriptors,
+        VkDescriptorSet aaDifferenceDescriptors,
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> const& taaCompositeDescriptors,
         VkDescriptorSet debugDescriptors,
         VkDescriptorSet customPostprocessDescriptors,

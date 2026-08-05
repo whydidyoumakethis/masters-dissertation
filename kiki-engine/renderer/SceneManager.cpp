@@ -390,7 +390,7 @@ namespace Kiki {
                 }
 
                 // set default state
-                animComp.ChangeState(CharacterState::Idle);
+                animComp.ChangeState(CharacterState::Running);
 
                 animComp.boneMatrixBuffer = RenderManager::get().allocateAnimationBuffer();
                 animComp.descriptorSet = RenderManager::get().allocateAnimationDescriptorSet(animComp.boneMatrixBuffer);

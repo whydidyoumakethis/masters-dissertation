@@ -6,7 +6,7 @@ int main(int argc, char** argv) {
     Kiki::Engine engine;
     engine.Init();
 
-    Kiki::SceneManager::get().loadScene(Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "moving_tri.glb"));
+    Kiki::SceneManager::get().loadScene(Kiki::GltfLoaderAssimp::loadScene(std::filesystem::path(PROJECT_ASSETS_PATH) / "sponza_diss_2.glb"));
 
     engine.RegisterSystem<DemoCameraPathSystem>();
     engine.Run();

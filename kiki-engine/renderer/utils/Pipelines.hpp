@@ -67,6 +67,10 @@ namespace rutils {
         float bloomStrength;
     };
 
+    struct DifferenceSettings {
+        float amplification;
+    };
+
     struct ChromaticAberrationSettings {
         int isEnabled;
         alignas(8) glm::vec2 redShift;
@@ -116,6 +120,7 @@ namespace rutils {
         rutils::Pipeline chromaticAberration;
         rutils::Pipeline taa;
         rutils::Pipeline ssaa;
+        rutils::Pipeline aaDifference;
     };
 
     struct PipelineLayouts {
@@ -180,7 +185,7 @@ namespace rutils {
     Pipeline createChromaticAberrationPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createTAAPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createSSAAPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
-
+    Pipeline createAADifferencePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
 

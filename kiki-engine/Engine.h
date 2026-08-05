@@ -57,33 +57,35 @@ namespace Kiki {
 			_scheduler.printSystemOrder();
 			auto& timer = Timer::get();
 			auto& input = Kiki::InputManager::get();
-			timer.UseFixedTime(1.f / 200.f);
+			//timer.UseFixedTime(1.f / 200.f);
 			bool paused = false;
+			bool showingAAComparison = false;
 
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
-
-				const bool stepRequested =
-					paused &&
-					input.isKeyJustDown(GLFW_KEY_F9);
-
-				const float dt = stepRequested
-					? timer.Step()
-					: timer.Tick();
-
 				_scheduler.UpdatePhase(System::Phase::Input, 0.0f);
 				if (input.isKeyJustDown(GLFW_KEY_F8)) {
-					paused = !paused;
-					if (paused) {
+					if (!paused) {
+						paused = true;
 						timer.Pause();
+						showingAAComparison = RenderManager::get().beginPausedAAComparison();
 						spdlog::info("Engine paused");
 					}
 					else {
+						if (showingAAComparison) {
+							RenderManager::get().endPausedAAComparison();
+							showingAAComparison = false;
+						}
+						paused = false;
 						timer.Resume();
 						spdlog::info("Engine resumed");
 					}
-
-
 				}
+
+				const bool stepRequested =
+					paused &&
+					!showingAAComparison &&
+					input.isKeyJustDown(GLFW_KEY_F9);
+
 				if (paused && !stepRequested) {
 					// Avoid consuming an entire CPU core while frozen.
 					std::this_thread::sleep_for(
@@ -92,6 +94,11 @@ namespace Kiki {
 
 					continue;
 				}
+
+				const float dt = stepRequested
+					? timer.Step()
+					: timer.Tick();
+
 				MessageCenter::Flush();
 
 				_scheduler.UpdateSimulation(dt);
