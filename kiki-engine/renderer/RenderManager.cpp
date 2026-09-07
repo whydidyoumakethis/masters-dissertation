@@ -18,7 +18,10 @@
 #include "interface/TextureManager.hpp"
 
 #include <algorithm>
+#include <chrono>
+#include <format>
 #include <iostream>
+#include <stb_image_write.h>
 #include <spdlog/spdlog.h>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -43,19 +46,6 @@ namespace Kiki {
             glm::vec2(0.4375f, -0.4375f)
         };
 
-        float halton(std::uint32_t index, std::uint32_t base) {
-            float result = 0.0f;
-            float fraction = 1.0f / static_cast<float>(base);
-
-            while (index > 0) {
-                result += static_cast<float>(index % base) * fraction;
-                index /= base;
-                fraction /= static_cast<float>(base);
-            }
-
-            return result;
-        }
-
         int previousTaaHistoryIndex(int currentIndex) {
             return (currentIndex + N_TAA_HISTORY_IMAGES - 1) % N_TAA_HISTORY_IMAGES;
         }
@@ -65,33 +55,6 @@ namespace Kiki {
         }
     }
 
-    void RenderManager::updateRenderExtents() {
-        renderExtents.output = window.swapchainExtent;
-
-        std::uint32_t const scale = renderSettings.ssaaEnabled
-            ? std::max(renderSettings.ssaa_scale, 1u)
-            : 1u;
-
-        VkPhysicalDeviceProperties properties{};
-        vkGetPhysicalDeviceProperties(window.physicalDevice, &properties);
-        auto const maxDimension = properties.limits.maxImageDimension2D;
-
-        if (renderExtents.output.width > maxDimension / scale ||
-            renderExtents.output.height > maxDimension / scale) {
-            throw Kiki::FatalError(
-                "Requested SSAA extent {}x{} at scale {} exceeds maxImageDimension2D ({})",
-                renderExtents.output.width,
-                renderExtents.output.height,
-                scale,
-                maxDimension
-            );
-        }
-
-        renderExtents.scene = {
-            renderExtents.output.width * scale,
-            renderExtents.output.height * scale
-        };
-    }
 
     RenderManager& RenderManager::get() {
         static RenderManager instance;
@@ -104,8 +67,6 @@ namespace Kiki {
 
             // Create window
             window = rutils::makeVulkanWindow(info);
-
-            updateRenderExtents();
 
             // Initialise resources
             sceneLayout = rutils::createSceneDescriptorLayout(window);
@@ -141,8 +102,8 @@ namespace Kiki {
             );
 
             
-            constexpr uint32_t MAX_BONES = 100;
-            VkDeviceSize dummyBufferSize = sizeof(glm::mat4) * MAX_BONES;
+			constexpr uint32_t GPU_BONE_MATRICES = AnimationComponent::MAX_BONES * AnimationComponent::GPU_BONE_PALETTES;
+			VkDeviceSize dummyBufferSize = sizeof(glm::mat4) * GPU_BONE_MATRICES;
 
             dummyAnimationBuffer = rutils::createBuffer(
                 allocator,
@@ -159,7 +120,7 @@ namespace Kiki {
                 VMA_MEMORY_USAGE_AUTO_PREFER_HOST
             );
 
-            std::vector<glm::mat4> identityBones(MAX_BONES, glm::mat4(1.0f));
+			std::vector<glm::mat4> identityBones(GPU_BONE_MATRICES, glm::mat4(1.0f));
             void* mappedData = nullptr;
             vmaMapMemory(allocator.allocator, dummyAnimationBuffer.allocation, &mappedData);
             std::memcpy(mappedData, identityBones.data(), dummyBufferSize);
@@ -190,7 +151,6 @@ namespace Kiki {
             pipelineLayouts.customPostprocessPipelineLayout = rutils::createCustomPostprocessPipelineLayout(window, customPostprocessLayout.handle);
             pipelineLayouts.chromaticAberrationPipelineLayout = rutils::createChromaticAberrationPipelineLayout(window, chromaticAberrationLayout.handle);
             pipelineLayouts.taaPipelineLayout = rutils::createTAAPipelineLayout(window, sceneLayout.handle, taaLayout.handle);
-            pipelineLayouts.ssaaPipelineLayout = rutils::createSSAAPipelineLayout(window, bloomLayout.handle);
             rutils::createInterfacePipelineLayout(window, interfaceLayout.handle, textLayout.handle, textureLayout.handle, &pipelineLayouts);
 
             pipelines = rutils::createAllPipelines(window, pipelineLayouts);
@@ -199,30 +159,25 @@ namespace Kiki {
 
             descriptorPool = rutils::createDescriptorPool(window);
 
-            depthBuffer = rutils::createDepthBuffer(window, allocator, renderExtents.scene);
-            doneLightingImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
-            doneSSRImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
-            doneCompositeImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
-            doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
-            doneTonemapImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-            doneDebugImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-            doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-
-            doneSsaaImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
-            frozenTaaImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-            frozenTaaExtent = renderExtents.output;
-            frozenTaaValid = false;
+            depthBuffer = rutils::createDepthBuffer(window, allocator);
+            doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+            doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+            doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
+            doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator);
+            doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
+            doneDebugImage = rutils::createPostTonemapImage(window, allocator);
+            doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator);
 
             for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
-                taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+                taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator);
             }
 
             for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                 bloomImages[i] = rutils::createBloomImage(
                     window,
                     allocator,
-                    renderExtents.output.width >> i,
-                    renderExtents.output.height >> i
+                    window.swapchainExtent.width >> i,
+                    window.swapchainExtent.height >> i
                 );
             }
 
@@ -234,7 +189,7 @@ namespace Kiki {
                 shadowCubemaps.push_back(std::move(shadowCubemap));
             }
 
-            gbuffers = rutils::createAllGBufferImages(window, allocator, renderExtents.scene);
+            gbuffers = rutils::createAllGBufferImages(window, allocator);
 
             createSkybox(skybox.paths);
 
@@ -276,24 +231,13 @@ namespace Kiki {
             compositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
             initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
 
-            ssaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
-            initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, ssaaDescriptors);
-
-            ssaaBloomImageDownsampleDescriptors = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
-            initialiseBloomImageDescriptorSet(window, doneSsaaImage, skybox.sampler, ssaaBloomImageDownsampleDescriptors);
-
-            ssaaCompositeDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
-            initialiseCompositeDescriptorSet(window, doneSsaaImage, bloomImages[0], sampler, ssaaCompositeDescriptors);
-
-            aaDifferenceDescriptors = rutils::allocDescSet(window, descriptorPool.handle, compositeLayout.handle);
-            initialiseCompositeDescriptorSet(window, doneTonemapImage, frozenTaaImage, sampler, aaDifferenceDescriptors);
 
             chromaticAberrationDescriptors = rutils::allocDescSet(window, descriptorPool.handle, chromaticAberrationLayout.handle);
             initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
 
             for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
                 taaDescriptors[i] = rutils::allocDescSet(window, descriptorPool.handle, taaLayout.handle);
-                initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, sampler, taaDescriptors[i]);
+				initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, gbuffers.velocity, sampler, taaDescriptors[i]);
 
                 taaBloomImageDownsampleDescriptorSets[i] = rutils::allocDescSet(window, descriptorPool.handle, bloomLayout.handle);
                 initialiseBloomImageDescriptorSet(window, taaHistoryImages[i], skybox.sampler, taaBloomImageDownsampleDescriptorSets[i]);
@@ -308,19 +252,13 @@ namespace Kiki {
             customPostprocessDescriptors = rutils::allocDescSet(window, descriptorPool.handle, customPostprocessLayout.handle);
             initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
 
-            frozenTaaSourceDescriptor = rutils::allocDescSet(window, descriptorPool.handle, customPostprocessLayout.handle);
-            initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, frozenTaaSourceDescriptor);
+
 
             debugDescriptors = rutils::allocDescSet(window, descriptorPool.handle, debugLayout.handle);
             initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
 
             fxaaDescriptors = rutils::allocDescSet(window, descriptorPool.handle, postProcessingLayout.handle);
             initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
-
-            appliedSsaaEnabled = renderSettings.ssaaEnabled;
-            appliedSsaaScale = renderSettings.ssaaEnabled
-                ? std::max(renderSettings.ssaa_scale, 1u)
-                : 1u;
 
             sceneDescriptors = rutils::allocDescSet(window, descriptorPool.handle, sceneLayout.handle );
 
@@ -577,212 +515,315 @@ namespace Kiki {
         }
     }
 
-    bool RenderManager::captureCompletedTAAFrame() {
-        if (!renderSettings.taaEnabled || !taaHistoryValid) {
-            spdlog::warn("[AA Comparison] TAA must be enabled and have valid history before pausing");
-            return false;
-        }
+	bool RenderManager::togglePngFrameCapture(std::uint32_t warmupFrames, std::uint32_t captureFrames) {
+		if (pngCapture.active) {
+			pngCapture.active = false;
+			spdlog::info(
+				"[PNG Capture] Cancelled after saving {} of {} frames",
+				pngCapture.savedFrames,
+				pngCapture.captureFrames
+			);
+			return false;
+		}
 
-        if (vkDeviceWaitIdle(window.device) != VK_SUCCESS) {
-            throw Kiki::FatalError("Unable to wait for the GPU before capturing the TAA frame");
-        }
+		if (captureFrames == 0) {
+			spdlog::warn("[PNG Capture] Capture frame count must be greater than zero");
+			return false;
+		}
 
-        VkCommandBuffer commandBuffer = rutils::allocCommandBuffer(window, commandPool.handle);
 
-        VkCommandBufferBeginInfo beginInfo{};
-        beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-        beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		const bool rgbaFormat =
+			window.swapchainFormat == VK_FORMAT_R8G8B8A8_UNORM ||
+			window.swapchainFormat == VK_FORMAT_R8G8B8A8_SRGB;
+		const bool bgraFormat =
+			window.swapchainFormat == VK_FORMAT_B8G8R8A8_UNORM ||
+			window.swapchainFormat == VK_FORMAT_B8G8R8A8_SRGB;
+		if (!rgbaFormat && !bgraFormat) {
+			spdlog::error(
+				"[PNG Capture] Unsupported post-tonemap format {}. Expected an 8-bit RGBA or BGRA format",
+				static_cast<int>(window.swapchainFormat)
+			);
+			return false;
+		}
 
-        if (auto const res = vkBeginCommandBuffer(commandBuffer, &beginInfo); res != VK_SUCCESS) {
-            throw Kiki::FatalError(
-                "Unable to begin the paused TAA capture command buffer\n"
-                "vkBeginCommandBuffer() returned {}",
-                rutils::toString(res)
-            );
-        }
+		std::string method = "no_aa";
+		if (!renderSettings.taaEnabled && !renderSettings.fxaaEnabled) {
+			method = "no_aa_ref";
+		}
+		else if (renderSettings.taaEnabled) {
+            std::string taaMethod;
 
-        rutils::imageBarrier(
-            commandBuffer,
-            frozenTaaImage.image,
-            frozenTaaValid ? VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT : VK_PIPELINE_STAGE_2_NONE,
-            frozenTaaValid ? VK_ACCESS_2_SHADER_SAMPLED_READ_BIT : VK_ACCESS_2_NONE,
-            frozenTaaValid ? VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL : VK_IMAGE_LAYOUT_UNDEFINED,
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-        );
-
-        VkViewport viewport{};
-        viewport.width = static_cast<float>(renderExtents.output.width);
-        viewport.height = static_cast<float>(renderExtents.output.height);
-        viewport.minDepth = 0.0f;
-        viewport.maxDepth = 1.0f;
-
-        VkRect2D scissor{};
-        scissor.extent = renderExtents.output;
-
-        vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-        vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-
-        VkRenderingAttachmentInfo colourAttachment{};
-        colourAttachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
-        colourAttachment.imageView = frozenTaaImage.view;
-        colourAttachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-        colourAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-        colourAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
-
-        VkRenderingInfo renderingInfo{};
-        renderingInfo.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
-        renderingInfo.renderArea.extent = renderExtents.output;
-        renderingInfo.layerCount = 1;
-        renderingInfo.colorAttachmentCount = 1;
-        renderingInfo.pColorAttachments = &colourAttachment;
-
-        vkCmdBeginRendering(commandBuffer, &renderingInfo);
-        vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelines.customPostprocess.handle);
-        vkCmdBindDescriptorSets(
-            commandBuffer,
-            VK_PIPELINE_BIND_POINT_GRAPHICS,
-            pipelineLayouts.customPostprocessPipelineLayout.handle,
-            0,
-            1,
-            &frozenTaaSourceDescriptor,
-            0,
-            nullptr
-        );
-
-        rutils::CustomPostprocessSettings copySettings{};
-        copySettings.isEnabled = 0;
-        vkCmdPushConstants(
-            commandBuffer,
-            pipelineLayouts.customPostprocessPipelineLayout.handle,
-            VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT,
-            0,
-            sizeof(copySettings),
-            &copySettings
-        );
-        vkCmdDraw(commandBuffer, 3, 1, 0, 0);
-        vkCmdEndRendering(commandBuffer);
-
-        rutils::imageBarrier(
-            commandBuffer,
-            frozenTaaImage.image,
-            VK_PIPELINE_STAGE_2_COLOR_ATTACHMENT_OUTPUT_BIT,
-            VK_ACCESS_2_COLOR_ATTACHMENT_WRITE_BIT,
-            VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL,
-            VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
-            VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
-            VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-        );
-
-        if (auto const res = vkEndCommandBuffer(commandBuffer); res != VK_SUCCESS) {
-            throw Kiki::FatalError(
-                "Unable to end the paused TAA capture command buffer\n"
-                "vkEndCommandBuffer() returned {}",
-                rutils::toString(res)
-            );
-        }
-
-        VkCommandBufferSubmitInfo commandInfo{};
-        commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
-        commandInfo.commandBuffer = commandBuffer;
-
-        VkSubmitInfo2 submitInfo{};
-        submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
-        submitInfo.commandBufferInfoCount = 1;
-        submitInfo.pCommandBufferInfos = &commandInfo;
-
-        {
-            std::lock_guard<std::mutex> lock(queueMutex);
-            if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE); res != VK_SUCCESS) {
-                throw Kiki::FatalError(
-                    "Unable to submit the paused TAA capture\n"
-                    "vkQueueSubmit2() returned {}",
-                    rutils::toString(res)
-                );
+            switch (renderSettings.taaOption) {
+            case TAAOptions::NONE:
+                taaMethod = "none";
+                break;
+            case TAAOptions::RGBCLAMP:
+                taaMethod = "rgb_clamp";
+                break;
+            case TAAOptions::AABBCLIP:
+                taaMethod = "aabb_clip";
+                break;
+            case TAAOptions::VARIANCECLIP:
+                taaMethod = "variance_clip_inclusive_" + std::to_string(renderSettings.taaVarianceGamma);
+                break;
+            case TAAOptions::SIMPLIFIEDKDOP:
+                taaMethod = "simplified_kdop_optimized";
+                break;
+            default:
+                taaMethod = "unknown";
+                break;
             }
-            if (auto const res = vkQueueWaitIdle(window.graphicsQueue); res != VK_SUCCESS) {
-                throw Kiki::FatalError(
-                    "Unable to wait for the paused TAA capture\n"
-                    "vkQueueWaitIdle() returned {}",
-                    rutils::toString(res)
-                );
-            }
-        }
 
-        vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
-        frozenTaaValid = true;
-        return true;
-    }
+            method = std::format("taa_{}", taaMethod);
+		}
+		else if (renderSettings.fxaaEnabled) {
+			method = "fxaa";
+		}
 
-    bool RenderManager::beginPausedAAComparison() {
-        if (aaComparisonActive) return true;
-        if (!captureCompletedTAAFrame()) return false;
+		const std::filesystem::path outputDirectory =
+			std::filesystem::path(PROJECT_ROOT_PATH) /
+			"captures" / std::format("{}", method);
 
-        savedAAComparisonSettings.ssaaEnabled = renderSettings.ssaaEnabled;
-        savedAAComparisonSettings.ssaaScale = renderSettings.ssaa_scale;
-        savedAAComparisonSettings.taaEnabled = renderSettings.taaEnabled;
-        savedAAComparisonSettings.fxaaEnabled = renderSettings.fxaaEnabled;
-        savedAAComparisonSettings.bloomEnabled = renderSettings.bloomEnabled;
-        savedAAComparisonSettings.chromaticAberrationEnabled = renderSettings.chromaticAberrationEnabled;
-        savedAAComparisonSettings.customPostprocessEnabled = renderSettings.customPostprocessEnabled;
-        savedAAComparisonSettings.renderMode = renderSettings.renderMode;
+		std::error_code directoryError;
+		std::filesystem::create_directories(outputDirectory, directoryError);
+		if (directoryError) {
+			spdlog::error(
+				"[PNG Capture] Unable to create output directory '{}': {}",
+				outputDirectory.string(),
+				directoryError.message()
+			);
+			return false;
+		}
 
-        aaComparisonActive = true;
-        renderSettings.ssaaEnabled = true;
-        renderSettings.taaEnabled = false;
-        renderSettings.fxaaEnabled = false;
-        renderSettings.renderMode = STANDARD;
-        renderSettings.aaDifferenceEnabled = true;
+		pngCapture = {};
+		pngCapture.active = true;
+		pngCapture.warmupFrames = warmupFrames;
+		pngCapture.captureFrames = captureFrames;
+		pngCapture.extent = window.swapchainExtent;
+		pngCapture.outputDirectory = outputDirectory;
 
-        spdlog::info(
-            "[AA Comparison] Captured TAA and rendering {}x SSAA difference (gain {:.1f})",
-            std::max(renderSettings.ssaa_scale, 1u),
-            renderSettings.aaDifferenceAmplification
-        );
+		spdlog::info(
+			"[PNG Capture] Started: warming up for {} frames, then saving {} frames to '{}'",
+			warmupFrames,
+			captureFrames,
+			outputDirectory.string()
+		);
+		return true;
+	}
 
-        nextFrame();
-        return true;
-    }
+	void RenderManager::savePostTonemapPng(const std::filesystem::path& outputPath) {
+		const std::uint32_t width = window.swapchainExtent.width;
+		const std::uint32_t height = window.swapchainExtent.height;
+		const VkDeviceSize byteCount =
+			static_cast<VkDeviceSize>(width) *
+			static_cast<VkDeviceSize>(height) * 4;
 
-    void RenderManager::endPausedAAComparison() {
-        if (!aaComparisonActive) return;
+		if (auto const res = vkDeviceWaitIdle(window.device); res != VK_SUCCESS) {
+			throw Kiki::FatalError(
+				"Unable to wait for the GPU before PNG readback\n"
+				"vkDeviceWaitIdle() returned {}",
+				rutils::toString(res)
+			);
+		}
 
-        renderSettings.ssaaEnabled = savedAAComparisonSettings.ssaaEnabled;
-        renderSettings.ssaa_scale = savedAAComparisonSettings.ssaaScale;
-        renderSettings.taaEnabled = savedAAComparisonSettings.taaEnabled;
-        renderSettings.fxaaEnabled = savedAAComparisonSettings.fxaaEnabled;
-        renderSettings.bloomEnabled = savedAAComparisonSettings.bloomEnabled;
-        renderSettings.chromaticAberrationEnabled = savedAAComparisonSettings.chromaticAberrationEnabled;
-        renderSettings.customPostprocessEnabled = savedAAComparisonSettings.customPostprocessEnabled;
-        renderSettings.renderMode = savedAAComparisonSettings.renderMode;
-        renderSettings.aaDifferenceEnabled = false;
-        aaComparisonActive = false;
+		rutils::Buffer readbackBuffer = rutils::createBuffer(
+			allocator,
+			byteCount,
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+			VMA_MEMORY_USAGE_AUTO_PREFER_HOST
+		);
 
-        spdlog::info("[AA Comparison] Restored normal rendering; TAA history will restart");
-    }
+		VkCommandBuffer commandBuffer = rutils::allocCommandBuffer(window, commandPool.handle);
+		VkCommandBufferBeginInfo beginInfo{};
+		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+		beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+		if (auto const res = vkBeginCommandBuffer(commandBuffer, &beginInfo); res != VK_SUCCESS) {
+			vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
+			throw Kiki::FatalError(
+				"Unable to begin PNG readback command buffer\n"
+				"vkBeginCommandBuffer() returned {}",
+				rutils::toString(res)
+			);
+		}
+
+		rutils::imageBarrier(
+			commandBuffer,
+			doneTonemapImage.image,
+            
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+
+			VK_PIPELINE_STAGE_2_COPY_BIT,
+			VK_ACCESS_2_TRANSFER_READ_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
+		);
+
+		VkBufferImageCopy copyRegion{};
+		copyRegion.bufferOffset = 0;
+		copyRegion.bufferRowLength = 0;
+		copyRegion.bufferImageHeight = 0;
+		copyRegion.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		copyRegion.imageSubresource.mipLevel = 0;
+		copyRegion.imageSubresource.baseArrayLayer = 0;
+		copyRegion.imageSubresource.layerCount = 1;
+		copyRegion.imageExtent = VkExtent3D{width, height, 1};
+		vkCmdCopyImageToBuffer(
+			commandBuffer,
+			doneTonemapImage.image,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			readbackBuffer.buffer,
+			1,
+			&copyRegion
+		);
+
+		rutils::imageBarrier(
+			commandBuffer,
+			doneTonemapImage.image,
+			VK_PIPELINE_STAGE_2_COPY_BIT,
+			VK_ACCESS_2_TRANSFER_READ_BIT,
+			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+			VK_PIPELINE_STAGE_2_FRAGMENT_SHADER_BIT,
+			VK_ACCESS_2_SHADER_SAMPLED_READ_BIT,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+		);
+
+		if (auto const res = vkEndCommandBuffer(commandBuffer); res != VK_SUCCESS) {
+			vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
+			throw Kiki::FatalError(
+				"Unable to end PNG readback command buffer\n"
+				"vkEndCommandBuffer() returned {}",
+				rutils::toString(res)
+			);
+		}
+
+		VkCommandBufferSubmitInfo commandInfo{};
+		commandInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_SUBMIT_INFO;
+		commandInfo.commandBuffer = commandBuffer;
+		VkSubmitInfo2 submitInfo{};
+		submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO_2;
+		submitInfo.commandBufferInfoCount = 1;
+		submitInfo.pCommandBufferInfos = &commandInfo;
+
+		{
+			std::lock_guard<std::mutex> lock(queueMutex);
+			if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE); res != VK_SUCCESS) {
+				vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
+				throw Kiki::FatalError(
+					"Unable to submit PNG readback\n"
+					"vkQueueSubmit2() returned {}",
+					rutils::toString(res)
+				);
+			}
+			if (auto const res = vkQueueWaitIdle(window.graphicsQueue); res != VK_SUCCESS) {
+				vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
+				throw Kiki::FatalError(
+					"Unable to wait for PNG readback\n"
+					"vkQueueWaitIdle() returned {}",
+					rutils::toString(res)
+				);
+			}
+		}
+		vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
+
+		void* mappedData = nullptr;
+		if (auto const res = vmaMapMemory(allocator.allocator, readbackBuffer.allocation, &mappedData); res != VK_SUCCESS) {
+			throw Kiki::FatalError(
+				"Unable to map PNG readback memory\n"
+				"vmaMapMemory() returned {}",
+				rutils::toString(res)
+			);
+		}
+		if (auto const res = vmaInvalidateAllocation(allocator.allocator,readbackBuffer.allocation,0,VK_WHOLE_SIZE); res != VK_SUCCESS) {
+			vmaUnmapMemory(allocator.allocator, readbackBuffer.allocation);
+			throw Kiki::FatalError(
+				"Unable to invalidate PNG readback memory\n"
+				"vmaInvalidateAllocation() returned {}",
+				rutils::toString(res)
+			);
+		}
+
+		std::vector<stbi_uc> pixels(static_cast<std::size_t>(byteCount));
+		std::memcpy(pixels.data(), mappedData, pixels.size());
+		vmaUnmapMemory(allocator.allocator, readbackBuffer.allocation);
+
+		const bool bgraFormat =
+			window.swapchainFormat == VK_FORMAT_B8G8R8A8_UNORM ||
+			window.swapchainFormat == VK_FORMAT_B8G8R8A8_SRGB;
+		if (bgraFormat) {
+			for (std::size_t pixel = 0; pixel < pixels.size(); pixel += 4) {
+				std::swap(pixels[pixel], pixels[pixel + 2]);
+			}
+		}
+
+		const std::string outputString = outputPath.string();
+		if (stbi_write_png(
+			outputString.c_str(),
+			static_cast<int>(width),
+			static_cast<int>(height),
+			4,
+			pixels.data(),
+			static_cast<int>(width * 4)
+		) == 0) {
+			throw Kiki::FatalError("Unable to write PNG capture '{}'", outputString);
+		}
+	}
+
+	void RenderManager::processPngFrameCapture() {
+		if (!pngCapture.active) return;
+
+		if (pngCapture.extent.width != window.swapchainExtent.width ||
+			pngCapture.extent.height != window.swapchainExtent.height) {
+			spdlog::warn("[PNG Capture] Cancelled because the output resolution changed");
+			pngCapture.active = false;
+			return;
+		}
+
+		const std::uint32_t sessionFrame = pngCapture.renderedFrames++;
+		if (sessionFrame < pngCapture.warmupFrames) {
+			if (sessionFrame + 1 == pngCapture.warmupFrames) {
+				spdlog::info("[PNG Capture] Warm-up complete; saving begins on the next frame");
+			}
+			return;
+		}
+
+		const std::uint32_t captureIndex = sessionFrame - pngCapture.warmupFrames;
+		if (captureIndex >= pngCapture.captureFrames) {
+			pngCapture.active = false;
+			return;
+		}
+
+		const std::filesystem::path outputPath =
+			pngCapture.outputDirectory /
+			std::format("frame_{:04}.png", sessionFrame);
+		savePostTonemapPng(outputPath);
+		pngCapture.savedFrames++;
+
+		spdlog::info(
+			"[PNG Capture] Saved {}/{}: {}",
+			pngCapture.savedFrames,
+			pngCapture.captureFrames,
+			outputPath.filename().string()
+		);
+
+		if (pngCapture.savedFrames >= pngCapture.captureFrames) {
+			pngCapture.active = false;
+			spdlog::info(
+				"[PNG Capture] Complete: {} frames saved to '{}'",
+				pngCapture.savedFrames,
+				pngCapture.outputDirectory.string()
+			);
+		}
+	}
+
+ 
+
 
     void RenderManager::nextFrame() {
         ZoneScoped;
         // glfwPollEvents(); called in input manager
 
-
-        if (renderSettings.ssaaEnabled) {
-            // SSAA is the reference AA method and must not be combined with temporal jitter or FXAA.
-            renderSettings.taaEnabled = false;
-            renderSettings.fxaaEnabled = false;
-        }
-
-        std::uint32_t const requestedSsaaScale = renderSettings.ssaaEnabled
-            ? std::max(renderSettings.ssaa_scale, 1u)
-            : 1u;
-
-        if (renderSettings.ssaaEnabled != appliedSsaaEnabled ||
-            requestedSsaaScale != appliedSsaaScale) {
-            appliedSsaaEnabled = renderSettings.ssaaEnabled;
-            appliedSsaaScale = requestedSsaaScale;
-            recreateSwapchain = true;
-        }
 
         
         if (recreateSwapchain) {
@@ -807,25 +848,18 @@ namespace Kiki {
 
                 rutils::recreateSwapchain(window);
 
-                updateRenderExtents();
 
-                if (frozenTaaExtent.width != renderExtents.output.width ||
-                    frozenTaaExtent.height != renderExtents.output.height) {
-                    frozenTaaImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-                    frozenTaaExtent = renderExtents.output;
-                    frozenTaaValid = false;
-                }
 
                 pipelines = rutils::createAllPipelines(window, pipelineLayouts);
-                depthBuffer = rutils::createDepthBuffer(window, allocator, renderExtents.scene);
-                gbuffers = rutils::createAllGBufferImages(window, allocator, renderExtents.scene);
+                depthBuffer = rutils::createDepthBuffer(window, allocator);
+                gbuffers = rutils::createAllGBufferImages(window, allocator);
 
                 for (int i = 0; i < N_BLOOM_IMAGES; i++) {
                     bloomImages[i] = rutils::createBloomImage(
                         window,
                         allocator,
-                        renderExtents.output.width >> i,
-                        renderExtents.output.height >> i
+                        window.swapchainExtent.width >> i,
+                        window.swapchainExtent.height >> i
                     );
                 }
             }
@@ -833,17 +867,16 @@ namespace Kiki {
             {
                 ZoneScopedN("Creating post-processing images");
 
-                doneLightingImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
-                doneSSRImage = rutils::createPostProcessingImage(window, allocator, renderExtents.scene);
-                doneCompositeImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
-                doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
-                doneTonemapImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-                doneDebugImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-                doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator, renderExtents.output);
-                doneSsaaImage = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+                doneLightingImage = rutils::createPostProcessingImage(window, allocator);
+                doneSSRImage = rutils::createPostProcessingImage(window, allocator);
+                doneCompositeImage = rutils::createPostProcessingImage(window, allocator);
+                doneChromaticAberrationImage = rutils::createPostProcessingImage(window, allocator);
+                doneTonemapImage = rutils::createPostTonemapImage(window, allocator);
+                doneDebugImage = rutils::createPostTonemapImage(window, allocator);
+                doneCustomPostprocessImage = rutils::createPostTonemapImage(window, allocator);
 
                 for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
-                    taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator, renderExtents.output);
+                    taaHistoryImages[i] = rutils::createPostProcessingImage(window, allocator);
                 }
             }
 
@@ -871,20 +904,15 @@ namespace Kiki {
                 }
 
                 initialiseCompositeDescriptorSet(window, doneSSRImage, bloomImages[0], sampler, compositeDescriptors);
-                initialiseBloomImageDescriptorSet(window, doneSSRImage, sampler, ssaaDescriptors);
-                initialiseBloomImageDescriptorSet(window, doneSsaaImage, skybox.sampler, ssaaBloomImageDownsampleDescriptors);
-                initialiseCompositeDescriptorSet(window, doneSsaaImage, bloomImages[0], sampler, ssaaCompositeDescriptors);
-                initialiseCompositeDescriptorSet(window, doneTonemapImage, frozenTaaImage, sampler, aaDifferenceDescriptors);
 
                 initialiseChromaticAberrationDescriptorSet(window, doneCompositeImage, sampler, chromaticAberrationDescriptors);
                 for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) {
-                    initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, sampler, taaDescriptors[i]);
+					initialiseTAADescriptorSet(window, doneSSRImage, taaHistoryImages[previousTaaHistoryIndex(i)], depthBuffer, gbuffers.velocity, sampler, taaDescriptors[i]);
                     initialiseBloomImageDescriptorSet(window, taaHistoryImages[i], skybox.sampler, taaBloomImageDownsampleDescriptorSets[i]);
                     initialiseCompositeDescriptorSet(window, taaHistoryImages[i], bloomImages[0], sampler, taaCompositeDescriptors[i]);
                 }
                 initialiseTonemapDescriptorSet(window, doneChromaticAberrationImage, sampler, tonemapDescriptors);
                 initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, customPostprocessDescriptors);
-                initialiseCustomPostprocessDescriptorSet(window, doneTonemapImage, sampler, frozenTaaSourceDescriptor);
                 initialiseDebugDescriptorSet(window, doneCustomPostprocessImage, gbuffers, depthBuffer, gbuffers.ssao_blurred, bloomImages[0], sampler, debugDescriptors);
                 initialisePostProcessingDescriptorSet(window, gbuffers, depthBuffer, doneDebugImage, sampler, fxaaDescriptors);
             }
@@ -989,7 +1017,7 @@ namespace Kiki {
 
             // Record and submit commands for this frame
             // Prepare data for this frame
-            updateSceneUniforms(sceneUniforms, renderExtents.scene.width, renderExtents.scene.height);
+            updateSceneUniforms(sceneUniforms, window.swapchainExtent.width, window.swapchainExtent.height);
             updateDebugLineBuffer();
         }
 
@@ -1003,7 +1031,7 @@ namespace Kiki {
 
         {
             ZoneScopedN("Updating interface uniform")
-            interfaceUniform.projection = glm::ortho(0.0f, (float)renderExtents.output.width, 0.0f, (float)renderExtents.output.height);
+            interfaceUniform.projection = glm::ortho(0.0f, (float)window.swapchainExtent.width, 0.0f, (float)window.swapchainExtent.height);
         }
 
         // std::cout << sceneUniforms.lightColour.r << std::endl;
@@ -1034,7 +1062,7 @@ namespace Kiki {
                     swapchainColourTarget,
                     depthBuffer,
                     gbuffers,
-                    renderExtents,
+					window.swapchainExtent,
                     sceneUBO.buffer,
                     sceneUniforms,
                     sceneDescriptors,
@@ -1044,14 +1072,10 @@ namespace Kiki {
                     deferredLightingDescriptors,
                     fxaaDescriptors,
                     ssrDescriptors,
-                    ssaaDescriptors,
-                    ssaaBloomImageDownsampleDescriptors,
                     taaDescriptors,
                     tonemapDescriptors,
                     shadowMatrixDescriptors,
                     compositeDescriptors,
-                    ssaaCompositeDescriptors,
-                    aaDifferenceDescriptors,
                     taaCompositeDescriptors,
                     debugDescriptors,
                     customPostprocessDescriptors,
@@ -1060,7 +1084,6 @@ namespace Kiki {
                     skybox,
                     doneLightingImage,
                     doneSSRImage,
-                    doneSsaaImage,
                     taaHistoryImages,
                     doneCompositeImage,
                     doneChromaticAberrationImage,
@@ -1133,7 +1156,16 @@ namespace Kiki {
             }
         }
 
-        previousProjCam = currentUnjitteredProjCam;
+		auto& registry = World::Get().Registry();
+		for (auto entity : registry.view<TransformComponent>()) {
+			auto& transform = registry.get<TransformComponent>(entity);
+			transform.previousworldMatrix = transform.worldMatrix;
+		}
+		for (auto entity : registry.view<AnimationComponent>()) {
+			registry.get<AnimationComponent>(entity).CommitRenderedPose();
+		}
+
+		previousProjCam = currentUnjitteredProjCam;
         previousJitter = currentJitter;
         taaWasEnabled = renderSettings.taaEnabled;
 
@@ -1145,6 +1177,8 @@ namespace Kiki {
         else {
             taaHistoryIndex = 0;
         }
+
+		processPngFrameCapture();
 
         FrameMark;
     }
@@ -1473,8 +1507,8 @@ namespace Kiki {
     }
 
     rutils::Buffer RenderManager::allocateAnimationBuffer() {
-        constexpr uint32_t MAX_BONES = 100;
-        VkDeviceSize bufferSize = sizeof(glm::mat4) * MAX_BONES;
+		constexpr uint32_t GPU_BONE_MATRICES = AnimationComponent::MAX_BONES * AnimationComponent::GPU_BONE_PALETTES;
+		VkDeviceSize bufferSize = sizeof(glm::mat4) * GPU_BONE_MATRICES;
 
         return rutils::createBuffer(
             allocator,
@@ -1485,14 +1519,14 @@ namespace Kiki {
     }
 
     VkDescriptorSet RenderManager::allocateAnimationDescriptorSet(const rutils::Buffer& buffer) {
-        constexpr uint32_t MAX_BONES = 100;
+		constexpr uint32_t GPU_BONE_MATRICES = AnimationComponent::MAX_BONES * AnimationComponent::GPU_BONE_PALETTES;
 
         VkDescriptorSet descSet = rutils::allocDescSet(window, descriptorPool.handle, animationLayout.handle);
 
         VkDescriptorBufferInfo bufferInfo{};
         bufferInfo.buffer = buffer.buffer;
         bufferInfo.offset = 0;
-        bufferInfo.range = sizeof(glm::mat4) * MAX_BONES;
+		bufferInfo.range = sizeof(glm::mat4) * GPU_BONE_MATRICES;
 
         VkWriteDescriptorSet write{};
         write.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
@@ -1945,19 +1979,16 @@ namespace Kiki {
         aSceneUniforms.projection = unjitteredProjection;
 
         if (renderSettings.taaEnabled) {
-            //glm::vec2 haltonSample = glm::vec2(
-            //    halton((taaFrameIndex % 8) + 1, 2),
-            //    halton((taaFrameIndex % 8) + 1, 3)
-            //);
+
             glm::vec2 jitterOffset = offsets[taaFrameIndex % 8];
             float jitterscale = 1.f;
 
-            //currentJitter = glm::vec2(
-            //    (((jitterOffset.x) * 2.0f) / static_cast<float>(aFramebufferWidth)) * jitterscale,
-            //    (((jitterOffset.y) * 2.0f) / static_cast<float>(aFramebufferHeight)) * jitterscale
-            //);
+            currentJitter = glm::vec2(
+                (((jitterOffset.x) * 2.0f) / static_cast<float>(aFramebufferWidth)) * jitterscale,
+                (((jitterOffset.y) * 2.0f) / static_cast<float>(aFramebufferHeight)) * jitterscale
+            );
 
-			currentJitter = glm::vec2(0.f, 0.f);
+			//currentJitter = glm::vec2(0.f, 0.f);
 
             aSceneUniforms.projection[2][0] += currentJitter.x;
             aSceneUniforms.projection[2][1] += currentJitter.y;
@@ -1971,12 +2002,12 @@ namespace Kiki {
         currentUnjitteredProjCam = unjitteredProjection * aSceneUniforms.camera;
         aSceneUniforms.projCam = aSceneUniforms.projection * aSceneUniforms.camera;
         aSceneUniforms.previousProjCam = previousProjCam;
-        aSceneUniforms.inverseProjCam = glm::inverse(aSceneUniforms.projCam);
         aSceneUniforms.taaData = glm::vec4(
             currentJitter,
             renderSettings.taaHistoryWeight,
             (!taaHistoryValid || !taaWasEnabled) ? 1.0f : 0.0f
         );
+		aSceneUniforms.currentUnjitteredProjCam = currentUnjitteredProjCam;
 
         int numLights = std::min<size_t>(lights.size(), 8);
         for (int i = 0; i < numLights; i++) {
@@ -1987,6 +2018,7 @@ namespace Kiki {
         aSceneUniforms.numLights[0] = float(numLights);
         aSceneUniforms.numLights[1] = camComp.nearPlane;
         aSceneUniforms.numLights[2] = camComp.farPlane;
+		aSceneUniforms.numLights[3] = static_cast<float>(renderSettings.shadowsEnabled ? renderSettings.shadowPcfSamples : 0);
 
         aSceneUniforms.cameraPos = glm::vec4(transformComp.position, 0.f);
     }
@@ -2182,7 +2214,6 @@ namespace Kiki {
     void RenderManager::setRenderPreset(RenderPreset preset) {
         // ignore simple/custom shaders like bayer, chromatic aberration, tonemap,... when applying settings
         renderSettings.renderPreset = preset;
-        renderSettings.ssaaEnabled = false;
         renderSettings.taaEnabled = false;
         renderSettings.fxaaEnabled = false;
 
@@ -2263,7 +2294,7 @@ namespace Kiki {
             renderSettings.bloomRadius_y = 0.005f;
             renderSettings.bloomStrength = 0.04f;
 
-            renderSettings.fxaaEnabled = true;
+            renderSettings.fxaaEnabled = false;
             renderSettings.fxaaStrength = 16.f;
         }
     }
@@ -2348,8 +2379,6 @@ namespace Kiki {
         pipelines.customPostprocess = {};
         pipelines.chromaticAberration = {};
         pipelines.taa = {};
-        pipelines.ssaa = {};
-        pipelines.aaDifference = {};
         pipelineLayouts.pbrPipelineLayout = {};
         pipelineLayouts.deferredPipelineLayout = {};
         pipelineLayouts.skyboxPipelineLayout = {};
@@ -2367,7 +2396,6 @@ namespace Kiki {
         pipelineLayouts.customPostprocessPipelineLayout = {};
         pipelineLayouts.chromaticAberrationPipelineLayout = {};
         pipelineLayouts.taaPipelineLayout = {};
-        pipelineLayouts.ssaaPipelineLayout = {};
 
         for (auto& shadowCubemap : shadowCubemaps) {
             if (shadowCubemap.arrayView != VK_NULL_HANDLE) {
@@ -2385,8 +2413,6 @@ namespace Kiki {
         doneDebugImage = {};
         doneCustomPostprocessImage = {};
         doneChromaticAberrationImage = {};
-        doneSsaaImage = {};
-        frozenTaaImage = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaHistoryImages[i] = {};
         
         for (int i = 0; i < N_BLOOM_IMAGES; i++) bloomImages[i] = {};
@@ -2429,11 +2455,6 @@ namespace Kiki {
         debugDescriptors = {};
         customPostprocessDescriptors = {};
         chromaticAberrationDescriptors = {};
-        ssaaDescriptors = {};
-        ssaaBloomImageDownsampleDescriptors = {};
-        ssaaCompositeDescriptors = {};
-        aaDifferenceDescriptors = {};
-        frozenTaaSourceDescriptor = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaDescriptors[i] = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaBloomImageDownsampleDescriptorSets[i] = {};
         for (int i = 0; i < N_TAA_HISTORY_IMAGES; i++) taaCompositeDescriptors[i] = {};

@@ -24,6 +24,8 @@
 
 #include <glm/glm.hpp>
 #include <stb_image.h>
+#include <cstdint>
+#include <filesystem>
 #include <string.h>
 #include <cstring>
 
@@ -45,7 +47,8 @@ namespace Kiki {
         METALNESS,
         ROUGHNESS,
         SSAO,
-        BLOOM
+        BLOOM,
+		MOTION_VECTORS
     };
 
     enum RenderPreset {
@@ -55,14 +58,6 @@ namespace Kiki {
         DISS
     };
 
-    struct TAAState {
-        glm::mat4 previousProjCam;
-        glm::mat4 inverseProjCam;
-        glm::vec2 currentJitter;
-        glm::vec2 previousJitter;
-        int taaFrameIndex;
-        bool taaResetHistory;
-	};
 
     enum TAAOptions {
         NONE,
@@ -77,6 +72,16 @@ namespace Kiki {
         float taaHistoryWeight = 0.9f;
 
 	};
+
+    struct PngCaptureState {
+        bool active = false;
+        std::uint32_t warmupFrames = 100;
+        std::uint32_t captureFrames = 100;
+        std::uint32_t renderedFrames = 0;
+        std::uint32_t savedFrames = 0;
+        VkExtent2D extent{};
+        std::filesystem::path outputDirectory;
+    };
 
     struct RenderSettings {
         int ssaoSamples = 16;
@@ -114,24 +119,12 @@ namespace Kiki {
         int bayerLevels = 3;
 
         float fxaaStrength = 16.f;
-
-
-        bool fxaaEnabled = true;
-
-        bool ssaaEnabled = false;
-        uint32_t ssaa_scale = 2;
-
+        bool fxaaEnabled = false;
 
 		bool taaEnabled = false;
-
-
         float taaHistoryWeight = 0.9f;
         float taaVarianceGamma = 1.25f;
-
-        bool aaDifferenceEnabled = false;
-        float aaDifferenceAmplification = 1.0f;
-
-		TAAOptions taaOption = NONE;
+		TAAOptions taaOption = SIMPLIFIEDKDOP;
 
         RenderMode renderMode = STANDARD;
         RenderPreset renderPreset = ULTRA;
@@ -214,15 +207,8 @@ namespace Kiki {
         std::filesystem::path custom_postprocess_f = "custom_postprocess.frag.spv";
         std::filesystem::path chromatic_aberration_f = "chromatic_aberration.frag.spv";
         std::filesystem::path taa_f = "taa.frag.spv";
-        std::filesystem::path ssaa_f = "ssaa_resolve.frag.spv";
-        std::filesystem::path aa_difference_f = "aa_difference.frag.spv";
-
     };
 
-    struct RenderExtents {
-        VkExtent2D output{};
-        VkExtent2D scene{};
-    };
 
     class RenderManager {
         private:
@@ -233,8 +219,6 @@ namespace Kiki {
 
         bool recreateSwapchain = false;
         bool initialised = false;
-        bool appliedSsaaEnabled = false;
-        std::uint32_t appliedSsaaScale = 1;
         rutils::VulkanWindow window;
 
         rutils::PipelineLayouts pipelineLayouts;
@@ -292,11 +276,6 @@ namespace Kiki {
         VkDescriptorSet compositeDescriptors;
         VkDescriptorSet debugDescriptors;
         VkDescriptorSet customPostprocessDescriptors;
-        VkDescriptorSet ssaaDescriptors;
-        VkDescriptorSet ssaaBloomImageDownsampleDescriptors;
-        VkDescriptorSet ssaaCompositeDescriptors;
-        VkDescriptorSet aaDifferenceDescriptors;
-        VkDescriptorSet frozenTaaSourceDescriptor;
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaDescriptors;
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaBloomImageDownsampleDescriptorSets;
         std::array<VkDescriptorSet, N_TAA_HISTORY_IMAGES> taaCompositeDescriptors;
@@ -310,23 +289,7 @@ namespace Kiki {
         rutils::Image doneCustomPostprocessImage;
         rutils::Image depthBuffer;
 
-        rutils::Image doneSsaaImage;
-
-        rutils::Image frozenTaaImage;
-        VkExtent2D frozenTaaExtent{};
-        bool frozenTaaValid = false;
-
-        struct AAComparisonSettings {
-            bool ssaaEnabled = false;
-            std::uint32_t ssaaScale = 1;
-            bool taaEnabled = false;
-            bool fxaaEnabled = false;
-            bool bloomEnabled = false;
-            bool chromaticAberrationEnabled = false;
-            bool customPostprocessEnabled = false;
-            RenderMode renderMode = STANDARD;
-        } savedAAComparisonSettings;
-        bool aaComparisonActive = false;
+        PngCaptureState pngCapture;
 
         std::array<rutils::Image, N_BLOOM_IMAGES> bloomImages;
         std::array<VkDescriptorSet, N_BLOOM_IMAGES> bloomImageDownsampleDescriptorSets;
@@ -342,7 +305,6 @@ namespace Kiki {
         glm::vec2 previousJitter = glm::vec2(0.0f);
         glm::vec2 currentJitter = glm::vec2(0.0f);
 
-        RenderExtents renderExtents;
 
         rutils::Buffer shadowMatricesBuffer;
 
@@ -406,8 +368,8 @@ namespace Kiki {
 
         void nextFrame();
         void shutdown();
-        bool beginPausedAAComparison();
-        void endPausedAAComparison();
+		bool togglePngFrameCapture(std::uint32_t warmupFrames = 100, std::uint32_t captureFrames = 100);
+		bool isPngFrameCaptureActive() const { return pngCapture.active; }
 
         VkDevice& getDevice() { return window.device; };
         GLFWwindow* getWindow() { return window.window; };
@@ -431,8 +393,8 @@ namespace Kiki {
             glm::vec4 cameraPos;
             glm::vec4 ssaoSamples[16];
             glm::mat4 previousProjCam;
-            glm::mat4 inverseProjCam;
             glm::vec4 taaData;
+			glm::mat4 currentUnjitteredProjCam;
         };
 
         struct InterfaceUniform {
@@ -456,8 +418,9 @@ namespace Kiki {
         void updateShadowMatrices(rutils::Allocator const& allocator, rutils::Buffer const& shadowMatricesBuffer, std::vector<Light>& lights);
         void createSkybox(const rutils::CubemapPaths& paths);
 		void updateDebugLineBuffer();
-        void updateRenderExtents();
         bool captureCompletedTAAFrame();
+		void processPngFrameCapture();
+		void savePostTonemapPng(const std::filesystem::path& outputPath);
 
         World& world = World::Get();
         entt::registry& registry = world.Registry();

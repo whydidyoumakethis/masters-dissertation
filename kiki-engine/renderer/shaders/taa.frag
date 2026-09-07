@@ -16,7 +16,6 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     vec4 cameraPos;
     vec4 ssaoSamples[16];
     mat4 previousProjCam;
-    mat4 inverseProjCam;
     vec4 taaData; // jitter x, jitter y, history weight, reset history
 } uScene;
 
@@ -30,12 +29,14 @@ layout(push_constant) uniform TAASettings {
 layout(set = 1, binding = 0) uniform sampler2D uCurrentColour;
 layout(set = 1, binding = 1) uniform sampler2D uHistoryColour;
 layout(set = 1, binding = 2) uniform sampler2D uDepth;
+layout(set = 1, binding = 3) uniform sampler2D uVelocity;
 
 layout(location = 0) out vec4 oColor;
 
 
 const int KDOP_AXIS_COUNT = 16;
 const float DIAGONAL = 0.70710678f;
+const float KDOP_EPS = 0.00001f;
 
 const vec3 KDOP_AXES[KDOP_AXIS_COUNT] = vec3[](
     vec3(1, 0, 0),
@@ -56,7 +57,24 @@ const vec3 KDOP_AXES[KDOP_AXIS_COUNT] = vec3[](
     vec3(-0.554854, -0.041550, -0.830910)
 );
 
-
+const vec3 KDOP_AXES_optimized[KDOP_AXIS_COUNT] = vec3[](
+    vec3(-0.873551, 0.431927, -0.224382),
+    vec3(0.021042, -0.474360, 0.880080),
+    vec3(-0.261376, -0.274902, 0.925263),
+    vec3(-0.072371, 0.677730, -0.731741),
+    vec3(0.448624, -0.892240, -0.051416),
+    vec3(0.634702, -0.008467, -0.772711),
+    vec3(-0.303251, -0.824686, 0.477421),
+    vec3(0.567093, -0.800918, 0.192185),
+    vec3(0.158575, -0.984863, 0.070000),
+    vec3(0.814500, -0.577822, -0.052071),
+    vec3(-0.532128, 0.815480, 0.227665),
+    vec3(-0.701478, 0.710127, 0.060395),
+    vec3(0.949010, 0.312049, -0.044790),
+    vec3(0.748883, 0.266201, -0.606887),
+    vec3(0.872406, 0.435221, -0.222466),
+    vec3(-0.001809, 0.020570, 0.999787)
+    );
 
 
 void neighbourhoodKdopBounds(
@@ -86,24 +104,20 @@ void neighbourhoodKdopBounds(
             vec3 colour =
                 texture(uCurrentColour, sampleUv).rgb;
 
-            for (int axis = 0;
-                 axis < KDOP_AXIS_COUNT;
-                 axis++) {
-                float projection =
-                    dot(colour, KDOP_AXES[axis]);
+            for (int axis = 0;axis < KDOP_AXIS_COUNT; axis++) {
+                float projection = dot(colour, KDOP_AXES_optimized[axis]);
 
-                minProjection[axis] = min(
-                    minProjection[axis],
-                    projection
-                );
+                minProjection[axis] = min(minProjection[axis], projection);
 
-                maxProjection[axis] = max(
-                    maxProjection[axis],
-                    projection
-                );
+                maxProjection[axis] = max(maxProjection[axis], projection);
             }
         }
     }
+    
+    for (int axis = 0; axis < KDOP_AXIS_COUNT; axis++) {
+        minProjection[axis] -= KDOP_EPS;
+        maxProjection[axis] += KDOP_EPS;
+        }
 }
 
 
@@ -114,14 +128,17 @@ vec3 clipHistoryToKdop(
     float maxProjection[KDOP_AXIS_COUNT]
 ) {
     vec3 direction = history - current;
-    float amount = 1.0f;
+
+    float nearAmount = -1000000000.0f;
+    float farAmount = 1000000000.0f;
+
+
 
     const float epsilon = 0.00001f;
 
-    for (int axis = 0;
-         axis < KDOP_AXIS_COUNT;
-         axis++) {
-        vec3 projectionAxis = KDOP_AXES[axis];
+    for (int axis = 0; axis < KDOP_AXIS_COUNT; axis++) {
+
+        vec3 projectionAxis = KDOP_AXES_optimized[axis];
 
         float currentProjection =
             dot(current, projectionAxis);
@@ -129,37 +146,33 @@ vec3 clipHistoryToKdop(
         float directionProjection =
             dot(direction, projectionAxis);
 
-        if (directionProjection > epsilon) {
-            float axisAmount =
-                (maxProjection[axis]
-                    - currentProjection)
-                / directionProjection;
-
-            amount = min(amount, axisAmount);
+        if(abs(directionProjection) <= epsilon) {
+            if(currentProjection < minProjection[axis] ||
+                currentProjection > maxProjection[axis]) {
+                return current;
+             }
+            continue;
         }
-        else if (directionProjection < -epsilon) {
-            float axisAmount =
-                (minProjection[axis]
-                    - currentProjection)
-                / directionProjection;
 
-            amount = min(amount, axisAmount);
+        float t0 = (minProjection[axis] - currentProjection) / directionProjection;
+
+        float t1 = (maxProjection[axis] - currentProjection) / directionProjection;
+
+        nearAmount = max(nearAmount, min(t0, t1));
+        farAmount = min(farAmount, max(t0, t1));
+      }
+
+      if(nearAmount <= farAmount && 
+        (nearAmount > 0.0f || farAmount > 0.0f)) {
+
+            float amount = nearAmount > 0.0f ? nearAmount : farAmount;
+
+            return current + direction * clamp(amount, 0.0f, 1.0f);
         }
-    }
 
-    return current
-        + direction * clamp(amount, 0.0f, 1.0f);
+    return current;
 }
 
-vec3 reconstructWorldPos(vec2 uv, float depth) {
-    vec3 ndc;
-    ndc.x = (uv.x * 2.0f) - 1.0f;
-    ndc.y = (uv.y * 2.0f) - 1.0f;
-    ndc.z = depth;
-
-    vec4 worldPos = uScene.inverseProjCam * vec4(ndc, 1.0f);
-    return worldPos.xyz / worldPos.w;
-}
 
 bool isOnScreen(vec2 uv) {
     return uv.x >= 0.0f && uv.x <= 1.0f && uv.y >= 0.0f && uv.y <= 1.0f;
@@ -177,10 +190,7 @@ void neighbourhoodBounds(vec2 uv, out vec3 minColour, out vec3 maxColour) {
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
             
-            vec2 sampleUv = clamp(
-            uv + (vec2(x, y) * texelSize),
-            minUv,
-            maxUv);
+            vec2 sampleUv = clamp(uv + (vec2(x, y) * texelSize), minUv, maxUv);
 
             vec3 sampleColour = texture(uCurrentColour, sampleUv).rgb;
             minColour = min(minColour, sampleColour);
@@ -205,14 +215,9 @@ void neighbourhoodMoments(
 
     for (int y = -1; y <= 1; y++) {
         for (int x = -1; x <= 1; x++) {
-            vec2 sampleUv = clamp(
-                uv + vec2(x, y) * texelSize,
-                minUv,
-                maxUv
-            );
+            vec2 sampleUv = clamp(uv + vec2(x, y) * texelSize, minUv, maxUv);
 
-            vec3 colour =
-                texture(uCurrentColour, sampleUv).rgb;
+            vec3 colour = texture(uCurrentColour, sampleUv).rgb;
 
             firstMoment += colour;
             secondMoment += colour * colour;
@@ -238,9 +243,9 @@ vec3 clipHistoryToAabbCentre(
     vec3 minColour,
     vec3 maxColour
 ) {
-    vec3 centre =
-        (minColour + maxColour) * 0.5f;
 
+    vec3 centre = (minColour + maxColour) * 0.5f;
+    
     vec3 extent = max(
         (maxColour - minColour) * 0.5f,
         vec3(0.00001f)
@@ -273,10 +278,7 @@ vec3 clipHistoryToAabb(
 
     for (int channel = 0; channel < 3; channel++) {
         if (abs(direction[channel]) > 0.000001f) {
-            float boundary =
-                direction[channel] > 0.0f
-                    ? maxColour[channel]
-                    : minColour[channel];
+            float boundary = direction[channel] > 0.0f ? maxColour[channel] : minColour[channel];
 
             float channelAmount =
                 (boundary - current[channel])
@@ -286,8 +288,7 @@ vec3 clipHistoryToAabb(
         }
     }
 
-    return current +
-        direction * clamp(amount, 0.0f, 1.0f);
+    return current + direction * clamp(amount, 0.0f, 1.0f);
 }
 
 vec3 validateHistory(
@@ -339,9 +340,15 @@ vec3 validateHistory(
 
         float gammaValue = max(taaSettings.varianceGamma, 0.0f);
 
-        minColour = meanColour - gammaValue * standardDeviation;
+        minColour = min(
+            meanColour - gammaValue * standardDeviation,
+            current
+        ); 
 
-        maxColour = meanColour + gammaValue * standardDeviation;
+        maxColour = max(
+            meanColour + gammaValue * standardDeviation,
+            current
+        );
 
         return clipHistoryToAabbCentre(
             history,
@@ -387,23 +394,11 @@ void main() {
     }
 
     if (depth >= 1.0f) {// No geometry, use history colour
-        vec3 historyColour = texture(uHistoryColour, v2fTexCoord).rgb;
-
-        historyColour = validateHistory(currentColour, historyColour, currentUv);
-
-        oColor = vec4(mix(currentColour, historyColour, taaSettings.historyweight), 1.0f);
-        return;
-    }
-
-    vec3 worldPos = reconstructWorldPos(currentUv, depth);
-    vec4 previousClip = uScene.previousProjCam * vec4(worldPos, 1.0f);
-
-    if (previousClip.w <= 0.0f) {// Behind camera, use current colour
         oColor = vec4(currentColour, 1.0f);
         return;
     }
 
-    vec2 previousUv = ((previousClip.xy / previousClip.w) * 0.5f) + 0.5f;// Convert from clip space to uv space
+	vec2 previousUv = v2fTexCoord  - texture(uVelocity, currentUv).rg;
 
     if (!isOnScreen(previousUv)) {// Outside of screen, use current colour
         oColor = vec4(currentColour, 1.0f);

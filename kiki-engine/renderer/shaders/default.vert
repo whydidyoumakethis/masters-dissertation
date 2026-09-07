@@ -21,28 +21,35 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     vec4 numLights;
     vec4 cameraPos;
     vec4 ssaoSamples[16];
+	mat4 previousProjCam;
+	vec4 taaData;
+	mat4 currentUnjitteredProjCam;
 } uScene;
 
 layout(scalar, set = 2, binding = 0) uniform BoneMatrices {
     mat4 bones[100];
+	mat4 previousBones[100];
 } uBones;
 
-layout(push_constant) uniform PushConstants {
-    mat4 model;
+layout(push_constant, scalar) uniform PushConstants {
+    mat4x3 model;
+    mat4x3 previousModel;
     vec4 baseColour;
-    int sprite;
-    int useTexture;
+    vec4 flags;
 } object;
 
 layout(location = 0) out vec2 v2fTexCoord;
 layout(location = 1) out vec3 v2fNormal;
 layout(location = 2) out vec3 v2fWorldSpace;
 layout(location = 3) out vec4 v2fTangent;
+layout(location = 4) out vec4 v2fCurrentClip;
+layout(location = 5) out vec4 v2fPreviousClip;
 
 void main() {
     v2fTexCoord = iTexCoord;
 
     mat4 skinMat = mat4(0.0);
+	mat4 previousSkinMat = mat4(0.0);
     float weightSum = iWeights.x + iWeights.y + iWeights.z + iWeights.w;
 
     if (weightSum > 0.0) {
@@ -50,19 +57,35 @@ void main() {
         skinMat += iWeights.y * uBones.bones[iBoneIDs.y];
         skinMat += iWeights.z * uBones.bones[iBoneIDs.z];
         skinMat += iWeights.w * uBones.bones[iBoneIDs.w];
+		previousSkinMat += iWeights.x * uBones.previousBones[iBoneIDs.x];
+		previousSkinMat += iWeights.y * uBones.previousBones[iBoneIDs.y];
+		previousSkinMat += iWeights.z * uBones.previousBones[iBoneIDs.z];
+		previousSkinMat += iWeights.w * uBones.previousBones[iBoneIDs.w];
     } else {
         skinMat = mat4(1.0);
+		previousSkinMat = mat4(1.0);
     }
 
-    mat4 finalModelMat = object.model * skinMat;
+	mat4x3 finalModelMat = object.model * skinMat;
+	mat4x3 previousFinalModelMat = object.previousModel * previousSkinMat;
+
+    vec4 localPosition = vec4(iPosition, 1.0);
+
+    vec3 currentWorld = finalModelMat * localPosition;
+    vec3 previousWorld = previousFinalModelMat * localPosition;
+
 
     v2fNormal = normalize(transpose(inverse(mat3(finalModelMat))) * iNormal);
     
-    v2fWorldSpace = (finalModelMat * vec4(iPosition, 1.0)).xyz;
+    v2fWorldSpace = currentWorld;
 
-    vec3 T = normalize(mat3(object.model) * iTangent.xyz);
+	vec3 T = normalize(mat3(finalModelMat) * iTangent.xyz);
     T = normalize(T - v2fNormal * dot(T, v2fNormal));
     v2fTangent = vec4(T, iTangent.w);
 
-    gl_Position = uScene.projCam * finalModelMat * vec4(iPosition, 1.f);
+    v2fCurrentClip = uScene.currentUnjitteredProjCam * vec4(currentWorld, 1.0);
+
+    v2fPreviousClip = uScene.previousProjCam * vec4(previousWorld, 1.0);
+
+	gl_Position = uScene.projCam * vec4(currentWorld, 1.0);
 }

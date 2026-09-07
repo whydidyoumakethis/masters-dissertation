@@ -25,11 +25,6 @@ layout(scalar, set = 0, binding = 0) uniform UScene {
     vec4 ssaoSamples[16];
 } uScene;
 
-layout(push_constant) uniform PushConstants {
-    mat4 model;
-    vec4 baseColour;
-} object;
-
 layout(location = 0) out vec4 oColor;
 
 void main() {

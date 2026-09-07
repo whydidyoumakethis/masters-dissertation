@@ -59,52 +59,80 @@ namespace Kiki {
 			auto& input = Kiki::InputManager::get();
 			//timer.UseFixedTime(1.f / 200.f);
 			bool paused = false;
-			bool showingAAComparison = false;
+			bool captureOverridesTimer = false;
+			Timer::Mode capturePreviousTimerMode = timer.GetMode();
+			float capturePreviousFixedDelta = timer.GetFixedDelta();
+
+			auto restoreTimerAfterCapture = [&]() {
+				if (!captureOverridesTimer) return;
+				if (capturePreviousTimerMode == Timer::Mode::Fixed) {
+					timer.UseFixedTime(capturePreviousFixedDelta);
+				}
+				else {
+					timer.UseRealTime();
+				}
+				captureOverridesTimer = false;
+			};
+
+			auto startDeterministicCapture = [&]() {
+				capturePreviousTimerMode = timer.GetMode();
+				capturePreviousFixedDelta = timer.GetFixedDelta();
+				timer.UseFixedTime(1.0f / 60.0f);
+				captureOverridesTimer = true;
+
+				if (RenderManager::get().togglePngFrameCapture(100, 50)) {
+					spdlog::info(
+						"[PNG Capture] Deterministic frame 0; frame 100 will be the first saved image"
+					);
+				}
+				else {
+					restoreTimerAfterCapture();
+				}
+			};
+
+			 //Begin the deterministic timeline before the first simulation update. Every
+			// launch therefore renders the same animation pose at capture frame 100.
+			//startDeterministicCapture();
 
 			while (_running && !glfwWindowShouldClose(RenderManager::get().getWindow())) {
 				_scheduler.UpdatePhase(System::Phase::Input, 0.0f);
 				if (input.isKeyJustDown(GLFW_KEY_F8)) {
-					if (!paused) {
-						paused = true;
-						timer.Pause();
-						showingAAComparison = RenderManager::get().beginPausedAAComparison();
-						spdlog::info("Engine paused");
+					if (RenderManager::get().isPngFrameCaptureActive()) {
+						spdlog::warn("[PNG Capture] Finish or cancel the F10 capture before pausing");
 					}
 					else {
-						if (showingAAComparison) {
-							RenderManager::get().endPausedAAComparison();
-							showingAAComparison = false;
+						if (!paused) {
+							paused = true;
+							timer.Pause();
+							spdlog::info("Engine paused");
 						}
-						paused = false;
-						timer.Resume();
-						spdlog::info("Engine resumed");
+						else {
+							paused = false;
+							timer.Resume();
+							spdlog::info("Engine resumed");
+						}
 					}
 				}
 
-				const bool stepRequested =
-					paused &&
-					!showingAAComparison &&
-					input.isKeyJustDown(GLFW_KEY_F9);
 
-				if (paused && !stepRequested) {
-					// Avoid consuming an entire CPU core while frozen.
-					std::this_thread::sleep_for(
-						std::chrono::milliseconds(8)
-					);
 
+				if (paused) {
+					// Keep polling input so F8 can resume, but do not begin a frame.
+					std::this_thread::sleep_for(std::chrono::milliseconds(8));
 					continue;
 				}
-
-				const float dt = stepRequested
-					? timer.Step()
-					: timer.Tick();
+				const float dt = timer.Tick();
 
 				MessageCenter::Flush();
 
 				_scheduler.UpdateSimulation(dt);
 
 				// Rendering occurs exactly once after simulation.
-				_scheduler.UpdatePhase(System::Phase::Render, dt);
+				 _scheduler.UpdatePhase(System::Phase::Render, dt);
+
+				if (captureOverridesTimer && !RenderManager::get().isPngFrameCaptureActive()) {
+					restoreTimerAfterCapture();
+				}
 
 				World::Get().FlushDestroy();
 

@@ -732,13 +732,13 @@ namespace rutils {
 		return 32-leadingZeros;
 	}
     
-	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten) {
+	Image createDepthBuffer(VulkanWindow const& window, Allocator const& allocator) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = VK_FORMAT_D32_SFLOAT;
-        imageInfo.extent.width = exten.width;
-        imageInfo.extent.height = exten.height;
+        imageInfo.extent.width = window.swapchainExtent.width;
+        imageInfo.extent.height = window.swapchainExtent.height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
@@ -785,13 +785,13 @@ namespace rutils {
         return depthBuffer;
     }
 
-    Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten) {
+    Image createPostProcessingImage(VulkanWindow const& window, Allocator const& allocator) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = window.hdrFormat;
-        imageInfo.extent.width = exten.width;
-        imageInfo.extent.height = exten.height;
+        imageInfo.extent.width = window.swapchainExtent.width;
+        imageInfo.extent.height = window.swapchainExtent.height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
@@ -838,19 +838,19 @@ namespace rutils {
         return postProcessingImage;
     }
 
-    Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten) {
+    Image createPostTonemapImage(VulkanWindow const& window, Allocator const& allocator) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = window.swapchainFormat;
-        imageInfo.extent.width = exten.width;
-        imageInfo.extent.height = exten.height;
+        imageInfo.extent.width = window.swapchainExtent.width;
+        imageInfo.extent.height = window.swapchainExtent.height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;
         imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
         imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-        imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
         imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
         imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
@@ -1054,28 +1054,29 @@ namespace rutils {
     }
 
 
-    GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator, VkExtent2D const& exten) {
+    GBuffers createAllGBufferImages(VulkanWindow const& window, Allocator const& allocator) {
         GBuffers gbuffers;
 
-        gbuffers.textureColour = createGBufferImage(window, allocator, VK_FORMAT_R8G8B8A8_UNORM, exten);
-        gbuffers.normals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT, exten);
-        gbuffers.roughnessMetalness = createGBufferImage(window, allocator, VK_FORMAT_R8G8_UNORM, exten);
-        gbuffers.mappedNormals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT, exten);
-        gbuffers.ssao = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT, exten);
-        gbuffers.ssao_hblur = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT, exten);
-        gbuffers.ssao_blurred = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT, exten);
+        gbuffers.textureColour = createGBufferImage(window, allocator, VK_FORMAT_R8G8B8A8_UNORM);
+        gbuffers.normals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
+        gbuffers.roughnessMetalness = createGBufferImage(window, allocator, VK_FORMAT_R8G8_UNORM);
+        gbuffers.mappedNormals = createGBufferImage(window, allocator, VK_FORMAT_R16G16B16A16_SFLOAT);
+		gbuffers.velocity = createGBufferImage(window, allocator, VK_FORMAT_R16G16_SFLOAT);
+        gbuffers.ssao = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
+        gbuffers.ssao_hblur = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
+        gbuffers.ssao_blurred = createGBufferImage(window, allocator, VK_FORMAT_R16_SFLOAT);
 
         return gbuffers;
     }
 
 
-    Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format, VkExtent2D const& exten) {
+    Image createGBufferImage(VulkanWindow const& window, Allocator const& allocator, VkFormat format) {
         VkImageCreateInfo imageInfo{};
         imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
         imageInfo.imageType = VK_IMAGE_TYPE_2D;
         imageInfo.format = format;
-        imageInfo.extent.width = exten.width;
-        imageInfo.extent.height = exten.height;
+        imageInfo.extent.width = window.swapchainExtent.width;
+        imageInfo.extent.height = window.swapchainExtent.height;
         imageInfo.extent.depth = 1;
         imageInfo.mipLevels = 1;
         imageInfo.arrayLayers = 1;

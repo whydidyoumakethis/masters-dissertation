@@ -13,7 +13,8 @@ struct TransformComponent {
     glm::vec3 scale = { 1, 1, 1 };
     Entity    parent = NullEntity;
     glm::mat4 worldMatrix = glm::mat4(1.0f);
-	bool      dirty = true; // flag to indicate if the transform has changed and needs to be updated
+	glm::mat4 previousworldMatrix = glm::mat4(1.0f);
+	bool dirty = true; // flag to indicate if the transform has changed and needs to be updated
 };
 
 struct ActiveComponent {

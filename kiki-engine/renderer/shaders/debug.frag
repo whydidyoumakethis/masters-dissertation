@@ -12,6 +12,7 @@ layout(set = 0, binding = 4) uniform sampler2D uDepth;
 layout(set = 0, binding = 5) uniform sampler2D uRoughnessMetalness;
 layout(set = 0, binding = 6) uniform sampler2D uSSAO;
 layout(set = 0, binding = 7) uniform sampler2D uBloomColour;
+layout(set = 0, binding = 8) uniform sampler2D uMotionVectors;
 
 layout(push_constant) uniform DebugSettings {
     int mode;
@@ -58,6 +59,10 @@ void main()
         case 8: // bloom
             vec3 inBloom = texture(uBloomColour, v2fTexCoord).rgb;
             oColor = vec4(inBloom, 1.f);
+            break;
+        case 9 : // motion vectors
+            vec3 inMotionVectors = texture(uMotionVectors, v2fTexCoord).rgb;
+            oColor = vec4(inMotionVectors, 1.f);
             break;
     };
 }

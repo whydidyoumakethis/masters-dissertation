@@ -120,7 +120,7 @@ namespace Kiki {
             if (ImGui::CollapsingHeader("Render Settings")) {
                 ImGui::Text("Mode:");
                 ImGui::SameLine(110.f);
-                const char* modes[] = {"Standard", "Base colour", "Normals (mapped)", "Normals (geometric)", "Depth", "Metalness", "Roughness", "SSAO", "Bloom"};
+                const char* modes[] = {"Standard", "Base colour", "Normals (mapped)", "Normals (geometric)", "Depth", "Metalness", "Roughness", "SSAO", "Bloom", "Motion Vectors"};
                 int currentMode = static_cast<int>(renderManager.renderSettings.renderMode);
                 if (ImGui::Combo("##editrendermode", &currentMode, modes, IM_ARRAYSIZE(modes))) {
                     renderManager.renderSettings.renderMode = static_cast<Kiki::RenderMode>(currentMode);
@@ -293,20 +293,6 @@ namespace Kiki {
                 ImGui::SameLine(110.f);
                 ImGui::InputFloat("##editfxaastrength", &renderManager.renderSettings.fxaaStrength, 0.5f, 1.f, "%.2f");
 
-                ImGui::SeparatorText("SSAA");
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Enabled:");
-                ImGui::SameLine(110.f);
-                ImGui::Checkbox("##ssaaenabled", &renderManager.renderSettings.ssaaEnabled);
-
-                ImGui::AlignTextToFramePadding();
-                ImGui::Text("Scale:");
-                ImGui::SameLine(110.f);
-                int ssaaScale = static_cast<int>(renderManager.renderSettings.ssaa_scale);
-                if (ImGui::SliderInt("##editssayscale", &ssaaScale, 1, 4)) {
-                    renderManager.renderSettings.ssaa_scale = static_cast<std::uint32_t>(ssaaScale);
-                }
 
                 ImGui::SeparatorText("TAA");
 

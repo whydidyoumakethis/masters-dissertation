@@ -43,6 +43,14 @@ class Timer {
 		_paused = false;
 	}
 
+	Mode GetMode() const {
+		return _mode;
+	}
+
+	float GetFixedDelta() const {
+		return _fixedDelta;
+	}
+
 	float Step() {
 		if (_mode != Mode::Fixed) {
 			return 0.0f;
@@ -65,18 +73,14 @@ class Timer {
 	void Reset() {
 		_fixedElapsed = 0.0f;
 
-		_startTime = _paused
-			? _pauseTime
-			: std::chrono::steady_clock::now();
+		_startTime = _paused ? _pauseTime : std::chrono::steady_clock::now();
 	}
 	// Returns the elapsed time in seconds since the last reset
 	float Elapsed() const {
 		if (_mode == Mode::Fixed) {
 			return _fixedElapsed;
 		}
-		const auto now = _paused
-			? _pauseTime
-			: std::chrono::steady_clock::now();
+		const auto now = _paused ? _pauseTime : std::chrono::steady_clock::now();
 		return std::chrono::duration_cast<std::chrono::duration<float>>(now - _startTime).count();
 	}
 	float Tick() {

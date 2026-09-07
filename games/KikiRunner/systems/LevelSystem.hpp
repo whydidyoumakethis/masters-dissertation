@@ -24,7 +24,7 @@ class LevelSystem : public System {
 	}
 
 	void OnTriggerEnter(const RequestLevelChangeEvent& e) {
-		std::thread([this, e]() {
+
 			sceneManager.clearLevel();
 			for (auto path : e.levelPaths) {
 				sceneManager.loadScene(Kiki::GltfLoaderAssimp::loadScene(path));
@@ -39,7 +39,7 @@ class LevelSystem : public System {
 			}
 
 			loaded = true;
-		}).detach();
+		
 	}
 
 	private:

@@ -6,17 +6,17 @@
 
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
+#include <cstddef>
 
 namespace rutils {
     struct ObjectData {
-        glm::mat4 model;
-        glm::vec4 baseColour;
-        // std::uint32_t sprite = 0;
-        // std::uint32_t useTexture = 1;
+        glm::mat4x3 model;
+        glm::mat4x3 previousModel;
+		glm::vec4 baseColour;
         glm::vec4 flags;
-        std::uint32_t pcfSamples;
     };
 
+	static_assert(sizeof(ObjectData) == 128, "ObjectData must fit Vulkan's guaranteed push-constant size");
     struct ShadowData {
         glm::mat4 model;
         glm::ivec4 indices;
@@ -54,9 +54,6 @@ namespace rutils {
 
     };
 
-    struct SSAASettings {
-        std::uint32_t scale;
-    };
 
     struct FXAASettings {
         float strength;
@@ -67,9 +64,6 @@ namespace rutils {
         float bloomStrength;
     };
 
-    struct DifferenceSettings {
-        float amplification;
-    };
 
     struct ChromaticAberrationSettings {
         int isEnabled;
@@ -119,8 +113,6 @@ namespace rutils {
         rutils::Pipeline customPostprocess;
         rutils::Pipeline chromaticAberration;
         rutils::Pipeline taa;
-        rutils::Pipeline ssaa;
-        rutils::Pipeline aaDifference;
     };
 
     struct PipelineLayouts {
@@ -141,7 +133,6 @@ namespace rutils {
         PipelineLayout customPostprocessPipelineLayout;
         PipelineLayout chromaticAberrationPipelineLayout;
         PipelineLayout taaPipelineLayout;
-        PipelineLayout ssaaPipelineLayout;
     };
 
     Pipelines createAllPipelines(
@@ -161,7 +152,6 @@ namespace rutils {
     PipelineLayout createCustomPostprocessPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout customPostprocessLayout);
     PipelineLayout createChromaticAberrationPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout chromaticAberrationLayout);
     PipelineLayout createTAAPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout taaLayout);
-    PipelineLayout createSSAAPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaaLayout);
     void createInterfacePipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout interfaceLayout, VkDescriptorSetLayout textLayout, VkDescriptorSetLayout textureLayout, PipelineLayouts* layouts);
     Pipeline createPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
     Pipeline createAlphaPipeline(VulkanWindow const& window, VkPipelineLayout pipelineLayout);
@@ -184,8 +174,6 @@ namespace rutils {
     Pipeline createCustomPostprocessPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createChromaticAberrationPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createTAAPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
-    Pipeline createSSAAPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
-    Pipeline createAADifferencePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout);
     Pipeline createInterfacePipeline(VulkanWindow const& window, VkPipelineLayout layout, std::filesystem::path fShaderPath);
 }
 

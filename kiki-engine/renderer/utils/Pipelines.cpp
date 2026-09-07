@@ -52,8 +52,6 @@ namespace rutils {
         pipelines.customPostprocess = createCustomPostprocessPipeline(window, pipelineLayouts.customPostprocessPipelineLayout.handle);
         pipelines.chromaticAberration = createChromaticAberrationPipeline(window, pipelineLayouts.chromaticAberrationPipelineLayout.handle);
         pipelines.taa = createTAAPipeline(window, pipelineLayouts.taaPipelineLayout.handle);
-        pipelines.ssaa = createSSAAPipeline(window, pipelineLayouts.ssaaPipelineLayout.handle);
-        pipelines.aaDifference = createAADifferencePipeline(window, pipelineLayouts.compositePipelineLayout.handle);
 
         pipelines.interfaceShape = createInterfacePipeline(window, pipelineLayouts.interfaceShapeLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_shape_f);
         pipelines.interfaceText = createInterfacePipeline(window, pipelineLayouts.interfaceTextLayout.handle, Kiki::RenderManager::get().shaderPaths.interface_text_f);
@@ -246,27 +244,7 @@ namespace rutils {
         return rutils::PipelineLayout(window.device, layout);
     }
 
-    PipelineLayout createSSAAPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout ssaaLayout) {
-        VkPushConstantRange pushRange{};
-        pushRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-        pushRange.offset = 0;
-        pushRange.size = sizeof(SSAASettings);
 
-        VkPipelineLayoutCreateInfo layoutInfo{};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-        layoutInfo.setLayoutCount = 1;
-        layoutInfo.pSetLayouts = &ssaaLayout;
-        layoutInfo.pushConstantRangeCount = 1;
-        layoutInfo.pPushConstantRanges = &pushRange;
-
-        VkPipelineLayout layout = VK_NULL_HANDLE;
-        if (auto const res = vkCreatePipelineLayout(window.device, &layoutInfo, nullptr, &layout); VK_SUCCESS != res) {
-            throw Kiki::FatalError("Unable to create SSAA pipeline layout\n"
-                "vkCreatePipelineLayout() returned {}", toString(res));
-        }
-
-        return rutils::PipelineLayout(window.device, layout);
-    }
 
     PipelineLayout createSSAOPipelineLayout(VulkanWindow const& window, VkDescriptorSetLayout sceneLayout, VkDescriptorSetLayout ssaoLayout) {
         VkDescriptorSetLayout layouts[] = {
@@ -928,7 +906,7 @@ namespace rutils {
         samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
 
         // define blend state
-        VkPipelineColorBlendAttachmentState blendStates[4]{};
+		VkPipelineColorBlendAttachmentState blendStates[5]{};
         blendStates[0].blendEnable = VK_FALSE;
         blendStates[0].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
@@ -941,10 +919,13 @@ namespace rutils {
         blendStates[3].blendEnable = VK_FALSE;
         blendStates[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+		blendStates[4].blendEnable = VK_FALSE;
+		blendStates[4].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+
         VkPipelineColorBlendStateCreateInfo blendInfo{};
         blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         blendInfo.logicOpEnable = VK_FALSE;
-        blendInfo.attachmentCount = 4;
+		blendInfo.attachmentCount = 5;
         blendInfo.pAttachments = blendStates;
 
         VkPipelineDepthStencilStateCreateInfo depthInfo{};
@@ -960,8 +941,8 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT};
-        renderingInfo.colorAttachmentCount = 4;
+		VkFormat const colorFormats[5] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16_SFLOAT};
+		renderingInfo.colorAttachmentCount = 5;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
@@ -1060,7 +1041,7 @@ namespace rutils {
 
         // define blend state
         // we define one blend state per colour attachment
-        VkPipelineColorBlendAttachmentState blendStates[4]{};
+		VkPipelineColorBlendAttachmentState blendStates[5]{};
         blendStates[0].blendEnable = VK_FALSE;
         blendStates[0].colorBlendOp = VK_BLEND_OP_ADD;
         blendStates[0].srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA;
@@ -1085,10 +1066,13 @@ namespace rutils {
         blendStates[3].dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA;
         blendStates[3].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
 
+		blendStates[4].blendEnable = VK_FALSE;
+		blendStates[4].colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT;
+
         VkPipelineColorBlendStateCreateInfo blendInfo{};
         blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
         blendInfo.logicOpEnable = VK_FALSE;
-        blendInfo.attachmentCount = 4;
+		blendInfo.attachmentCount = 5;
         blendInfo.pAttachments = blendStates;
 
         VkPipelineDepthStencilStateCreateInfo depthInfo{};
@@ -1104,8 +1088,8 @@ namespace rutils {
         VkPipelineRenderingCreateInfo renderingInfo{};
         renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
         
-        VkFormat const colorFormats[4] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT};
-        renderingInfo.colorAttachmentCount = 4;
+		VkFormat const colorFormats[5] = {VK_FORMAT_R8G8B8A8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R8G8_UNORM, VK_FORMAT_R16G16B16A16_SFLOAT, VK_FORMAT_R16G16_SFLOAT};
+		renderingInfo.colorAttachmentCount = 5;
         renderingInfo.pColorAttachmentFormats = colorFormats;
         renderingInfo.depthAttachmentFormat = VK_FORMAT_D32_SFLOAT;
 
@@ -1775,16 +1759,6 @@ namespace rutils {
             aWindow.hdrFormat
         );
     }
-
-    Pipeline createAADifferencePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
-        return createFullscreenPipeline(
-            aWindow,
-            aPipelineLayout,
-            Kiki::RenderManager::get().shaderPaths.aa_difference_f,
-            aWindow.swapchainFormat
-        );
-    }
-
 
     Pipeline createChromaticAberrationPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         // load shader code
@@ -3042,105 +3016,6 @@ namespace rutils {
         return Pipeline(aWindow.device, pipe);
     }
 
-    Pipeline createSSAAPipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
-        auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.deferred_lighting_v.string().c_str());
-        auto const fShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.ssaa_f.string().c_str());
-
-        VkShaderModuleCreateInfo code[2]{};
-        code[0].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[0].codeSize = vShader.size() * sizeof(std::uint32_t);
-        code[0].pCode = vShader.data();
-        code[1].sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
-        code[1].codeSize = fShader.size() * sizeof(std::uint32_t);
-        code[1].pCode = fShader.data();
-
-        VkShaderModule vertModule = VK_NULL_HANDLE;
-        VkShaderModule fragModule = VK_NULL_HANDLE;
-        if (vkCreateShaderModule(aWindow.device, &code[0], nullptr, &vertModule) != VK_SUCCESS ||
-            vkCreateShaderModule(aWindow.device, &code[1], nullptr, &fragModule) != VK_SUCCESS) {
-            if (vertModule != VK_NULL_HANDLE) vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
-            if (fragModule != VK_NULL_HANDLE) vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
-            throw Kiki::FatalError("Unable to create SSAA shader modules");
-        }
-
-        VkPipelineShaderStageCreateInfo stages[2]{};
-        stages[0].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stages[0].stage = VK_SHADER_STAGE_VERTEX_BIT;
-        stages[0].module = vertModule;
-        stages[0].pName = "main";
-        stages[1].sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
-        stages[1].stage = VK_SHADER_STAGE_FRAGMENT_BIT;
-        stages[1].module = fragModule;
-        stages[1].pName = "main";
-
-        VkPipelineVertexInputStateCreateInfo inputInfo{};
-        inputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-
-        VkPipelineInputAssemblyStateCreateInfo assemblyInfo{};
-        assemblyInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
-        assemblyInfo.topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST;
-
-        VkViewport viewport{};
-        VkRect2D scissor{};
-        VkPipelineViewportStateCreateInfo viewportInfo{};
-        setup_viewport(aWindow, &viewport, &scissor, &viewportInfo);
-
-        VkPipelineRasterizationStateCreateInfo rasterInfo{};
-        rasterInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-        rasterInfo.polygonMode = VK_POLYGON_MODE_FILL;
-        rasterInfo.cullMode = VK_CULL_MODE_NONE;
-        rasterInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;
-        rasterInfo.lineWidth = 1.0f;
-
-        VkPipelineMultisampleStateCreateInfo samplingInfo{};
-        samplingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-        samplingInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
-
-        VkPipelineColorBlendAttachmentState blendState{};
-        blendState.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
-            VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
-
-        VkPipelineColorBlendStateCreateInfo blendInfo{};
-        blendInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
-        blendInfo.attachmentCount = 1;
-        blendInfo.pAttachments = &blendState;
-
-        VkPipelineDepthStencilStateCreateInfo depthInfo{};
-        depthInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO;
-        depthInfo.depthTestEnable = VK_FALSE;
-        depthInfo.depthWriteEnable = VK_FALSE;
-
-        VkPipelineRenderingCreateInfo renderingInfo{};
-        renderingInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
-        renderingInfo.colorAttachmentCount = 1;
-        renderingInfo.pColorAttachmentFormats = &aWindow.hdrFormat;
-
-        VkGraphicsPipelineCreateInfo pipeInfo{};
-        pipeInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-        pipeInfo.pNext = &renderingInfo;
-        pipeInfo.stageCount = 2;
-        pipeInfo.pStages = stages;
-        pipeInfo.pVertexInputState = &inputInfo;
-        pipeInfo.pInputAssemblyState = &assemblyInfo;
-        pipeInfo.pViewportState = &viewportInfo;
-        pipeInfo.pRasterizationState = &rasterInfo;
-        pipeInfo.pMultisampleState = &samplingInfo;
-        pipeInfo.pDepthStencilState = &depthInfo;
-        pipeInfo.pColorBlendState = &blendInfo;
-        pipeInfo.pDynamicState = dynamicViewportScissorState();
-        pipeInfo.layout = aPipelineLayout;
-
-        VkPipeline pipe = VK_NULL_HANDLE;
-        auto const result = vkCreateGraphicsPipelines(aWindow.device, VK_NULL_HANDLE, 1, &pipeInfo, nullptr, &pipe);
-        vkDestroyShaderModule(aWindow.device, vertModule, nullptr);
-        vkDestroyShaderModule(aWindow.device, fragModule, nullptr);
-        if (result != VK_SUCCESS) {
-            throw Kiki::FatalError("Unable to create SSAA pipeline\n"
-                "vkCreateGraphicsPipelines() returned {}", rutils::toString(result));
-        }
-
-        return Pipeline(aWindow.device, pipe);
-    }
 
     Pipeline createDebugLinePipeline(VulkanWindow const& aWindow, VkPipelineLayout aPipelineLayout) {
         auto const vShader = rutils::loadShader(Kiki::RenderManager::get().shaderPaths.debug_line_v.string().c_str());

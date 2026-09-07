@@ -1,6 +1,9 @@
 #pragma once
 
 #include <memory>
+#include <array>
+#include <algorithm>
+#include <cstring>
 #include <vector>
 #include <glm/glm.hpp>
 #include <volk.h>
@@ -47,6 +50,10 @@ namespace Kiki {
         float playbackSpeed = 1.0f;
 
         static constexpr uint32_t MAX_BONES = 100;
+		static constexpr uint32_t GPU_BONE_PALETTES = 2;
+
+		std::vector<glm::mat4> previousFinalMatrices;
+		bool previousPoseValid = false;
 
         AnimationComponent() = default;
 
@@ -100,16 +107,27 @@ namespace Kiki {
         void UpdateGpuBuffer(VmaAllocator allocator) {
             if (animator.finalMatrices.empty()) return;
 
-            size_t copySize = std::min(
-                animator.finalMatrices.size() * sizeof(glm::mat4),
-                (size_t)MAX_BONES * sizeof(glm::mat4)
-            );
+			std::array<glm::mat4, MAX_BONES * GPU_BONE_PALETTES> gpuMatrices;
+			gpuMatrices.fill(glm::mat4(1.0f));
+
+			auto copyPalette = [&gpuMatrices](const std::vector<glm::mat4>& palette, uint32_t paletteIndex) {
+				const size_t boneCount = std::min(palette.size(), static_cast<size_t>(MAX_BONES));
+				std::copy_n(palette.begin(), boneCount, gpuMatrices.begin() + paletteIndex * MAX_BONES);
+			};
+
+			copyPalette(animator.finalMatrices, 0);
+			copyPalette(previousPoseValid ? previousFinalMatrices : animator.finalMatrices, 1);
 
             void* data = nullptr;
             vmaMapMemory(allocator, boneMatrixBuffer.allocation, &data);
-            memcpy(data, animator.finalMatrices.data(), copySize);
+			std::memcpy(data, gpuMatrices.data(), sizeof(gpuMatrices));
             vmaUnmapMemory(allocator, boneMatrixBuffer.allocation);
         }
+
+		void CommitRenderedPose() {
+			previousFinalMatrices = animator.finalMatrices;
+			previousPoseValid = !previousFinalMatrices.empty();
+		}
     };
 
 }

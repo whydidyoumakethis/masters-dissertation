@@ -32,12 +32,6 @@ layout(set = 1, binding = 7) uniform samplerCube shadowCubemaps[MAX_LIGHTS];
 
 layout(location = 0) out vec4 oColor;
 
-layout(push_constant) uniform PushConstants {
-    mat4 model;
-    vec4 baseColour;
-    vec4 flags; // sprite, useTexture, roughnessFactor, metallicFactor
-    int pcfSamples;
-} lightingSettings;
 
 // linearise depth sampled from a shadow cubemap
 float linearise(float depth, float near, float far) {
@@ -111,7 +105,7 @@ void main()
     float shadowNear = uScene.numLights[1];
     float shadowFar = uScene.numLights[2];
 
-    int samples = min(PCF_SAMPLES, lightingSettings.pcfSamples);
+	int samples = min(PCF_SAMPLES, int(uScene.numLights.w));
 
     for (int i = 0; i < uScene.numLights[0]; i++) {
         vec3 lightColour = uScene.lightColour[i].xyz * uScene.lightColour[i].w;

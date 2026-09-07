@@ -75,7 +75,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createMaterialDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[3]{};
+		VkDescriptorSetLayoutBinding bindings[3]{};
 
         // base colour
         bindings[0].binding = 0; // must match the index of the corresponding binding = N declarations in the shaders
@@ -362,7 +362,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createTAADescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[3]{};
+		VkDescriptorSetLayoutBinding bindings[4]{};
 
         // current colour
         bindings[0].binding = 0;
@@ -381,6 +381,12 @@ namespace rutils {
         bindings[2].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[2].descriptorCount = 1;
         bindings[2].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		// motion vectors
+		bindings[3].binding = 3;
+		bindings[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[3].descriptorCount = 1;
+		bindings[3].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -424,7 +430,7 @@ namespace rutils {
     }
 
     DescriptorSetLayout createDebugDescriptorLayout(VulkanWindow const& window) {
-        VkDescriptorSetLayoutBinding bindings[8]{};
+        VkDescriptorSetLayoutBinding bindings[9]{};
 
         // lit scene
         bindings[0].binding = 0;
@@ -473,6 +479,13 @@ namespace rutils {
         bindings[7].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
         bindings[7].descriptorCount = 1;
         bindings[7].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		//motion vectors
+		bindings[8].binding = 8;
+		bindings[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		bindings[8].descriptorCount = 1;
+		bindings[8].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
 
         VkDescriptorSetLayoutCreateInfo layoutInfo{};
         layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -853,8 +866,8 @@ namespace rutils {
         vkUpdateDescriptorSets(window.device, 1, desc, 0, nullptr);
     }
 
-    void initialiseTAADescriptorSet(VulkanWindow const& window, Image& currentImage, Image& historyImage, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& taaDescriptors) {
-        VkWriteDescriptorSet desc[3]{};
+	void initialiseTAADescriptorSet(VulkanWindow const& window, Image& currentImage, Image& historyImage, Image& depthBuffer, Image& velocity, Sampler& sampler, VkDescriptorSet& taaDescriptors) {
+		VkWriteDescriptorSet desc[4]{};
 
         VkDescriptorImageInfo currentInfo{};
         currentInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -870,6 +883,11 @@ namespace rutils {
         depthInfo.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
         depthInfo.imageView = depthBuffer.view;
         depthInfo.sampler = sampler.handle;
+
+		VkDescriptorImageInfo velocityInfo{};
+		velocityInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		velocityInfo.imageView = velocity.view;
+		velocityInfo.sampler = sampler.handle;
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = taaDescriptors;
@@ -892,7 +910,14 @@ namespace rutils {
         desc[2].descriptorCount = 1;
         desc[2].pImageInfo = &depthInfo;
 
-        vkUpdateDescriptorSets(window.device, 3, desc, 0, nullptr);
+		desc[3].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		desc[3].dstSet = taaDescriptors;
+		desc[3].dstBinding = 3;
+		desc[3].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		desc[3].descriptorCount = 1;
+		desc[3].pImageInfo = &velocityInfo;
+
+		vkUpdateDescriptorSets(window.device, 4, desc, 0, nullptr);
     }
 
     void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors) {
@@ -1052,7 +1077,7 @@ namespace rutils {
     }
 
     void initialiseDebugDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, GBuffers& gbuffers, Image& depthBuffer, Image& ssao, Image& bloom, Sampler& sampler, VkDescriptorSet& debugDescriptors) {
-        VkWriteDescriptorSet desc[8]{};
+        VkWriteDescriptorSet desc[9]{};
 
         VkDescriptorImageInfo sceneColourInfo{};
         sceneColourInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1094,6 +1119,10 @@ namespace rutils {
         bloomInfo.imageView = bloom.view;
         bloomInfo.sampler = sampler.handle;
 
+		VkDescriptorImageInfo motionVectorsInfo{};
+		motionVectorsInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		motionVectorsInfo.imageView = gbuffers.velocity.view;
+		motionVectorsInfo.sampler = sampler.handle;
 
         desc[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         desc[0].dstSet = debugDescriptors;
@@ -1151,6 +1180,13 @@ namespace rutils {
         desc[7].descriptorCount = 1;
         desc[7].pImageInfo = &bloomInfo;
 
-        vkUpdateDescriptorSets(window.device, 8, desc, 0, nullptr);
+		desc[8].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		desc[8].dstSet = debugDescriptors;
+		desc[8].dstBinding = 8;
+		desc[8].descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		desc[8].descriptorCount = 1;
+		desc[8].pImageInfo = &motionVectorsInfo;
+
+        vkUpdateDescriptorSets(window.device, 9, desc, 0, nullptr);
     }
 }

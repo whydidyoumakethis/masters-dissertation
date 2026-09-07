@@ -41,7 +41,7 @@ namespace rutils {
     void initialiseCompositeDescriptorSet(VulkanWindow const& window, Image& doneSSRImage, Image& bloomResult, Sampler& sampler, VkDescriptorSet& compositeDescriptors);
     void initialiseDebugDescriptorSet(VulkanWindow const& window, Image& doneCompositeImage, GBuffers& gbuffers, Image& depthBuffer, Image& ssao, Image& bloom, Sampler& sampler, VkDescriptorSet& debugDescriptors);
     void initialiseCustomPostprocessDescriptorSet(VulkanWindow const& window, Image& inputImage, Sampler& sampler, VkDescriptorSet& customPostprocessDescriptors);
-    void initialiseTAADescriptorSet(VulkanWindow const& window, Image& currentImage, Image& historyImage, Image& depthBuffer, Sampler& sampler, VkDescriptorSet& taaDescriptors);
+	void initialiseTAADescriptorSet(VulkanWindow const& window, Image& currentImage, Image& historyImage, Image& depthBuffer, Image& velocity, Sampler& sampler, VkDescriptorSet& taaDescriptors);
 
     DescriptorSetLayout createInterfaceDescriptorLayout(VulkanWindow const& window);
     DescriptorSetLayout createInterfaceTextDescriptorLayout(VulkanWindow const& window);
