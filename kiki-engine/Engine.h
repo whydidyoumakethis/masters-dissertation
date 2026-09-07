@@ -80,7 +80,7 @@ namespace Kiki {
 				timer.UseFixedTime(1.0f / 60.0f);
 				captureOverridesTimer = true;
 
-				if (RenderManager::get().togglePngFrameCapture(100, 50)) {
+				if (RenderManager::get().togglePngFrameCapture(100, 50)) { // 100 warm up frames and 50 actual frames captures
 					spdlog::info(
 						"[PNG Capture] Deterministic frame 0; frame 100 will be the first saved image"
 					);
