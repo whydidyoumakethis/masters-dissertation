@@ -113,7 +113,7 @@ namespace Kiki {
 			auto copyPalette = [&gpuMatrices](const std::vector<glm::mat4>& palette, uint32_t paletteIndex) {
 				const size_t boneCount = std::min(palette.size(), static_cast<size_t>(MAX_BONES));
 				std::copy_n(palette.begin(), boneCount, gpuMatrices.begin() + paletteIndex * MAX_BONES);
-			};
+				};// Copy the current and previous bone matrices into the GPU buffer
 
 			copyPalette(animator.finalMatrices, 0);
 			copyPalette(previousPoseValid ? previousFinalMatrices : animator.finalMatrices, 1);

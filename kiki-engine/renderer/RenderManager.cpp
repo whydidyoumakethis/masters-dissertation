@@ -614,9 +614,7 @@ namespace Kiki {
 	void RenderManager::savePostTonemapPng(const std::filesystem::path& outputPath) {
 		const std::uint32_t width = window.swapchainExtent.width;
 		const std::uint32_t height = window.swapchainExtent.height;
-		const VkDeviceSize byteCount =
-			static_cast<VkDeviceSize>(width) *
-			static_cast<VkDeviceSize>(height) * 4;
+		const VkDeviceSize byteCount = static_cast<VkDeviceSize>(width) * static_cast<VkDeviceSize>(height) * 4;
 
 		if (auto const res = vkDeviceWaitIdle(window.device); res != VK_SUCCESS) {
 			throw Kiki::FatalError(
@@ -625,15 +623,15 @@ namespace Kiki {
 				rutils::toString(res)
 			);
 		}
-
+		// Create a buffer to read back the image data
 		rutils::Buffer readbackBuffer = rutils::createBuffer(
 			allocator,
 			byteCount,
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-			VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,
+			VMA_ALLOCATION_CREATE_HOST_ACCESS_RANDOM_BIT,// host access for reading back the data
 			VMA_MEMORY_USAGE_AUTO_PREFER_HOST
 		);
-
+		// Create a command buffer to copy the image data to the buffer
 		VkCommandBuffer commandBuffer = rutils::allocCommandBuffer(window, commandPool.handle);
 		VkCommandBufferBeginInfo beginInfo{};
 		beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -646,7 +644,7 @@ namespace Kiki {
 				rutils::toString(res)
 			);
 		}
-
+		// Transition the image to transfer source layout
 		rutils::imageBarrier(
 			commandBuffer,
 			doneTonemapImage.image,
@@ -660,7 +658,7 @@ namespace Kiki {
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL
 		);
 
-		VkBufferImageCopy copyRegion{};
+		VkBufferImageCopy copyRegion{}; 
 		copyRegion.bufferOffset = 0;
 		copyRegion.bufferRowLength = 0;
 		copyRegion.bufferImageHeight = 0;
@@ -669,16 +667,16 @@ namespace Kiki {
 		copyRegion.imageSubresource.baseArrayLayer = 0;
 		copyRegion.imageSubresource.layerCount = 1;
 		copyRegion.imageExtent = VkExtent3D{width, height, 1};
-		vkCmdCopyImageToBuffer(
+		vkCmdCopyImageToBuffer( // copy the image to the buffer
 			commandBuffer,
 			doneTonemapImage.image,
 			VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
-			readbackBuffer.buffer,
+			readbackBuffer.buffer, 
 			1,
 			&copyRegion
 		);
 
-		rutils::imageBarrier(
+		rutils::imageBarrier( // transition the image back to shader read-only layout
 			commandBuffer,
 			doneTonemapImage.image,
 			VK_PIPELINE_STAGE_2_COPY_BIT,
@@ -706,8 +704,8 @@ namespace Kiki {
 		submitInfo.commandBufferInfoCount = 1;
 		submitInfo.pCommandBufferInfos = &commandInfo;
 
-		{
-			std::lock_guard<std::mutex> lock(queueMutex);
+		{// Submit the command buffer and wait for it to finish
+			std::lock_guard<std::mutex> lock(queueMutex); 
 			if (auto const res = vkQueueSubmit2(window.graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE); res != VK_SUCCESS) {
 				vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
 				throw Kiki::FatalError(
@@ -727,7 +725,7 @@ namespace Kiki {
 		}
 		vkFreeCommandBuffers(window.device, commandPool.handle, 1, &commandBuffer);
 
-		void* mappedData = nullptr;
+		void* mappedData = nullptr; // Map the buffer memory to read the data
 		if (auto const res = vmaMapMemory(allocator.allocator, readbackBuffer.allocation, &mappedData); res != VK_SUCCESS) {
 			throw Kiki::FatalError(
 				"Unable to map PNG readback memory\n"
@@ -756,7 +754,7 @@ namespace Kiki {
 				std::swap(pixels[pixel], pixels[pixel + 2]);
 			}
 		}
-
+		// Write the pixel data to a PNG file using stb_image_write
 		const std::string outputString = outputPath.string();
 		if (stbi_write_png(
 			outputString.c_str(),
